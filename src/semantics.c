@@ -468,9 +468,7 @@ SimpleType TypeOfToken(const QString *t)
 
 bool SemanticallyPredictable(const struct TokenSequence *ts)
 {
-	short f;
-	unsigned short tn, an = 0;
-	int nesting = 0;
+	unsigned short tn;
 	bool predictable = TRUE;
 	SimpleType tPrev = T_EMPTY;
 

@@ -80,7 +80,6 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 {
 	const QString *ct;
 	char firstCh;
-	bool outermost = tokIndex == 0;
 
 	assert(toks != NULL && intern != NULL && exprStack != NULL);
 
