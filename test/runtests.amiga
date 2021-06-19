@@ -1,0 +1,61 @@
+
+; Module path is set locally - comment out to use the environment variable -
+copy /module/#?.bas t: quiet
+set savedmodpath `get BAS_MODULE_PATH`
+set BAS_MODULE_PATH t:
+
+set logfile log.amiga.txt
+if exists $logfile
+	delete $logfile quiet
+endif
+set ehlogfile log_eh.amiga.txt
+if exists $ehlogfile
+	delete $ehlogfile quiet
+endif
+
+;resident /src/nba force
+
+failat 21
+
+echo ++++++ Platform is AMIGA > $logfile
+echo "Starting at: " `date`
+
+; Run the interpreter's self-testing -
+
+echo ++++++ invoke startup self-testing only (empty program) >> $logfile
+/src/nba --noprelude --self-test --exec "" >> $logfile
+
+; Simple expressions -
+
+echo ++++++ simple_exprs.amiga (one-liners) >> $logfile
+execute simple_exprs.amiga
+
+; More involved tests - 'c_' (for 'correctness') prefix -
+
+list c_#?.bas lformat "echo +++++ %s >> $logfile*N/src/nba --buf 30k %n >> $logfile" > t:runthem
+execute t:runthem
+delete t:runthem quiet
+
+; Error handling tests - 'e_' prefix -
+
+list e_#?.bas lformat "echo +++++ %s >> $ehlogfile*N/src/nba %n >> $ehlogfile" > t:runthem
+execute t:runthem
+delete t:runthem quiet
+
+echo "Finished at: " `date`
+
+search $logfile ": FAIL|nba: error|Assertion failed|\[Heap\] error|\[Stack\] error" quick quiet pattern
+if warn
+	echo "Test batch passed"
+else
+	echo "Test batch failed"
+endif
+
+;resident nba remove
+
+set BAS_MODULE_PATH `get savedmodpath`
+unset savedmodpath
+unset logfile
+unset ehlogfile
+
+failat 10

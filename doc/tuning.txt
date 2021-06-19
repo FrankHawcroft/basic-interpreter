@@ -1,0 +1,47 @@
+Performance tuning BASIC programs
+=================================
+
+If you want the best possible performance from your BASIC program, you are better off trying a BASIC compiler or an interpreter which is built with performance in mind.
+
+Here are some tips if you want to make your program run faster with this interpreter.
+
+
+Minimising memory use or startup time
+-------------------------------------
+
+If you have a very small program which executes quickly, and you just want to minimise the startup time of the interpreter or use as little memory as possible, there are several options you could consider:
+
+	--low-memory	means that built in commands and functions are only defined when needed, rather than all being defined at start up.
+		With this option, you can typically run the interpreter with several less KB of memory preallocated (see --heap). This option also means the interpreter doesn't cache statements, which isn't necessary if your program has only short loops and no recursion, and again, will save some memory - but will result in slower execution for long-running programs.
+	
+	--heap <size>	you can use a small, fixed-size heap to save memory. This may also reduce time taken to allocate memory from the system at start up. The FRE function, and XFREE statement in a debug build of the interpreter, are helpful to find out the memory use of your program.
+	
+	--noprelude		if you don't use any functions or SUBs defined in prelude.bas, avoiding loading the prelude saves start up time and also a small amount of buffer memory.
+	
+	--buffer		a smaller program buffer size saves memory and may also help reduce start up memory allocation overhead.
+	
+	--script-mode	avoids an initial syntax check of the whole program.
+
+
+Improving execution speed for long-running programs
+---------------------------------------------------
+
+Chances are though that your program is long-running, and spends most of its time doing computations. Here are some ideas to make it quicker:
+
+1. Use the --profile option to see where your program spends most of its time. Consider improving algorithms, and tuning your BASIC code in these places. Using a good algorithm will make more difference than any of these performance tuning suggestions.
+
+2. Ensure you are running an optimised, non-DEBUG build of the intepreter. You can see whether the interpreter is a DEBUG or NDEBUG build by running it with no command line arguments.
+
+3. Use the --optimise option. This is especially effective if your program spends a lot of time in loops and mostly does numeric computations. It will make much less difference if your program does a lot of recursive subprogram or function calls, file I/O, or string processing.
+
+4. Do not use --low-memory though - this makes the precompiled statement cache much smaller.
+
+5. Check your program for specific slow features:
+
+- Avoid traditional single-line IF statements, especially if they have a long condition or THEN statement part. The interpreter treats these statements as a 'macro' which is effectively recompiled each time the IF executes. Small IF statements with very simple conditions are not notably slow, but complex ones should be replaced with a block IF statement. The 'IF expr GOTO label' form does not have this problem.
+- Do not build loops using GOTO statements. Use the block loop constructs (FOR, WHILE, REPEAT).
+- Avoid labels and line numbers inside SUBs. Labelled statements in SUBs won't be cached in a precompiled form, because the interpreter deals with labels and line numbers at compile-time rather than execution-time. Also, the first time a forward-referenced label is used in each execution of a subprogram, the interpreter searches the text of the subprogram for the label. Only use labels inside SUBs when necessary for rarely-executed pieces of code, like event or error handling.
+- If x and t are existing variables and you want to assign t to x, but don't care what the value of t is afterwards, 'SWAP x, t' is faster than 'x = t'.
+- STATIC subprograms have much less call and exit overhead than non-STATIC ones, because the local variables are only created once for a STATIC sub. STATIC subprograms can't be recursive, though. It is generally safe to make 'leaf' subprograms STATIC - a 'leaf' subprogram is one which doesn't call any other subprograms. This is only worth doing for very frequently called subs, but can be a considerable improvement in a long-running program. Bear in mind the other downside of STATIC subprograms apart from recursion not working - their variables will use up memory even when the subprogram isn't executing.
+- Avoid calling DEFined functions frequently in loops, especially recursive functions. Try to precompute values which don't change, and keep them in variables or constants. Write recursive functions using tail call style with accumulating parameter(s): tail calls will be optimised by the interpreter, so local variables don't have to be created each call. See prelude.bas for examples of functions written in this 'iterative recursion' style.
+- Functions can be defined as STATIC like subprograms - there are some examples of this in prelude.bas - but do this with extreme caution. All STATIC function parameters are shared globally! It is only safe to use STATIC on 'leaf' functions, which do not call other functions defined in the program.

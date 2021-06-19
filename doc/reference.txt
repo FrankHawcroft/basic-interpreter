@@ -1,0 +1,347 @@
+
+Type specifiers for variables, parameters, and functions
+--------------------------------------------------------
+
+!	single precision floating point (32 bits)
+#	double precision floating point (64 bits)
+%	'short' signed integer (typically 16 bits)
+&	'long' signed integer (typically 32 bits)
+$	string
+@	character
+?	Boolean (true or false). Constants TRUE and FALSE are defined as 1 and 0 in prelude.bas.
+
+
+Operators in order of precedence, highest (evaluated first) to lowest
+---------------------------------------------------------------------
+
+( )									parenthesised expressions
+- (unary), + (unary), BITNOT		unary plus and minus and bitwise not - these are right-associative
+BITAND								bitwise AND a.k.a. bitwise conjunction a.k.a. 'half multiplication'
+BITXOR								bitwise XOR a.k.a. bitwise exclusive disjunction a.k.a. 'half addition'
+BITOR								bitwise OR a.k.a. bitwise disjunction
+^									exponentiation - this is right-associative
+*, /, MOD, \						multiplication, floating point division, integer modulus (remainder), integer whole division
++ (binary), - (binary), &, IN		addition or string concatenation, subtraction, string concatenation, character in string test
+>=, >, <=, <						comparison: greater than or equal to, greater than, less than or equal to, less than
+=, <>								comparison: equality, inequality
+NOT									logical negation
+AND, OR, XOR, IMP, EQV				logical conjunction, disjunction, exclusive disjunction, implication, equivalence
+
+
+Subprogram syntax
+-----------------
+
+	SUB name[(parameter-list)] [STATIC]
+		...
+	END SUB
+	
+Parameters are passed by reference unless enclosed by ( ) in the parameter list. Arrays can only be passed by reference.
+
+The STATIC option means only one instance of the subprogram's variables will be created, and reused each time it is called. Subprograms do not have to be STATIC. Recursive subprogram calls are allowed. Avoid making a STATIC subprogram involved in recursive calls - doing this will almost certainly cause strange hard-to-debug problems.
+
+
+Function syntax
+---------------
+
+	DEF name[(parameter-list)] [STATIC] [WHERE <condition>] AS <expression>
+	
+Functions may be defined piecewise, using the guard <condition> to determine when each piece will execute, and may be recursive. The interpreter will detect functions written in a tail-recursive style, and treat these as iterative, rather than creating a new set of local parameter variables for each recursive call. See prelude.bas for examples of functions written in this style.
+
+STATIC offers faster execution, but should be used with care. It is even more restrictive than STATIC used for subprograms - only one copy of the parameter variables will be created, globally.
+
+
+File modes for the OPEN statement
+---------------------------------
+
+"I"		open existing file for 'input' - reading from the file
+"O"		open existing or new file for 'output' - writing to the file, starting at the beginning. Any previous contents will be lost.
+"A"		open existing or new file for appending - writing at the end of the file
+"R"		open existing or new file for random access, with fixed size records. See: FIELD, GET, PUT, LOC
+	
+
+Events in order of priority, highest to lowest
+----------------------------------------------
+
+ERROR		recoverable errors
+BREAK		signal break (Ctrl-C etc.)
+MENU		from the GUI - only available on the Amiga
+INKEY		from the GUI - only available on the Amiga
+MOUSE		from the GUI - only available on the Amiga
+FILE		not yet implemented! For file events
+COLLISION	not yet implemented! For animated object collisions
+TIMER(<n>)	occurs every <n> seconds
+
+
+List of statements and functions
+--------------------------------
+
+ABS(a#)				absolute value
+AREA x%, y%			(gfx) adds a point (x, y) to the coordinates of an area (polygon)
+AREAFILL			(gfx) fills the currently defined AREA - the next AREA statement will start a new one
+AREA STEP dx%, dy%	(gfx) like AREA but position is relative to the current pen coordinates
+ARGC				count of command line arguments to the program
+ARGV$(n%)			command line argument n. ARGV(0) is the name of the program file run.
+ASC(c@)				the numeric code of the character c	in the system's character set. Inverse of CHR
+ATN(x#)				arc or inverse tangent; x is in radians
+BEEP				(gui) produces a brief alert in the UI, such as playing a sound or changing the screen colour
+BREAK				triggers a break, simulating the effect of Ctrl-C
+BREAK {ON|OFF|STOP}	controls break event handling, as: ENABLE BREAK, DISABLE BREAK, SUSPEND BREAK
+CALL sub[(arg1 ...)]
+					calls a subprogram. Generally the CALL keyword can be omitted and a simpler syntax used: sub [arg1 ...]
+CALLBYNAME$(f$[, arg1 ...])
+					calls a function f, named by a string expression rather than hard coded, as: {value-of-f}([arg1 ...])
+CASE value1[, ...]	as part of a SELECT block: the following statements run if the selected value matches any in the list
+CDBL(a)				the numeric value converted to double precision floating point (#)	
+CHDIR dir$			changes the current directory
+CHR(n%)				the character with the given code in the system's character set. Inverse of ASC
+CINT(a)				the numeric value converted to a short integer (%)
+CIRCLE x%, y%, r%	(gfx) draws an outlined circle in the output window, centred at (x, y) and with radius r
+CIRCLE STEP dx%, dy%, r%
+					(gfx) like CIRCLE but position is relative to the current pen coordinates
+CLEAR [d&], [s&]	clears the interpreter's memory, setting data (d) and stack (s) size
+CLNG(a)				the numeric value converted to a long integer (&)
+CLOSE [id%][, ...]	closes a file or files; with no arguments, all opened files are closed
+COLOR [fg%], [bg%]	(gfx) sets the foreground and/or background pen colour for the current output window
+COLOUR [fg%], [bg%]	(gfx) COLOR spelled properly ;-)
+CONST c = value		defines a named constant. As LET, but the 'variable' c can't be changed
+COS(x#)				cosine; x is in radians
+CSNG(a)				the numeric value converted to single precision floating point (!)
+CSTR$(a)			the numeric value formatted as a string
+CVB(a$)				the Boolean value of the binary string. Usually used when reading fields from "R" mode files. Inverse of MKB.
+CVD(a$)				the double value of the binary string. Usually used when reading fields from "R" mode files. Inverse of MKD.
+CVI(a$)				the short int value of the binary string. Usually used when reading fields from "R" mode files. Inverse of MKI.
+CVL(a$)				the long int value of the binary string. Usually used when reading fields from "R" mode files. Inverse of MKL.
+CVS(a$)				the single value of the binary string. Usually used when reading fields from "R" mode files. Inverse of MKS.
+DATA c1[, ...]		lists constant data which can be read into variables using the READ statement. See: READ, RESTORE
+DATE$				the current date, in mm-dd-yyyy format
+DEF	function-defn	defines a function. See the section above
+DEFBLN letter-list	sets the default type of all variables as Boolean, based on the starting letter of their names
+DEFCHR letter-list	sets the default type of all variables as character, based on the starting letter of their names
+DEFDBL letter-list	sets the default type of all variables as double precision, based on the starting letter of their names
+DEFINT letter-list	sets the default type of all variables as short integer, based on the starting letter of their names
+DEFLNG letter-list	sets the default type of all variables as long integer, based on the starting letter of their names
+DEFSNG letter-list	sets the default type of all variables as single precision, based on the starting letter of their names
+DEFSTR letter-list	sets the default type of all variables as string, based on the starting letter of their names
+DIM A$[([x], ...])	dimensions an array
+DIM SHARED A$[([x], ...])
+					dimensions a global array which will be accessible in all subprograms
+DISABLE event		stops all trapping and tracking for the given kind of event
+ELSE				as the last part of an IF block: the following statements will run if no preceding conditions were true
+ELSEIF cond THEN	as part of an IF block: the following statements will run if the condition is true, and no prior condition was 
+ENABLE event		enable trapping and tracking for the given event
+END					ends the program. The interpreter will exit or go in to immediate mode
+END IF				ends an IF block
+END SELECT			ends a SELECT block
+END SUB				ends a subprogram block
+EOF(id%)			true if the file's read/write position is at the end of the file. False if not, or it can't be determined.
+ERASE A$()[, ...]	deletes memory used by arrays, and allows them to be dimensioned again. See: DIM
+ERL					in an error handler: the last line number at or before where the error occurred
+ERLAB$				in an error handler: the last alphanumeric label name at or before where the error occurred
+ERR					in an error handler: the last error code
+ERROR [code%]		causes an error with the given code
+EXECUTED			true if the current statement is in a file which was directly run; false if in a MERGEd file
+EXIT SUB			exits a subprogram
+EXP(x#)				the base of natural logarithms raised to the power of x: e ^ x
+FIELD id%, var$[, ...]
+					defines data fields for an open "R" mode file
+FILES [dir$], [id%], [limit%]
+					lists files in the directory; optionally to an open "O" or "A" mode file (id); optionally up to a limit
+FINPUT id%, [var$, ...]
+					reads the next line from a file and attempts to assign values to the list of variables, as if in 'CSV' format
+FIX(a#)				the truncated long integer value
+FLINEINPUT id%, [var$]
+					reads the next line from a file and stores it in the variable
+FOR n = start TO stop [STEP increment]
+					begins a FOR loop, iterating the variable n between the values, adding the increment each time
+FOREVER				as the end of a REPEAT block, indicates that the loop will not terminate based on a condition
+FORGET				in an event handler: discards the trapped event
+FPRINT id%, [a]...	prints a list of expressions to the file as strings, formatted as PRINT does
+FRE(n%)				memory info; n = -1: free in system; -2: unused control flow stack space; -3: program buffer; else: free in BASIC
+FREAD$(id%, n)		read up to n bytes of data from the file as a string
+GET id%, [recn&]	get the given record, or the next record by default, from the "R" mode file. See also: SCREEN GET
+GOSUB label			jump to the label, remembering this location so that a RETURN statement will continue at the next statement
+GOTO label			jump to the label, with no memory of where the jump came from
+HEX$(n&)			the value formatted as a string in base 16 (hexadecimal)
+IF condition THEN	start a block IF statement: the following statements will run if the condition is true. See: ELSEIF, ELSE, END IF
+IF cond GOTO label	if the condition is true, jump to the label as GOTO
+IF cond THEN stmt1 [ELSE stmt2]
+					a 'one-line' IF statement: if the condition is true, do stmt1; otherwise, optionally, stmt2
+INKEY$				(gui) the last key pressed in the output window
+INKEY {ON|OFF|STOP}	controls key event handling, as: ENABLE INKEY, DISABLE INKEY, SUSPEND INKEY
+INPUT [pr$], v ...	input comma-separated values into a list of variables, optionally printing a prompt first
+INSTR([n%, ] s$, t$)
+					index of the first occurrence of string t in string s, optionally starting from position n; or 0 if not found
+INT(a)				the value truncated to an integer - i.e. the largest integer <= a
+KILL file$			delete the named file
+LBOUND(A(), n&)		the lowest allowed subscript for dimension n of array A; will be either 0 or 1 depending on OPTION BASE
+LCASE$(s$)			the string as lower case. See: UCASE
+LEFT$(s$, n%)		the leftmost n characters of the string s
+LEN(s$)				the length of the string
+[LET] x = expr		assigns a value to a variable or subscripted array element. The default statement: usually 'LET' is omitted
+LET MID s$ = n%, m%, t$
+					set part of the string s from position n to m, to t
+LINE x1%, y1%, x2%, y2%
+					(gfx) draw a single pixel wide line between points (x1, y1) and (x2, y2) in the current output window
+LINE INPUT [pr$], s$
+					input an entire line of text into variable s, optionally printing a prompt first
+LOAD file$			load a BASIC program from the named file. This replaces the current program.
+LOC(id%)			the current location in the file for reading or writing; for "R" mode files, the current record number
+LOF(id%)			the length of the file; for "R" mode files, in records; for others, in bytes or characters
+LOG(x#)				the natural (base e) logarithm of x
+LSET x = strexpr$	left-justify the strexpr in the string variable x; padded with spaces if x is longer, truncated if x shorter
+MENU [item$], [key@], [flags%]
+					(gui) set or change a menu bar/menu item/subitem
+MENU {ON|OFF|STOP}	(gui) controls menu event handling, as: ENABLE MENU, DISABLE MENU, SUSPEND MENU
+MENUSTATE(item$)	(gui) the state of the menu item
+MENUPICKED$			(gui) in a menu event handler - the last menu selection, "menu|item[|subitem]" format
+MERGE file$			'merge' another BASIC program from the file; in practice the file is appended to the buffer
+MID$(s$, i%[, n%])	substring of s, n characters long (or the rest of the string if n is longer or omitted), starting at character i
+MKB$(a?)			the Boolean value as a binary string. Usually used when writing fields to "R" mode files. Inverse of CVB.
+MKD$(a#)			the double prec value as a binary string. Usually used when writing fields to "R" mode files. Inverse of CVD.
+MKI$(a%)			the short integer value as a binary string. Usually used when writing fields to "R" mode files. Inverse of CVI.
+MKL$(a&)			the long integer value as a binary string. Usually used when writing fields to "R" mode files. Inverse of CVL.
+MKS$(a!)			the single prec value as a binary string. Usually used when writing fields to "R" mode files. Inverse of CVS.
+MOUSE(n)			(gui) information about the user interface pointer
+MOUSE {ON|OFF|STOP}	(gui) controls mouse event handling, as: ENABLE MOUSE, DISABLE MOUSE, SUSPEND MOUSE
+NAME oldf$ AS newf$	rename or move the file
+NEXT [n]			ends a FOR loop. The variable name is optional.
+OCT$(n&)			the value formatted as a string in base 8 (octal)
+ON event CALL esub	installs esub as an event handler
+ON event GOSUB label
+					installs the labelled position as an event handler
+ON x GOSUB label1, ...
+					computed GOSUB - based on the value of x (1 .. ), GOSUB to the corresponding label
+ON x GOTO label1, ...
+					computed GOTO - based on the value of x (1 .. ), GOTO the corresponding label
+OPEN mode@, id%, name$, [bufsize&]
+					open a file. Mode can be "I", "O", "A", or "R", as listed above
+OPEN name$ FOR mode AS id [LEN=bufsize]
+					open a file (traditional syntax)
+OPTION BASE n		set the first subscript index for arrays as either 0 or 1
+OTHERWISE			optional at the end of a SELECT block: the default case - if no case has already been done, do this one
+PAINT x%, y%		(gfx) 'flood fill' the graphics drawing area with the current pen colour
+PALETTE cid%, r!, g!, b!
+					(gfx) define or change a colour palette entry. r, g, b should be [0, 1]. See also: COLOUR
+PEEK(a&)			only allowed in --unsafe mode! The byte at address a
+PEEKL(a&)			only allowed in --unsafe mode! The long integer at address a
+PEEKW(a&)			only allowed in --unsafe mode! The short integer at address a
+POINT(x, y)			(gfx) the colour of the pixel at coordinate (x, y) in the drawing area
+POKE a&, b%			only allowed in --unsafe mode! Writes byte b to address a
+POKEL a&, l&		only allowed in --unsafe mode! Writes long integer l to address a
+POKEW a&, i%		only allowed in --unsafe mode! Writes short integer i to address a
+PRESET x%, y%		(gfx) resets a single pixel in the drawing area to the background colour. See also: PSET
+PRINT [expr, ...]	prints the values. See also: WPRINT
+PSET x%, y%, [c%]	(gfx) sets a single pixel in the drawing area to palette colour c, or the foreground colour by default
+PUT id%, [n&]		writes currently fielded variables to the "R" mode file at record n, or the current record by default
+RANDOM(max&)		a uniform pseudo-random long integer in the range 1 .. max. See also: RND, RANDOMIZE
+RANDOMIZE [seed&]	reseeds the pseudo-random number generator
+READ var1, [...]	reads constants from DATA statement(s) and stores them in the variables or array elements. See: DATA, RESTORE
+REM	comment-text	an explanatory remark or comment which is ignored by the interpreter. You can also use ' to introduce a comment
+REPEAT				begins a loop where the exit condition is at the end. See: UNTIL, FOREVER
+RESTORE label		starts reading data values from the given label or line number. See: DATA, READ
+RESUME label		finishes handling the active event; execution continues from the given label/line
+RETURN [label]		returns from a GOSUB, optionally at the given label rather than the next statement after the GOSUB
+RIGHT$(s$, n%)		the rightmost n characters of the string s
+RND					a uniform pseudo-random floating point number in the range [0, 1]. See also: RANDOM, RANDOMIZE
+RSET x$ = strexpr$	right-justify the strexpr in the string variable x; padded with spaces if x is longer, truncated if x shorter
+RUN					begin runnning the currently loaded program; current variables, subprograms, etc. are wiped first
+SADD(s$)			only allowed in --unsafe mode! The address of the contents of the string. See also: VARPTR
+SCREEN id%, title$, w%, h%, d%, mode&
+					(gfx, gui) open a new screen with the given id number, title, width, height, colour depth, and mode
+SCREEN CLOSE id%	(gfx, gui) close the screen
+SCREEN GET x1%, y1%, x2%, y2%, A()
+					(gfx) copy a block of pixel colours from the drawing area to the array
+SCREEN PUT x1%, y1%, x2%, y2%, A()
+					(gfx) copy a block of pixel colours from the array to the drawing area
+SELECT expr			begins a SELECT block statement using the expression value
+SGN(a)				the sign of a numeric value
+SHARED var-list		in a subprogram, allows variables from the main program to be used
+SIN(x#)				sine; x is in radians
+SLEEP				suspends execution until an event occurs
+SOUND freq!, dur!, [vol%], [voice%], [prio%]
+					plays a sound, either immediately or (after SOUND WAIT) only when SOUND RESUME happens
+SOUND RESUME		after SOUND WAIT, starts playing all paused sounds simultaneously
+SOUND WAIT			'pauses' playing of sounds until a SOUND RESUME statement, allowing multiple sounds to be played at the same time
+SPACE$(n%)			a string of space characters (" ") of length n
+SPC$(n%)			the same as SPACE
+SQR(x#)				square root
+STATUS(id%)			status of a file
+STOP				stop execution and go into immediate mode
+STR$(a)				the numeric value as a string; inverse of VAL
+STRING$(n%, c@)		a string of length n, of repeated character c
+SUB	sub-defn		introduces a subprogram. See the section above
+SUSPEND event		stops event trapping, but keeps tracking event occurrences
+SWAP a, b			exchanges the value of the variables or single array elements. They must have the same type
+SYSTEM [failure?]	exits the interpreter, optionally with a system return code indicating execution failed
+TAN(x#)				tangent; x is in radians
+TIME$				the time, in 24 hour format as hh:mm:ss
+TIMER				the system timer, typically a count of seconds since midnight
+TIMER {ON|OFF|STOP}	controls timer event handling, as: ENABLE TIMER, DISABLE TIMER, SUSPEND TIMER
+TROFF				turns off tracing
+TRON				turns on tracing; each statement will be printed before it's executed
+UBOUND(A(), n&)		the highest allowed subscript for dimension n of array A, as specified when A was DIMensioned
+UCASE$(s$)			the string as upper case. See: LCASE
+UNTIL condition?	ends a REPEAT loop. The loop will finish when the condition is true	(the opposite of WHILE)
+VAL(s$)				the numeric value of the string; if it can't be parsed as a number, an error occurs; inverse of STR
+VARPTR(a)			only allowed in --unsafe mode! The address of a variable or array element. See also: SADD
+WAIT secs!			pauses execution until the given length of time has elapsed. Events will not stop it early
+WAVE voice%, A%()	for sound, defines the wave form for the identified voice
+WAVE voice%, SIN	for sound, uses the sine wave for the voice. This is the default waveform
+WCLS				(gfx) clears the drawing area
+WCSRLIN				(gfx) the approximate line number of the pen in the drawing area, with the top of the drawable area as line 1
+WEND				ends a WHILE loop
+WHILE condition?	begins a WHILE loop. The condition is checked at the start of each loop iteration
+WINDOW id%, title$, x1%, y1%, x2%, y2%, screenid%, screentitle$, flags& 
+					(gui) opens a new window
+WINDOW CLOSE id%	(gui) closes a window
+WINDOWINFO(id%, b)	(gui) gets information about the window
+WINDOW OUTPUT id%	(gui) sets the current output window. Graphics will be drawn into this window
+WLOCATE line%, col%	(gfx) sets the pen position to the given line and column. See: WPRINT, WCSRLIN, WPOS
+WPOS				(gfx) the approximate column number of the pen, with the left of the drawable area as column 1
+WPRINT [expr, ...]	(gfx) prints the values in the current output window; as PRINT, but for graphic output rather than to the console
+WPTAB(x%)			(gfx) in a WPRINT statement, moves the horizontal print position to pixel x
+WRITE id%, val ...	writes values to a file in 'CSV' format, suitable for reading with FINPUT
+XCACHE				DEBUG builds only! Shows information about caches
+XDOC				DEBUG builds only! Shows a list of defined statements and functions
+XFREE				DEBUG builds only! Shows various information about memory
+XOBJ name			DEBUG builds only! Shows information about the named object (variable, subprogram, etc.)
+XSTACK [n%]			DEBUG builds only! Shows the top n entries on the control flow stack, or the whole stack by default
+
+
+Still to be done
+----------------
+
+Graphics and GUI:
+	Animation: OBJECT.xyz, COLLISION etc.
+	MENU RESET
+	PATTERN
+	Box and fill options for line, circle. LINE STEP and colour options.
+	Pattern mode for AREAFILL
+	Further args for CIRCLE: color, start, end
+	WPTAB
+	WWIDTH
+	SCROLL
+Debugging, immediate mode:
+	CONT
+	LIST
+	DELETE
+	NEW
+	RUN line, RUN filename[, R]
+	SAVE
+	R option for LOAD
+I/O:
+	PRINT USING
+	LLIST, LPOS, LPRINT etc.
+	TAB
+	WIDTH
+	FILES to test for existence of a file
+	INPUT question mark behaviour
+	INPUT and LINE INPUT function parameter order and default reading from console
+	LOC conventions are different for sequential access files
+SAY, TRANSLATE
+STICK, STRIG
+CALL of library function, DECLARE FUNCTION
+CHAIN, COMMON
+Details of what CLEAR does
+RESUME 0, RESUME NEXT
+RESTORE label is optional - start from beginning of program if omitted

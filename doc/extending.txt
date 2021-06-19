@@ -1,0 +1,135 @@
+Extending the BASIC interpreter
+===============================
+
+The easiest way is to write a SUB or function in BASIC and include it in prelude.bas, or another file you MERGE into your program or specify with the --prelude option.
+
+If you want a built-in statement or function, you need to add it to the interpreter's own source code, written in C.
+
+
+Adding a new statement
+----------------------
+
+1. Declare it in builtin.h -
+
+	extern void Rainbow_(BObject *, unsigned);
+
+2. Define the statement's parameters in statements.c -
+
+	static struct Parameter m_ArgsForRainbow[] = {
+		{ARRAY, TR_NUMERIC, NULL, NO_NAME, 1, FALSE}, /* First parameter - array of colours (pen numbers). */
+		{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 2, FALSE} /* Then two (short) int parameters - row numbers for rainbow effect on screen. */
+	};
+
+3. Write the statement's implementation in an appropriate source file following this pattern - look at other statements to see how parameters are accessed -
+
+	void Rainbow_(BObject *arg, unsigned count)
+	{
+		const struct Variable *colour = VarPtr(&arg[0]); /* Array of colours. */
+		short startRow = (short)GetLong(&arg[1].value.scalar), /* Row numbers. */
+			stopRow = (short)GetLong(&arg[2].value.scalar);
+		short row;
+		
+		/* Check parameters: */
+		
+		if(startRow < 0 || stopRow < 0 || startRow > stopRow) {
+			CauseError(OUTSIDEDOMAIN);
+			return;
+		}
+		
+		/* If parameters are OK, do what you want to do: */
+		
+		for(row = startRow; row <= stopRow; row++) {
+			... /* Do some graphics stuff.
+				See IndexArray in vars.c for how to access array elements. */
+		}
+	}
+
+4. Add the statement to the array of built in statements in statements.c -
+
+	static const struct BuiltInStatement m_StmtDefinitions[] = {
+		...
+		{"RAINBOW", Rainbow_, DefaultConvert, DefaultInactive, m_ArgsForRainbow, 1},
+		...
+	};
+
+5. If your statement has any special syntactic sugar, you will need to change sugar.c as well. The sequencing of dealing with special syntax can be tricky.
+
+
+Adding a new macro
+------------------
+
+Or if you need a macro - which gets the rest of its command as strings rather than evaluated expressions -
+
+1. Declare it in builtin.h -
+
+	extern void Data_(const QString *, unsigned);
+
+2. Write the macro following the pattern -
+
+	void Data_(const QString *toks, unsigned nToks)
+	{
+		/* Do something with the tokens.
+			These will be the literal tokens from the program text:
+			
+				DATA a, b, c
+				
+			would give nToks = 3; toks[0] would be 'a' (as a QString), and so on.
+		*/
+		...
+	}
+
+3. Add the macro to the array of built in statements in statements.c -
+
+	static const struct BuiltInStatement m_StmtDefinitions[] = {
+		...
+		{"DATA", Data_, EmptyConvert, DataInactive, NULL, TOKENISED_ARGUMENTS},
+		...
+	};
+	
+
+Special interning and inactive code handlers
+--------------------------------------------
+
+You will notice that in the example for the RAINBOW statement above these two functions appear -
+
+	... DefaultConvert, DefaultInactive ...
+	
+If you need your new statement to create a variable or some other kind of object, you will need to write a different 'convert' function. You can find examples of this for statements which create variables, like LET.
+
+The 'inactive' function is called when the interpreter skips over 'dead code' - untaken branches. This is mostly used to ensure nested control structures are tracked, for block-structured multi-part statements like SELECT, the block form of IF, and WHILE. The interpreter maintains a cache to skip over untaken branches, which you can also find used in the implementations of some control flow statements.
+
+Macros use 'EmptyConvert', though they can have an 'inactive' function, as DATA does in the example above.
+
+
+Adding a new function
+---------------------
+
+1. Declare it in builtin.h -
+
+	extern void Sin_(Scalar *, const BObject *, unsigned);
+	
+2. Define the function's parameters in functions.c -
+
+	static const enum TypeRule m_ArgForSin[1] = { TR_SINGLE_TO_DOUBLE };	/* Sin(x) */
+	
+This is simpler than defining a statement's parameters, since the assumption is that function parameters are simple values, rather than variable references or labels. The UBOUND, LBOUND, and VARPTR functions have special treatment because they take variables as parameters.
+
+3. Write the function following the pattern -
+
+	void Sin_(Scalar *result, const BObject *arg, unsigned count)
+	{
+		double x = GetDouble(&arg[0].value.scalar);
+		
+		/* Check parameters, and do some computation if they're OK. */
+		...
+	}
+
+This is similar to writing a new statement, except there's another parameter, the 'result'. This should be assigned the function result, OR an error code, if there's a problem with the parameters or any other error, rather than using CauseError.
+
+4. Add the function to the array of built in functions in functions.c -
+
+	static const struct BuiltInFunction m_FuncDefinitions[] = {
+		...
+		{"SIN", Sin_, TR_DOUBLE_ONLY, m_ArgForSin, 1},
+		...
+	};

@@ -1,0 +1,3 @@
+radiator,m,440,*
+brakes,f,700,*
+registration,f,287.87,*

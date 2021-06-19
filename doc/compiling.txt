@@ -1,0 +1,14 @@
+You will need a C compiler and runtime library. Depending on your host and target systems, you may also need to have various other system include files and libraries available.
+
+There are several makefiles in the 'src' directory:
+
+- Makefile - this uses gcc. It may also work with more fashionable compilers which can pretend they're called 'gcc', as well. I have used this to compile on MacOS X using Clang/LLVM.
+- Makefile-Amiga-GCC - for cross-compiling using amiga-gcc - I have run this under MinGW on Windows, running the resulting executable (nba) using WinUAE.
+- Makefile-Amiga-VBCC - for compiling natively on the Amiga using VBCC. You will need a 'make' utility on the Amiga as well. I have used the one from NorthC, available on Aminet.
+- Makefile-MSVC.mak - for compiling with Microsoft C, as included with Visual Studio or the standalone Visual C++ command line build tools.
+
+Statements and functions for graphics, windowing, and sound are only available on the Amiga.
+
+The makefiles are generated using metamake.bas. Look there to see the optimisation options I use. A DEBUG build is the default (see: common.h). This will run substantially slower than an optimised build, partly because of all the assert() macros.
+
+Microsoft Visual Studio project files are also included. These are from VS 2017 Community Edition.

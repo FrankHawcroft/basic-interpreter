@@ -1,0 +1,246 @@
+++++++ Platform is AMIGA
+++++++ invoke startup self-testing only (empty program)
+++++++ simple_exprs.amiga (one-liners)
+Some numeric literals
+ 1
+Relational operators
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+Arithmetic operators
+ 1
+-1
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+Bitwise operators
+ 1
+ 1
+ 1
+-1
+Other mathematical operators - TODO
+Parenthesised expressions
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+Built-in functions
+TRUE
+TRUE
+TRUE
+Finished!
++++++ c_lexer.bas
+Total tokens in program:	 3220
++++++ c_xhtml.bas
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Test HTML Document</title>
+<style type="text/css">
+</style>
+</head>
+<body>
+<h1>Test Document</h1>
+<p>And here's a paragraph &amp; a half!</p>
+</body>
+</html>
+
++++++ c_type_conv.bas
++++++ c_traditional.bas
+ 1
+ 2
+ 3
+ 2
+ 4
+ 6
+ 3
+ 6
+ 9
++++++ c_sub.bas
+Subprogram tests completed.
++++++ c_string.bas
+String tests completed.
++++++ c_simple.bas
+1A. int variable
+1B. long variable
+1C. float variable
+1D. double variable
+1E. string variable
+1F. char variable
+1G. Boolean variable
+2A. simple addition
+2B. unary negation
+2C. parentheses and type conv on assignment
+2D. type conv (int, float, double)
+2E. unary negation/unary plus/addition/subtraction overloading
+2F. polynomial (tests order of precedence of some common operators)
+3A. simple string concatenation
+3B. string to char cat
+3B(2). string cat with & operator - string and number
+3C. in - found
+3D. in - not found
+4A. Boolean AND
+4B. Boolean OR, NOT
+4C. Boolean with comparisons
+4D. Boolean with comparisons (2)
+4E. More obscure Boolean operators
+5A. Simple conditional assignment
+5B. Simple IF ... ELSE
+6A. Simple WHILE loop
+7A. Simple REPEAT ... UNTIL
+8A. Simple FOR loop (new variable!)
+8B. Simple FOR loop (step size -1)
+9A. Simple SELECT
+11A. Simple array creation and assignment to element
+11B. Use of array as FOR loop index
+12A. Simple intrinsic function - INSTR
+12B. Simple intrinsic function - INSTR (not found)
+13A. Subprogram with local hiding global variable
+13B. Sub with params
+13C. Recursive sub
+13D. Sub with reference param hiding global variable
+Simple tests finished!
++++++ c_prelude_test.bas
+TRUE and FALSE	: Passed!
+ABS	: Passed!
+EXP	: Passed!
+SGN	: Passed!
+FIX	: Passed!
+INT	: Passed!
+INSTR2	: Passed!
+MID2	: Passed!
+LEFT	: Passed!
+RIGHT	: Passed!
+STRING	: Passed!
+SPACE	: Passed!
+UCASE	: Passed!
+LCASE	: Passed!
+LSET	: Passed!
+RSET	: Passed!
+LETMID	: Passed!
+CHR and ASC	: Passed!
+HEX	: Passed!
+OCT	: Passed!
+CSTR	: Passed!
+CDBL	: Passed!
+CSNG	: Passed!
+CLNG	: Passed!
+CINT	: Passed!
++++++ c_num_literal.bas
+Numeric literal tests completed.
++++++ c_mm.bas
+Platform is Amiga
+ 66	 files processed OK!
++++++ c_lisp.bas
+( 1  2  3 ( 1 .  2) ( 3 .  4))
+X
+X
+ 31
+ 4
+( 1 .  2)
++++++ c_io_seq.bas
+Sequential I/O test completed.
++++++ c_io_rand.bas
+Person1	Address1	   0123 4567 890
+Person2	Address2	   0123 4567 890
+Person3	Address3	   0123 4567 890
+Person4	Address4	   0123 4567 890
+Person5	Address5	   0123 4567 890
+Random access I/O test completed.
++++++ c_goto.bas
+Forward GOTO arrived
+Forward GOSUB arrived
++++++ c_events.bas
+Timer handler called:	 0	at timer = 	 70160
+Timer handler called:	 1	at timer = 	 70160
+Break handler called:	 2
+Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
+Break event was correctly deferred
+Break handler called:	 4
+Successful RESUME
++++++ c_deftype.bas
+hi there!	also a string	 1	x
++++++ c_def.bas
+DEFined function tests completed OK
++++++ c_data.bas
+Finished DATA tests.
++++++ c_comments.bas
++++++ c_cheque_fn.bas
+No dollars and no cents
+Exactly one cent only
+Exactly one hundred dollars only
+Exactly ninety-nine dollars and ninety-nine cents only
+Exactly three hundred and twenty-seven dollars and sixty-seven cents only
+Exactly four dollars only
+Exactly fifteen thousand dollars only
+Exactly one thousand two hundred and thirty-four dollars and fifty-six cents only
++++++ c_callbyname.bas
+ 0.51387
++++++ c_call.bas
+Old-style CALL succeeded
++++++ c_arrays.bas
+Simple array 1	: Passed!
+Simple array 2	: Passed!
+Simple array 3	: Passed!
+Simple array 4	: Passed!
+Simple array 5	: Passed!
+Simple array 6	: Passed!
+Simple array 7	: Passed!
+Simple array 8	: Passed!
+Simple array 9	: Passed!
+Simple array 10	: Passed!
+String array 1	: Passed!
+String array 2	: Passed!
+String array 3	: Passed!
+String array 4	: Passed!
+String array 5	: Passed!
+String array 6	: Passed!
+String array 7	: Passed!
+String array 8	: Passed!
+String array 9	: Passed!
+String array 10	: Passed!
+2D array 1:1	: Passed!
+2D array 1:2	: Passed!
+2D array 1:3	: Passed!
+2D array 1:4	: Passed!
+2D array 1:5	: Passed!
+2D array 2:1	: Passed!
+2D array 2:2	: Passed!
+2D array 2:3	: Passed!
+2D array 2:4	: Passed!
+2D array 2:5	: Passed!
+2D array 3:1	: Passed!
+2D array 3:2	: Passed!
+2D array 3:3	: Passed!
+2D array 3:4	: Passed!
+2D array 3:5	: Passed!
+2D array 4:1	: Passed!
+2D array 4:2	: Passed!
+2D array 4:3	: Passed!
+2D array 4:4	: Passed!
+2D array 4:5	: Passed!
+Array parameter 1	: Passed!
+Array parameter 2	: Passed!
+Array parameter 3	: Passed!
+Array parameter - post 1	: Passed!
+Array parameter - post 2	: Passed!
+Array parameter - post 3	: Passed!
+2D array parameter - post 1:1	: Passed!
+2D array parameter - post 1:2	: Passed!
+2D array parameter - post 1:3	: Passed!
+2D array parameter - post 2:1	: Passed!
+2D array parameter - post 2:2	: Passed!
+2D array parameter - post 2:3	: Passed!
+SHARED array	: Passed!
+Redimensioned array access	: Passed!
++++++ c_accounts.bas
+Margot	 owes 	Flan	 	$273.93

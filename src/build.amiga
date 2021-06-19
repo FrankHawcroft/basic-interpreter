@@ -1,0 +1,6 @@
+make -fMakefile-Amiga-VBCC
+if not warn
+	cd /test
+	execute runtests.amiga
+	cd /src
+endif

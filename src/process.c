@@ -1,0 +1,333 @@
+/****** process.c ******/
+
+/*
+	$VER: process.h 0.16A (9.22.2017)
+
+	Execution state for a BASIC program.
+*/
+
+#include <string.h>
+#include <stdio.h>
+#include "process.h"
+#include "heap.h"
+#include "options.h"
+#include "cache.h"
+#include "buffer.h"
+#include "hashtable.h"
+#include "platform.h"
+
+/*extern void InitUI(void);
+extern void InitAudio(void);*/
+extern void CleanUpUI(void);
+extern void CleanUpAudio(void);
+
+static void DeleteStatementCache(void);
+
+#if PF_REENTRANT
+#define MAX_PROCESSES 20
+#else
+#define MAX_PROCESSES 1
+#endif
+
+struct ProcessTableEntry {
+	PfTaskIdentifier owner;
+	struct Process *proc;
+};
+
+static struct ProcessTableEntry m_PT[MAX_PROCESSES];
+static int m_PTUsedCount = 0;
+
+#define PROCESS_SIZE sizeof(struct Process)
+
+struct Process *Proc(void)
+{
+	/* For performance, doesn't lock in PF_REENTRANT mode. This is in practice, if not in theory, safe,
+	because of the way the process table is accessed - m_PTUsedCount is never decreased. */
+	if(m_PTUsedCount == 1) {
+		/* If not running the same code from more than one task, avoid getting the task identifier,
+		which may be slow. */
+		assert(m_PT[0].proc != NULL);
+		return m_PT[0].proc;
+	}
+	else {	
+		int i;
+		PfTaskIdentifier self = PfGetCurrentTaskIdentifier();
+		
+		for(i = 0; i < m_PTUsedCount; i++) {
+			if(m_PT[i].owner == self) {
+				assert(m_PT[i].proc != NULL);
+				return m_PT[i].proc;
+			}
+		}
+		assert(FALSE);
+		return NULL;
+	}
+}
+
+Error CreateNewProcess(const struct Options *options)
+{
+	int slot;
+	struct Process *p;
+	PfMutex mutex;
+	
+	assert(options != NULL);
+	assert(PF_REENTRANT || m_PTUsedCount == 0);
+
+	PfInitialiseMutex(&mutex);
+	PfBeginExclusiveExecution(&mutex);
+	if(m_PTUsedCount == 0)	
+		memset(m_PT, 0, sizeof(m_PT));
+	PfEndExclusiveExecution(&mutex);
+	
+	{
+		Error error;
+		PfTaskIdentifier myTaskId = PfGetCurrentTaskIdentifier();
+	
+		PfBeginExclusiveExecution(&mutex);
+		
+		for(slot = 0; slot < m_PTUsedCount && m_PT[slot].proc != NULL; slot++)
+			;
+		
+		error = slot >= MAX_PROCESSES ? ER_TOO_MANY_INSTANCES : SUCCESS;
+		
+		if(error == SUCCESS) {
+			if(slot >= m_PTUsedCount)
+				++m_PTUsedCount;
+			m_PT[slot].owner = myTaskId;
+		}
+		
+		PfEndExclusiveExecution(&mutex);
+		
+		if(error != SUCCESS)
+			return error;
+	}
+	
+	m_PT[slot].proc = p = New(PROCESS_SIZE);
+	memset(p, NUL, PROCESS_SIZE);
+	
+	p->mode = MODE_HALTED_FOR_EXIT;
+	
+	p->opts = options;
+	
+	p->pendingError = SUCCESS;
+	p->returnCode = EXIT_SUCCESS;
+	
+	p->buffer = CreateFileBuffer(options->initialBufferSize);
+	p->initialTextExtent = NULL;
+	
+	p->currentPosition = NULL;
+	p->currentStatementStart = NULL;
+	p->currentFileName = NULL;
+	
+	p->trace = FALSE;
+	
+	InitStreams();
+	
+	p->gui = NULL;
+	p->audio = NULL;
+	/*InitUI();
+	InitAudio();*/
+	
+	CreateControlFlowStack(0);
+	
+	InitProfile(&p->stats);
+	
+	p->breakFlag = FALSE;
+	InitEventTraps();
+
+	DefineBuiltIns();
+	
+#ifdef DEBUG
+	/*if(Opts()->verbose)
+		PrintSymTab();*/
+		
+	p->maxNestLevel = SCOPE_MAIN;
+	p->definitions = p->hashTableSearches = p->lookUps = 0;
+#endif
+
+	p->statementCache = NULL;
+	p->untakenBranchCache = NULL;
+
+	p->callNestLevel 
+		= p->functionCallNesting
+		= p->staticSubCallNesting = SCOPE_MAIN;
+		
+	p->staticFunctionParams = NULL;
+	
+	p->arrayIndexBase = 0;
+	p->readPosition = NULL;
+	p->tokenIndex = -1;
+	
+	return SUCCESS;
+}
+
+void DisposeProcess(void)
+{
+	struct Process *p = Proc(); /* TODO don't use Proc() - shouldn't fail if no, or an incomplete, proc table entry */
+	
+	if(Opts()->profileDest != NULL) {
+		FILE *profileDump = fopen(p->opts->profileDest, "w");
+		if(profileDump == NULL) {
+			sprintf(p->additionalErrorInfo, "File: %.200s", p->opts->profileDest);
+			ReportError(CANTOPENPROFILE, NULL, -1, NULL, p->additionalErrorInfo);
+		}
+		else {
+			PrintProfile(p->stats, p->buffer, profileDump);
+			fclose(profileDump);
+		}
+	}
+	
+	DisposeProfilingData(&p->stats);
+	
+	DeleteStatementCache();
+	
+	if(p->untakenBranchCache != NULL) {
+		DisposeCache(p->untakenBranchCache);
+		p->untakenBranchCache = NULL;
+	}
+
+	DisposeControlFlowStack();
+
+	if(p->staticFunctionParams != NULL) {
+		HtDispose(p->staticFunctionParams);
+		p->staticFunctionParams = NULL;
+	}
+
+	DisposeSymbolTable();
+
+	DisposeEventTraps();
+	
+	CloseAllStreams();
+	Dispose(p->streams);
+	p->streams = NULL;
+	
+	if(p->buffer != NULL) {
+		DisposeFileBuffer(p->buffer);
+		p->buffer = NULL;
+	}
+	
+	CleanUpUI();
+	CleanUpAudio();
+	
+	Dispose(p);
+	
+	{
+		PfMutex mutex;
+		PfTaskIdentifier self = PfGetCurrentTaskIdentifier();
+		int slot;
+		
+		PfInitialiseMutex(&mutex);
+		PfBeginExclusiveExecution(&mutex);
+		
+		for(slot = 0; slot < m_PTUsedCount && m_PT[slot].owner != self; slot++)
+			;	
+		if(slot < m_PTUsedCount) {
+			m_PT[slot].owner = PF_NULL_TASK_ID;
+			m_PT[slot].proc = NULL;
+		}
+				
+		PfEndExclusiveExecution(&mutex);
+	}
+}
+
+const struct Options *Opts(void)
+{
+	return Proc()->opts;
+}
+
+/* Because the location in the source code is used as the key when caching, the cache must
+	be cleared if there's the potential for memory to be reused to hold a different program;
+	e.g. for immediate mode code which is stored in a potentially temporarily allocated
+	buffer. */
+struct TokenSequence *GetFromCache(struct Process *proc, const char *position)
+{
+	return proc->statementCache != NULL ? RetrieveFromCache(proc->statementCache, position) : NULL;
+}
+
+static void DisposeEntry(void *ts)
+{
+	DisposeTokenSequence(ts);
+	Dispose(ts);
+}
+
+void AttemptToCache(const struct TokenSequence *tokSeq)
+{
+	struct Process *p = Proc();
+	if(p->statementCache == NULL) {
+		/* Since not operating in memory restricted mode (-l), create a generously sized cache -
+			aim is to avoid thrashing. */
+
+		/* mandel.bas - 900 chs, 27 cacheable stmts
+		   lisp.bas - 22924 chs, 487 cacheable stmts
+		   fractal_mountains.bas - 5513 chs, 145 cacheable stmts
+		   life.bas - 1794 chs, 38 cacheable stmts */
+		const unsigned approxPreludeSize = 3500;
+		unsigned expectedCacheableStatements = (FileBufferExtent(p->buffer) - FileBufferBase(p->buffer) - approxPreludeSize) / 40;
+		
+		if(expectedCacheableStatements < 11)
+			expectedCacheableStatements = 11;
+
+		p->statementCache = CreateCache(expectedCacheableStatements, 0, &DisposeEntry);
+	}
+
+	{	
+		struct TokenSequence *cached = Duplicate(tokSeq);
+		
+		/* Don't end the program due to failing to alloc a cache entry. */
+		if(cached == NULL)
+			return;
+		
+		SetInCache(p->statementCache, tokSeq->start, cached);
+	}
+}
+
+static void DeleteStatementCache(void)
+{
+	if(Proc()->statementCache != NULL) {
+		DisposeCache(Proc()->statementCache);
+		Proc()->statementCache = NULL;
+	}
+}
+
+void ClearStatementCache(void)
+{
+	if(Proc()->statementCache != NULL)
+		ClearCache(Proc()->statementCache);
+}
+
+#ifdef DEBUG
+
+void PrintStatementCacheStatus(FILE *f, const char *stmt)
+{
+	const struct TokenSequence *ts = GetFromCache(Proc(), stmt);
+	fprintf(f, "<%c%x> ", ts == NULL ? ' ' : (ts->preconverted != NULL ? 'P' : 'T'),
+		ts == NULL ? 0 : ts->ops);
+}
+
+#endif
+
+static void NoNeedToDisposeValue(void *v) {	}
+
+void CreateUntakenBranchCache(void)
+{
+	if(Proc()->untakenBranchCache == NULL && !Opts()->lowMemory)
+		Proc()->untakenBranchCache = CreateCache(100, 97, &NoNeedToDisposeValue);
+}
+
+/* Length is passed separately so this can easily be used for QStrings. */
+void SetAdditionalErrorMessage(const char *fmt, const char *obj, size_t len)
+{
+	struct Process *p = Proc();
+	int maxLen;
+
+	assert(fmt != NULL);
+	assert((obj != NULL) == (strstr(fmt, "%.*") != NULL));
+	
+	maxLen = strlen(fmt) + len >= MAX_ADDITIONAL_ERROR_MSG_LEN ? 0 : (int)len;
+	if(obj != NULL)
+		sprintf(p->additionalErrorInfo, fmt, maxLen, obj);
+	else if(strlen(fmt) < MAX_ADDITIONAL_ERROR_MSG_LEN)
+		strcpy(p->additionalErrorInfo, fmt);
+	else
+		p->additionalErrorInfo[0] = NUL;
+}

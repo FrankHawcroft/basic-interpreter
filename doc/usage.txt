@@ -1,0 +1,193 @@
+BASIC interpreter usage
+=======================
+
+Prerequisites
+-------------
+
+1. Compile the interpreter - see: compiling.txt.
+2. Define an environment variable BAS_MODULE_PATH, with the location of the 'module' folder on your system.
+	OR: if you can't, or don't want to, define BAS_MODULE_PATH, see the --module-path, --prelude and --noprelude options described below.
+
+
+Quick usage examples
+--------------------
+
+	nb program.bas
+	
+Loads and runs the file 'program.bas'.
+
+	nb -e"print sqr(100)"
+
+or
+
+	nb --exec "print sqr(100)"
+	
+Runs the program given on the command line. This may need to be written differently for different systems and shells, depending on the rules about whitespace, escaping or quoting special characters, and separating options and arguments. "?sqr(100)" could also be used if your shell doesn't treat the '?' character specially.
+
+	nb -e"" -i
+	
+Starts the interpreter in immediate mode, where statements typed in will be executed straight away. The '-e""' parameter is also required to go directly into immediate mode without running another program first.
+
+
+All options
+-----------
+
+	[--file] <program-file> [<args> ...]
+	
+Execute the given program.
+
+Any arguments after the <program-file> will be passed to the BASIC program and will not be treated as options for the interpreter. These arguments can be accessed in the BASIC program using the ARGV function.
+
+This is the default parameter, so the option name --file does not usually need to be included.
+
+Short form: -f<program-file>
+
+
+	--exec[ute] <statements>
+
+Execute the statements given directly as a program, rather than loading a program from a file.
+
+This option cannot be specified along with --file.
+
+If the <statements> contain quotes or other special characters, you will need to follow the conventions of your shell to escape these.
+	
+Short form: -e<statements>
+
+
+	--immediate
+	
+Put the interpreter into 'immediate' mode after any program has executed. Immediate mode is a 'read-eval-print' loop, where statements to execute are read from the standard input (typically, the command line).
+
+Because either a program file or statements to execute must always be supplied, to start the interpreter in immediate mode (effectively) without running another program first, this option should be combined with -e"", which will execute an empty program.
+	
+Short form: -i
+
+
+	--buf[fer] <size>
+	
+Use a buffer of the given size. The size is in KB by default.
+
+The suffix 'b', 'k' or 'kb', 'm' or 'mb' (in lower or upper case) may be added to the size to scale it.
+
+By default, the buffer size is automatically calculated based on the size of the program (if possible), the prelude, and a 'merge factor' to account for further files that may be included using the MERGE statement. In some circumstances, when a large file is MERGEd with a small program, this will mean that the auto-sized buffer will not be large enough, and an error will occur. The --buffer option must then be used to allocate a sufficiently large buffer.
+
+The buffer is allocated on the heap, so if a fixed-size heap is used (see --heap), the interpreter will fail to start up if it cannot allocate enough memory for the buffer.
+
+Short form:	-b<size>
+
+
+	--heap <size>
+	
+Use a fixed size heap of the given size. The size is in KB by default.
+
+The suffix 'b', 'k' or 'kb', 'm' or 'mb' (in lower or upper case) may be added to the size to scale it.
+
+By default, the interpreter will use a dynamically-sized heap and will request memory from the system as required. If the --heap option is used, the heap will not grow beyond the size given, so if the program requires more memory than was initially allocated, an 'out of memory' error will occur.
+
+Short form: -h<size>
+
+
+	--profile <output-file>
+	
+Profile the program being executed and write a report to <output-file>.
+
+Currently the profiler is extremely simple. It is a line-by-line profiler that simply counts how many times each statement is executed.
+
+Short form: -p<output-file>
+
+
+	--prelude <prelude-file>
+	--noprelude
+
+Load and run <prelude-file> before loading the program to be executed.
+
+Generally you do not have to use this option. By default, the interpreter will load 'prelude.bas' from the first location where it is found, searching in this order -
+
+	1. The location(s) given by the --module-path option.
+	2. The location(s) given by the BAS_MODULE_PATH environment variable.
+	3. The system default location(s). This may be the current directory, the home directory, or somewhere else.
+	
+The prelude.bas included with the interpreter contains some common BASIC functions. If you have defined BAS_MODULE_PATH appropriately, these functions will be available and work as expected.
+
+If you use the --prelude option, and the interpreter determines that the parameter is an absolute path, then only that location will be tried. If it is a simple filename, or a relative path, then the locations given above will be searched.
+
+--noprelude means that the interpreter will not load a prelude. This may be useful if you wish to redefine some of the functions defined in prelude.bas, or to save a small amount of memory and start up time.
+
+Short forms: -r<prelude-file>, -n
+
+Example: on a Unix-like system, load the file myprelude.bas from the current directory instead of the ordinary prelude -
+
+	nb -r./myprelude.bas program.bas
+
+
+	--module-path <paths>
+	
+Search the given locations for modules loaded using the MERGE statement, as well as the prelude.
+
+See the description of --prelude for a description of how the interpreter searches for modules.
+
+<paths> may contain several paths, separated by semicolons.
+
+Short form: -m<paths>
+
+Example: on a Unix-like system, search for modules in the home directory and /etc/basic -
+
+	nb -m~;/etc/basic program.bas
+
+Short form: -m<paths>
+
+
+	--check-only
+	
+Don't actually execute the program - just syntax check it, then quit.
+
+	
+	--script-mode
+	--noscript-mode
+
+Do not syntax check the program before executing it.
+
+This will stop the interpreter from checking the program for common syntax errors before starting to run it. It will make the program start up slightly faster. Regardless of the use of this option, the prelude is not checked unless --debug-prelude is specified, on the rationale that a prelude module is generally fairly well tested, and does not change frequently.
+
+--noscript-mode is the default.
+
+Short forms: -s, -c (mnemonic: 'check')
+
+
+	--low-memory
+	--nolow-memory
+
+Attempt to reduce the interpreter's memory usage.
+
+By default, or if --nolow-memory is specified, the interpreter maintains a cache of statements which have been pre-processed into an internal form which executes more quickly. All statements in loops, or in nested subprogram calls, are cached. This means that --low-memory will slow down the interpreter significantly for most programs, because the main thing --low-memory does to reduce memory usage is not to create this cache. It also reduces the size of some internal lookup tables; again, this will tend to make the interpreter run more slowly, but use slightly less memory.
+
+Short forms: -l, -g (mnemonic: 'gross', 'grand' or 'greedy' memory usage)
+
+
+    --optimise
+
+Enable some simple local 'optimisations'. These are transformations which attempt to make the program run faster.
+
+Usually this will make the program run slightly more slowly to start with, because statements and user-defined functions will be transformed the first time they are executed, but should improve performance for longer-running programs, especially programs which make heavy use of user-defined functions.
+
+This is not generally useful when combined with --low-memory, unless your program mostly calls user-defined functions but does not contain any significant loops or much use of subprograms.
+
+Short form: -o
+
+
+	--debug-prelude
+
+Report errors in the prelude, and also check it for syntax errors before running anything (unless --script-mode is specified).
+
+Useful if you have changed prelude.bas or are using your own prelude module.
+
+Short form: -d
+
+
+	--verbose
+	
+(1) Run the interpreter's internal self-tests before loading anything; (2) print verbose debugging information and warning messages to stderr.
+
+This option is only available if the interpreter has been compiled in DEBUG mode, i.e. without an NDEBUG or _NDEBUG C macro defined. It might be useful to diagnose a bug in the interpreter, or check how the interpreter compiles a particular statement.
+
+Short form: -v

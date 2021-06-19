@@ -1,0 +1,47 @@
+set logfile log.amiga.txt
+
+alias runnb /src/nba -l -b128b -s --noprelude --exec 
+
+echo Some numeric literals >> $logfile
+runnb "print 1" >> $logfile
+
+echo Relational operators >> $logfile
+runnb "print 1 = 1" >> $logfile
+runnb "print 2 > 1" >> $logfile
+runnb "print 1 < 2" >> $logfile
+runnb "print 2 >= 1" >> $logfile
+runnb "print 1 <= 2" >> $logfile
+runnb "print 1 <> 2" >> $logfile
+
+echo Arithmetic operators >> $logfile
+runnb "print +1" >> $logfile
+runnb "print -1" >> $logfile
+runnb "print 1 + 1 = 2" >> $logfile
+runnb "print 2 - 1 = 1" >> $logfile
+runnb "print 2 ** 3 = 6" >> $logfile
+runnb "print 4 / 2 = 2" >> $logfile
+runnb "print 5 / 2 = 2.5" >> $logfile
+runnb "print 5 \ 2 = 2" >> $logfile
+runnb "print 5 mod 2 = 1" >> $logfile
+
+echo Bitwise operators >> $logfile
+runnb "print 1 bitand 1" >> $logfile
+runnb "print 0 bitor 1" >> $logfile
+runnb "print 0 bitxor 1" >> $logfile
+runnb "print bitnot 0" >> $logfile
+
+echo Other mathematical operators - TODO >> $logfile
+
+echo Parenthesised expressions >> $logfile
+runnb "print (1) = 1" >> $logfile
+runnb "print (1 + 1) = 2" >> $logfile
+runnb "print (1 + 1) ** 2 = 4" >> $logfile
+runnb "print (1 + 1) ** (2 + 2) = 8" >> $logfile
+runnb "print 1 + ((1 ** 2) + 2) = 5" >> $logfile
+
+echo Built-in functions >> $logfile
+runnb "print sin(0) = 0" >> $logfile
+runnb "print cos(0) = 1" >> $logfile
+runnb "print tan(0) = 0" >> $logfile
+
+echo Finished! >> $logfile

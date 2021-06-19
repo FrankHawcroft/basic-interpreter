@@ -1,0 +1,1 @@
+vc #?.o -o nba -DAMIGA -DVBCC -DDEBUG -c99 -lmieee -lamiga -lauto

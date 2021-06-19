@@ -1,0 +1,490 @@
+***** Platform is Windows CMD.EXE 
+***** invoke startup self-testing only (empty program) 
+---- Running heap self-tests ...
+-- Bit vector self-tests running ...
+-- Bit vector self-tests finished.
+---- Heap self-tests finished.
+---- Running other self-tests ...
+-- Stack self-tests running ...
+-- Stack self-tests finished.
+-- QString self-tests running ...
+-- QString self-tests finished.
+-- Hash table self-tests running ...
+-- Hash table dump - num bins = 1087
+ 356: key one => <01057AE8>.
+ 633: key three => <01057B00>.
+-- End of hash table dump
+-- Hash table self-tests finished.
+-- Cache self-tests running ...
+-- Cache self-tests finished.
+-- Buffer self-tests running ...
+-- Buffer self-tests finished.
+---- Self-tests finished.
+***** simple_exprs.cmd (one-liners) 
+Some numeric literals
+ 1
+Relational operators
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+Simple arithmetic operators
+ 1
+-1
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+Bitwise operators
+ 1
+ 1
+ 1
+-1
+Other mathematical operators - TODO
+Parenthesised expressions
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+Built-in functions
+TRUE
+TRUE
+TRUE
+Finished simple expression tests!
+***** Testing command line options 
+ 2
+-- Loading program from source file '..\module\prelude.bas'.
+-- Loading program from source one-liner 'print 1 + 1'.
+    0 + 1 [] [] const TRUE? = 1 <newline>.
+    0 + 2 [] [] const TRUE? ; 1 |.
+    0 + 3 [] [] const TRUE? 1 |.
+    0 + 4  <var(256) cat=56 @ 0: 012A13CC> <lit(4):  1>.
+    0 + 5  <var(256) cat=56 @ 0: 012A13CC> <lit(256): TRUE>.
+   16 + 1 [] [] const FALSE? = not TRUE <newline>.
+   16 + 2 [] [] const FALSE? ; not TRUE |.
+   16 + 3 [] [] const FALSE? ( not TRUE ) |.
+   16 + 4  <var(256) cat=56 @ 0: 012A1D8C> <lit(256): FALSE>.
+   16 + 5  <var(256) cat=56 @ 0: 012A1D8C> <lit(256): FALSE>.
+   40 + 1 [] [] [] <newline>.
+   40 + 2 [] [] e~ |.
+   41 + 1 [] [] def ABS# ( pabsx# ) static where pabsx < 0 as - pabsx <newline>.
+   41 + 2 [] [] def ABS# ( pabsx# ) static where pabsx < 0 as -u pabsx |.
+   91 + 1 [] [] def ABS# ( pabsx# ) static as pabsx <newline>.
+   91 + 2 [] [] def ABS# ( pabsx# ) static as pabsx |.
+  124 + 1 [] [] [] <newline>.
+  124 + 2 [] [] e~ |.
+  125 + 1 [] [] def SGN% ( psgnx# ) static where psgnx = 0 as 0 <newline>.
+  125 + 2 [] [] def SGN% ( psgnx# ) static where psgnx = 0 as 0 |.
+  170 + 1 [] [] def SGN% ( psgnx# ) static where psgnx > 0 as 1 <newline>.
+  170 + 2 [] [] def SGN% ( psgnx# ) static where psgnx > 0 as 1 |.
+  215 + 1 [] [] def SGN% ( psgnx# ) static where psgnx < 0 as -1 <newline>.
+  215 + 2 [] [] def SGN% ( psgnx# ) static where psgnx < 0 as -1 |.
+  261 + 1 [] [] [] <newline>.
+  261 + 2 [] [] e~ |.
+  262 + 1 [] [] def FIX& ( pfixx# ) static as pfixx <newline>.
+  262 + 2 [] [] def FIX& ( pfixx# ) static as pfixx |.
+  295 + 1 [] [] [] <newline>.
+  295 + 2 [] [] e~ |.
+  296 + 1 [] [] const pmaxlng& = 0x7FFFFFFF <newline>.
+  296 + 2 [] [] const pmaxlng& ; 0x7FFFFFFF |.
+  296 + 3 [] [] const pmaxlng& 0x7FFFFFFF |.
+  296 + 4  <var(8) cat=56 @ 0: 012A256C> <lit(8):  2147483647>.
+  296 + 5  <var(8) cat=56 @ 0: 012A256C> <lit(8):  2147483647>.
+  324 + 1 [] [] const pminlng& = 0x80000000 <newline>.
+  324 + 2 [] [] const pminlng& ; 0x80000000 |.
+  324 + 3 [] [] const pminlng& 0x80000000 |.
+  324 + 4  <var(8) cat=56 @ 0: 012A25CC> <lit(8): -2147483648>.
+  324 + 5  <var(8) cat=56 @ 0: 012A25CC> <lit(8): -2147483648>.
+  352 + 1 [] [] [] <newline>.
+  352 + 2 [] [] e~ |.
+  353 + 1 [] [] def INT& ( pintx! ) static where pminlng < pintx and pintx < 0 as FIX ( pintx ) - 1 <newline>.
+  353 + 2 [] [] def INT& ( pintx! ) static where pminlng < pintx and pintx < 0 as FIX ( pintx ) - 1 |.
+  431 + 1 [] [] def INT& ( pintx! ) static where pintx <= pmaxlng as FIX ( pintx ) <newline>.
+  431 + 2 [] [] def INT& ( pintx! ) static where pintx <= pmaxlng as FIX ( pintx ) |.
+  492 + 1 [] [] [] <newline>.
+  492 + 2 [] [] e~ |.
+  493 + 1 [] [] def CDBL# ( pcdbx# ) static as pcdbx <newline>.
+  493 + 2 [] [] def CDBL# ( pcdbx# ) static as pcdbx |.
+  527 + 1 [] [] [] <newline>.
+  527 + 2 [] [] e~ |.
+  528 + 1 [] [] def CSNG! ( pcsnx# ) static as pcsnx <newline>.
+  528 + 2 [] [] def CSNG! ( pcsnx# ) static as pcsnx |.
+  562 + 1 [] [] [] <newline>.
+  562 + 2 [] [] e~ |.
+  563 + 1 [] [] def CLNG& ( pclnx# ) static where pminlng <= pclnx and pclnx <= pmaxlng and ABS ( pclnx - FIX ( pclnx ) ) >= 0.5 as FIX ( pclnx ) + SGN ( pclnx ) <newline>.
+  563 + 2 [] [] def CLNG& ( pclnx# ) static where pminlng <= pclnx and pclnx <= pmaxlng and ABS ( pclnx - FIX ( pclnx ) ) >= 0.5 as FIX ( pclnx ) + SGN ( pclnx ) |.
+  694 + 1 [] [] def CLNG& ( pclnx# ) static where pminlng <= pclnx and pclnx <= pmaxlng as pclnx <newline>.
+  694 + 2 [] [] def CLNG& ( pclnx# ) static where pminlng <= pclnx and pclnx <= pmaxlng as pclnx |.
+  772 + 1 [] [] [] <newline>.
+  772 + 2 [] [] e~ |.
+  773 + 1 [] [] def CINT% ( pcinx# ) static as CLNG ( pcinx ) <newline>.
+  773 + 2 [] [] def CINT% ( pcinx# ) static as CLNG ( pcinx ) |.
+  813 + 1 [] [] [] <newline>.
+  813 + 2 [] [] e~ |.
+  814 + 1 [] [] def CSTR$ ( pcstx# ) static as pcstx & "" <newline>.
+  814 + 2 [] [] def CSTR$ ( pcstx# ) static as pcstx & "" |.
+  853 + 1 [] [] [] <newline>.
+  853 + 2 [] [] e~ |.
+  854 + 1 [] [] def INSTR2% ( pinss$ , pinst$ ) static as instr ( 1 , pinss , pinst ) <newline>.
+  854 + 2 [] [] def INSTR2% ( pinss$ , pinst$ ) static as instr ( 1 , pinss , pinst ) |.
+  915 + 1 [] [] [] <newline>.
+  915 + 2 [] [] e~ |.
+  916 + 1 [] [] const pmaxstrlen% = 32767 <newline>.
+  916 + 2 [] [] const pmaxstrlen% ; 32767 |.
+  916 + 3 [] [] const pmaxstrlen% 32767 |.
+  916 + 4  <var(4) cat=56 @ 0: 012A35EC> <lit(4):  32767>.
+  916 + 5  <var(4) cat=56 @ 0: 012A35EC> <lit(4):  32767>.
+  942 + 1 [] [] [] <newline>.
+  942 + 2 [] [] e~ |.
+  943 + 1 [] [] def MID2$ ( pmids$ , pmidn% ) static as mid ( pmids , pmidn , pmaxstrlen ) <newline>.
+  943 + 2 [] [] def MID2$ ( pmids$ , pmidn% ) static as mid ( pmids , pmidn , pmaxstrlen ) |.
+ 1009 + 1 [] [] [] <newline>.
+ 1009 + 2 [] [] e~ |.
+ 1010 + 1 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn > 0 as mid ( plefs , 1 , plefn ) <newline>.
+ 1010 + 2 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn > 0 as mid ( plefs , 1 , plefn ) |.
+ 1083 + 1 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn = 0 as "" <newline>.
+ 1083 + 2 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn = 0 as "" |.
+ 1138 + 1 [] [] [] <newline>.
+ 1138 + 2 [] [] e~ |.
+ 1139 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > len ( prigs ) as prigs <newline>.
+ 1139 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > len ( prigs ) as prigs |.
+ 1207 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > 0 as mid ( prigs , len ( prigs ) - prign + 1 , prign ) <newline>.
+ 1207 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > 0 as mid ( prigs , len ( prigs ) - prign + 1 , prign ) |.
+ 1302 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign = 0 as "" <newline>.
+ 1302 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign = 0 as "" |.
+ 1358 + 1 [] [] [] <newline>.
+ 1358 + 2 [] [] e~ |.
+ 1359 + 1 [] [] def pstringiter$ ( n% , c@ , acc$ ) static where n > 0 as pstringiter ( n - 1 , c , acc & c ) <newline>.
+ 1359 + 2 [] [] def pstringiter$ ( n% , c@ , acc$ ) static where n > 0 as pstringiter ( n - 1 , c , acc & c ) |.
+ 1443 + 1 [] [] def pstringiter$ ( n% , c@ , acc$ ) static as acc <newline>.
+ 1443 + 2 [] [] def pstringiter$ ( n% , c@ , acc$ ) static as acc |.
+ 1488 + 1 [] [] def STRING$ ( pstrn% , pstrc@ ) static where pstrn >= 0 as pstringiter ( pstrn , pstrc , "" ) <newline>.
+ 1488 + 2 [] [] def STRING$ ( pstrn% , pstrc@ ) static where pstrn >= 0 as pstringiter ( pstrn , pstrc , "" ) |.
+ 1573 + 1 [] [] [] <newline>.
+ 1573 + 2 [] [] e~ |.
+ 1574 + 1 [] [] def SPACE$ ( pspan% ) static as STRING ( pspan , " " ) <newline>.
+ 1574 + 2 [] [] def SPACE$ ( pspan% ) static as STRING ( pspan , " " ) |.
+ 1622 + 1 [] [] [] <newline>.
+ 1622 + 2 [] [] e~ |.
+ 1623 + 1 [] [] def SPC$ ( pspcn% ) static as SPACE ( pspcn ) <newline>.
+ 1623 + 2 [] [] def SPC$ ( pspcn% ) static as SPACE ( pspcn ) |.
+ 1663 + 1 [] [] [] <newline>.
+ 1663 + 2 [] [] e~ |.
+ 1664 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where s = "" as acc <newline>.
+ 1664 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where s = "" as acc |.
+ 1730 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where left ( s , 1 ) in tfrom as pxlititer ( MID2 ( s , 2 ) , acc & mid ( tto , instr ( 1 , tfrom , left ( s , 1 ) ) , 1 ) , tfrom , tto ) <newline>.
+ 1730 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where left ( s , 1 ) in tfrom as pxlititer ( MID2 ( s , 2 ) , acc & mid ( tto , instr ( 1 , tfrom , left ( s , 1 ) ) , 1 ) , tfrom , tto ) |.
+ 1887 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static as pxlititer ( mid2 ( s , 2 ) , acc & left ( s , 1 ) , tfrom , tto ) <newline>.
+ 1887 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static as pxlititer ( mid2 ( s , 2 ) , acc & left ( s , 1 ) , tfrom , tto ) |.
+ 1988 + 1 [] [] [] <newline>.
+ 1988 + 2 [] [] e~ |.
+ 1989 + 1 [] [] const pucase$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <newline>.
+ 1989 + 2 [] [] const pucase$ ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
+ 1989 + 3 [] [] const pucase$ "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
+ 1989 + 4  <var(64) cat=56 @ 0: 012A124C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
+ 1989 + 5  <var(64) cat=56 @ 0: 012A124C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
+ 2034 + 1 [] [] const plcase$ = "abcdefghijklmnopqrstuvwxyz" <newline>.
+ 2034 + 2 [] [] const plcase$ ; "abcdefghijklmnopqrstuvwxyz" |.
+ 2034 + 3 [] [] const plcase$ "abcdefghijklmnopqrstuvwxyz" |.
+ 2034 + 4  <var(64) cat=56 @ 0: 012A4F6C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
+ 2034 + 5  <var(64) cat=56 @ 0: 012A4F6C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
+ 2079 + 1 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) <newline>.
+ 2079 + 2 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) |.
+ 2145 + 1 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) <newline>.
+ 2145 + 2 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) |.
+ 2212 + 1 [] [] [] <newline>.
+ 2212 + 2 [] [] e~ |.
+ 2213 + 1 [] [] sub LSET ( s$ , ( t$ ) ) static <newline>.
+ 2213 + 2 [] [] sub LSET ( s$ , ( t$ ) ) static |.
+ 2341 + 1 [] [] [] <newline>.
+ 2341 + 2 [] [] e~ |.
+ 2342 + 1 [] [] sub RSET ( s$ , ( t$ ) ) static <newline>.
+ 2342 + 2 [] [] sub RSET ( s$ , ( t$ ) ) static |.
+ 2466 + 1 [] [] [] <newline>.
+ 2466 + 2 [] [] e~ |.
+ 2467 + 1 [] [] sub LETMID ( s$ , ( st% ) , ( cnt% ) , ( t$ ) ) static <newline>.
+ 2467 + 2 [] [] sub LETMID ( s$ , ( st% ) , ( cnt% ) , ( t$ ) ) static |.
+ 2750 + 1 [] [] [] <newline>.
+ 2750 + 2 [] [] e~ |.
+ 2751 + 1 [] [] const plittleendian? = cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 <newline>.
+ 2751 + 2 [] [] const plittleendian? ; cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 |.
+ 2751 + 3 [] [] const plittleendian? ( < ( cvi ( & "x" ( mid ( mki 0 ) 1 1 ) ) ) 255 ) |.
+ 2751 + 4  <var(256) cat=56 @ 0: 012A58FC> <lit(256): TRUE>.
+ 2751 + 5  <var(256) cat=56 @ 0: 012A58FC> <lit(256): TRUE>.
+ 2809 + 1 [] [] if plittleendian goto plechr <newline>.
+ 2809 + 2 [] [] IFGOTO~ plittleendian ; plechr |.
+ 2809 + 3 [] [] IFGOTO~ plittleendian plechr |.
+ 2809 + 4  <var(256) cat=56 @ 0: 012A58FC> <label: file ..\module\prelude.bas, line 88>.
+ 2809 + 5  <lit(256): TRUE> <label: file ..\module\prelude.bas, line 88>.
+ 2983 + 1 [] plechr [] <newline>.
+ 2983 + 2 [] plechr e~ |.
+ 2991 + 1 [] [] def CHR@ ( pchrn% ) static where 0 <= pchrn and pchrn <= 255 as left ( mki ( pchrn ) , 1 ) <newline>.
+ 2991 + 2 [] [] def CHR@ ( pchrn% ) static where 0 <= pchrn and pchrn <= 255 as left ( mki ( pchrn ) , 1 ) |.
+ 3072 + 1 [] [] def ASC% ( pascc@ ) static as cvi ( pascc & chr ( 0 ) ) <newline>.
+ 3072 + 2 [] [] def ASC% ( pascc@ ) static as cvi ( pascc & chr ( 0 ) ) |.
+ 3119 + 1 [] pskiplechr [] <newline>.
+ 3119 + 2 [] pskiplechr e~ |.
+ 3131 + 1 [] [] [] <newline>.
+ 3131 + 2 [] [] e~ |.
+ 3132 + 1 [] [] const p2ndbit& = 0x40000000 <newline>.
+ 3132 + 2 [] [] const p2ndbit& ; 0x40000000 |.
+ 3132 + 3 [] [] const p2ndbit& 0x40000000 |.
+ 3132 + 4  <var(8) cat=56 @ 0: 012A5F5C> <lit(8):  1073741824>.
+ 3132 + 5  <var(8) cat=56 @ 0: 012A5F5C> <lit(8):  1073741824>.
+ 3160 + 1 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) <newline>.
+ 3160 + 2 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) |.
+ 3210 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n <newline>.
+ 3210 + 2 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n |.
+ 3255 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c > 0 as plsr ( p2ndbit , c - 1 ) bitor plsr ( n bitand pmaxlng , c ) <newline>.
+ 3255 + 2 [] [] def plsr& ( n& , c% ) where n < 0 and c > 0 as plsr ( p2ndbit , c - 1 ) bitor plsr ( n bitand pmaxlng , c ) |.
+ 3351 + 1 [] [] const phdigit$ = "0123456789ABCDEF" <newline>.
+ 3351 + 2 [] [] const phdigit$ ; "0123456789ABCDEF" |.
+ 3351 + 3 [] [] const phdigit$ "0123456789ABCDEF" |.
+ 3351 + 4  <var(64) cat=56 @ 0: 012A61CC> <lit(64): 0123456789ABCDEF>.
+ 3351 + 5  <var(64) cat=56 @ 0: 012A61CC> <lit(64): 0123456789ABCDEF>.
+ 3387 + 1 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) <newline>.
+ 3387 + 2 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) |.
+ 3460 + 1 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) <newline>.
+ 3460 + 2 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) |.
+ 3555 + 1 [] [] def HEX$ ( phexn& ) static as p2bstr ( phexn , 16 ) <newline>.
+ 3555 + 2 [] [] def HEX$ ( phexn& ) static as p2bstr ( phexn , 16 ) |.
+ 3600 + 1 [] [] def OCT$ ( poctn& ) static as p2bstr ( poctn , 8 ) <newline>.
+ 3600 + 2 [] [] def OCT$ ( poctn& ) static as p2bstr ( poctn , 8 ) |.
+ 3644 + 1 [] [] print 1 + 1 <nul>.
+ 3644 + 2 [] [] print 1 + 1 ; "
+" |.
+ 3644 + 3 [] [] print ( + 1 1 ) "
+" |.
+ 3644 + 4  <lit(4):  2> <lit(64): 
+>.
+ 3644 + 5  <lit(4):  2> <lit(64): 
+>.
+ 2
+ 1
+ 2
+ 3
+ 1
+ 2
+ 3
+ 1
+ 2
+ 3
+ 1
+ 2
+ 3
+ 1
+ 2
+ 3
+***** "c_accounts.bas"  
+Margot	 owes 	Flan	 	$273.93
+***** "c_arrays.bas"  
+Simple array 1	: Passed!
+Simple array 2	: Passed!
+Simple array 3	: Passed!
+Simple array 4	: Passed!
+Simple array 5	: Passed!
+Simple array 6	: Passed!
+Simple array 7	: Passed!
+Simple array 8	: Passed!
+Simple array 9	: Passed!
+Simple array 10	: Passed!
+String array 1	: Passed!
+String array 2	: Passed!
+String array 3	: Passed!
+String array 4	: Passed!
+String array 5	: Passed!
+String array 6	: Passed!
+String array 7	: Passed!
+String array 8	: Passed!
+String array 9	: Passed!
+String array 10	: Passed!
+2D array 1:1	: Passed!
+2D array 1:2	: Passed!
+2D array 1:3	: Passed!
+2D array 1:4	: Passed!
+2D array 1:5	: Passed!
+2D array 2:1	: Passed!
+2D array 2:2	: Passed!
+2D array 2:3	: Passed!
+2D array 2:4	: Passed!
+2D array 2:5	: Passed!
+2D array 3:1	: Passed!
+2D array 3:2	: Passed!
+2D array 3:3	: Passed!
+2D array 3:4	: Passed!
+2D array 3:5	: Passed!
+2D array 4:1	: Passed!
+2D array 4:2	: Passed!
+2D array 4:3	: Passed!
+2D array 4:4	: Passed!
+2D array 4:5	: Passed!
+Array parameter 1	: Passed!
+Array parameter 2	: Passed!
+Array parameter 3	: Passed!
+Array parameter - post 1	: Passed!
+Array parameter - post 2	: Passed!
+Array parameter - post 3	: Passed!
+2D array parameter - post 1:1	: Passed!
+2D array parameter - post 1:2	: Passed!
+2D array parameter - post 1:3	: Passed!
+2D array parameter - post 2:1	: Passed!
+2D array parameter - post 2:2	: Passed!
+2D array parameter - post 2:3	: Passed!
+SHARED array	: Passed!
+Redimensioned array access	: Passed!
+***** "c_call.bas"  
+Old-style CALL succeeded
+***** "c_callbyname.bas"  
+ 0.00125126
+***** "c_cheque_fn.bas"  
+No dollars and no cents
+Exactly one cent only
+Exactly one hundred dollars only
+Exactly ninety-nine dollars and ninety-nine cents only
+Exactly three hundred and twenty-seven dollars and sixty-seven cents only
+Exactly four dollars only
+Exactly fifteen thousand dollars only
+Exactly one thousand two hundred and thirty-four dollars and fifty-six cents only
+***** "c_comments.bas"  
+***** "c_data.bas"  
+Finished DATA tests.
+***** "c_def.bas"  
+DEFined function tests completed OK
+***** "c_deftype.bas"  
+hi there!	also a string	 1	x
+***** "c_events.bas"  
+Timer handler called:	 0	at timer = 	 65004
+Timer handler called:	 1	at timer = 	 65005
+Break handler called:	 2
+Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
+Break event was correctly deferred
+Break handler called:	 4
+Successful RESUME
+***** "c_goto.bas"  
+Forward GOTO arrived
+Forward GOSUB arrived
+***** "c_io_rand.bas"  
+Person1	Address1	   0123 4567 890
+Person2	Address2	   0123 4567 890
+Person3	Address3	   0123 4567 890
+Person4	Address4	   0123 4567 890
+Person5	Address5	   0123 4567 890
+Random access I/O test completed.
+***** "c_io_seq.bas"  
+Sequential I/O test completed.
+***** "c_lexer.bas"  
+Total tokens in program:	 3219
+***** "c_lisp.bas"  
+( 1  2  3 ( 1 .  2) ( 3 .  4))
+X
+X
+ 31
+ 4
+( 1 .  2)
+***** "c_mm.bas"  
+Platform is Windows
+ 64	 files processed OK!
+***** "c_num_literal.bas"  
+Numeric literal tests completed.
+***** "c_prelude_test.bas"  
+TRUE and FALSE	: Passed!
+ABS	: Passed!
+EXP	: Passed!
+SGN	: Passed!
+FIX	: Passed!
+INT	: Passed!
+INSTR2	: Passed!
+MID2	: Passed!
+LEFT	: Passed!
+RIGHT	: Passed!
+STRING	: Passed!
+SPACE	: Passed!
+UCASE	: Passed!
+LCASE	: Passed!
+LSET	: Passed!
+RSET	: Passed!
+LETMID	: Passed!
+CHR and ASC	: Passed!
+HEX	: Passed!
+OCT	: Passed!
+CSTR	: Passed!
+CDBL	: Passed!
+CSNG	: Passed!
+CLNG	: Passed!
+CINT	: Passed!
+***** "c_simple.bas"  
+1A. int variable
+1B. long variable
+1C. float variable
+1D. double variable
+1E. string variable
+1F. char variable
+1G. Boolean variable
+2A. simple addition
+2B. unary negation
+2C. parentheses and type conv on assignment
+2D. type conv (int, float, double)
+2E. unary negation/unary plus/addition/subtraction overloading
+2F. polynomial (tests order of precedence of some common operators)
+3A. simple string concatenation
+3B. string to char cat
+3B(2). string cat with & operator - string and number
+3C. in - found
+3D. in - not found
+4A. Boolean AND
+4B. Boolean OR, NOT
+4C. Boolean with comparisons
+4D. Boolean with comparisons (2)
+4E. More obscure Boolean operators
+5A. Simple conditional assignment
+5B. Simple IF ... ELSE
+6A. Simple WHILE loop
+7A. Simple REPEAT ... UNTIL
+8A. Simple FOR loop (new variable!)
+8B. Simple FOR loop (step size -1)
+9A. Simple SELECT
+11A. Simple array creation and assignment to element
+11B. Use of array as FOR loop index
+12A. Simple intrinsic function - INSTR
+12B. Simple intrinsic function - INSTR (not found)
+13A. Subprogram with local hiding global variable
+13B. Sub with params
+13C. Recursive sub
+13D. Sub with reference param hiding global variable
+Simple tests finished!
+***** "c_string.bas"  
+String tests completed.
+***** "c_sub.bas"  
+Subprogram tests completed.
+***** "c_traditional.bas"  
+ 1
+ 2
+ 3
+ 2
+ 4
+ 6
+ 3
+ 6
+ 9
+***** "c_type_conv.bas"  
+***** "c_xhtml.bas"  
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Test HTML Document</title>
+<style type="text/css">
+</style>
+</head>
+<body>
+<h1>Test Document</h1>
+<p>And here's a paragraph &amp; a half!</p>
+</body>
+</html>
+
