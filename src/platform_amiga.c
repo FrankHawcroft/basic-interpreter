@@ -412,9 +412,14 @@ bool PfRepresentsStdin(const char *name)
 	return strcmp(name, "*") == 0 || strnicmp(name, "con:", 4) == 0;
 }
 
-void PfSleep(unsigned micros)
+void PfSleep(unsigned long micros)
 {
 	Delay(micros / (1000000 / 50));
+}
+
+void PfSleepUntilEvent(PfEventNotificationHandle mask)
+{
+	Wait(mask);
 }
 
 bool PfTestAndClearBreakSignal()
@@ -425,6 +430,11 @@ bool PfTestAndClearBreakSignal()
 	}
 	else
 		return FALSE;
+}
+
+PfEventNotificationHandle PfGetBreakEventNotificationHandle(void)
+{
+	return FindTask(NULL)->tc_SigAlloc;
 }
 
 #endif /* AMIGA */

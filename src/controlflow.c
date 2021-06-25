@@ -1291,7 +1291,7 @@ void JumpConvert(unsigned index, const QString *token, BObject *result)
 	if(index == 0 && IsValidLabelOrLineNumber(token))
 		ResolveLabel(token, result);
 	else
-		ConvertToObject(token, result, Proc()->callNestLevel);
+		ConvertToObject(token, result, SCOPE_CURRENT);
 }
 
 /* IF <cond> GOTO <label> --> IFGOTO~ <cond>; <label>
@@ -1308,7 +1308,7 @@ void ConditionalJumpConvert(unsigned index, const QString *token, BObject *resul
 	if(index > 0 && nesting == 0 && IsValidLabelOrLineNumber(token))
 		ResolveLabel(token, result);
 	else
-		ConvertToObject(token, result, Proc()->callNestLevel);
+		ConvertToObject(token, result, SCOPE_CURRENT);
 }
 
 /*** Inactive statements, a.k.a. untaken branch handling ***/

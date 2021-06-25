@@ -207,7 +207,22 @@ extern const char *PfHomeDirectory(void);
 extern bool PfRepresentsStdin(const char *name);
 
 /* Sleep for a period of time: */
-extern void PfSleep(unsigned micros);
+extern void PfSleep(unsigned long micros);
+
+/* Event notification: */
+
+#ifdef AMIGA
+typedef ULONG PfEventNotificationHandle;
+#define PfCombineEventNotificationHandles(signalBreak, ui, audio) ((signalBreak) | (ui) | (audio))
+extern PfEventNotificationHandle PfGetBreakEventNotificationHandle(void);
+extern void PfSleepUntilEvent(PfEventNotificationHandle);
+#else
+/* TODO implement for other systems */
+typedef int PfEventNotificationHandle;
+#define PfCombineEventNotificationHandles(signalBreak, ui, audio) 0
+#define PfGetBreakEventNotificationHandle() 0
+#define PfSleepUntilEvent(handle) PfSleep(10 * 1000) /* Just wait for 10 milliseconds */
+#endif
 
 #ifdef AMIGA
 

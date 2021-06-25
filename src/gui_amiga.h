@@ -1314,6 +1314,11 @@ static int GetMenuItemStateNative(PfWindowHandle win, char *menuName, char *item
 static bool WindowExists(const PfWindowHandle w);
 static PfWindowHandle OutputWindow(void);
 
+PfEventNotificationHandle GetUIEventNotificationHandle(void)
+{
+	return m_Port != NULL ? m_Port->mp_SigBit : 0;
+}
+
 static bool GetNextWindowEventNative(PfWindowEvent *nextEvent)
 {
 	struct IntuiMessage *msg;

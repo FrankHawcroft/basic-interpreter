@@ -281,18 +281,19 @@ void WindowInfo_(Scalar *result, const BObject *arg, unsigned count)
 {
 	int id = arg[0].value.scalar.value.number.s;
 	int infoKey = arg[1].value.scalar.value.number.s;
+	struct UserInterface *gui = Gui();
 	
 	if(!FeatureAvailable(Window_)) {
 		SetError(result, NOTIMPLEMENTED);
 		return;
 	}
 	
-	if(Gui() == NULL || id < 0 || id >= MAX_WINDOWS || Gui()->window[id] == NULL_WINDOW_HANDLE || Gui()->openWindowCount == 0) {
+	if(gui == NULL || id < 0 || id >= MAX_WINDOWS || gui->window[id] == NULL_WINDOW_HANDLE || gui->openWindowCount == 0) {
 		SetError(result, ER_BAD_WINDOW_ID);
 		return;
 	}
 	
-	SetFromLong(result, GetWindowInfoNative(Gui()->window[id], (unsigned)infoKey), T_LONG);
+	SetFromLong(result, GetWindowInfoNative(gui->window[id], (unsigned)infoKey), T_LONG);
 }
 	
 void Palette_(BObject *arg, unsigned count)
@@ -301,6 +302,7 @@ void Palette_(BObject *arg, unsigned count)
 	float red = arg[1].value.scalar.value.number.f;
 	float green = arg[2].value.scalar.value.number.f;
 	float blue = arg[3].value.scalar.value.number.f;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(Colour_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -308,7 +310,7 @@ void Palette_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -316,13 +318,14 @@ void Palette_(BObject *arg, unsigned count)
 	InitGfx();
 #endif
 
-	SetPaletteColourNative(OutputWindow(), penID, red, green, blue);
+	SetPaletteColourNative(win, penID, red, green, blue);
 }
 
 void Colour_(BObject *arg, unsigned count)
 {
 	short fgID = arg[0].value.scalar.value.number.s;
 	short bgID = arg[1].value.scalar.value.number.s;
+	PfWindowHandle win = OutputWindow();
 
 	if(!FeatureAvailable(Colour_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -330,7 +333,7 @@ void Colour_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -339,15 +342,16 @@ void Colour_(BObject *arg, unsigned count)
 #endif
 	
 	if(fgID != -1)
-		SetWindowPenNative(OutputWindow(), TRUE, fgID);
+		SetWindowPenNative(win, TRUE, fgID);
 	
 	if(bgID != -1)
-		SetWindowPenNative(OutputWindow(), FALSE, bgID);
+		SetWindowPenNative(win, FALSE, bgID);
 }
 
 void Point_(Scalar *result, const BObject *arg, unsigned count)
 {
 	BasicPoint p;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(PSet_)) {
 		SetError(result, NOTIMPLEMENTED);
@@ -355,7 +359,7 @@ void Point_(Scalar *result, const BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		SetError(result, ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -366,13 +370,14 @@ void Point_(Scalar *result, const BObject *arg, unsigned count)
 	p.x = arg[0].value.scalar.value.number.s;
 	p.y = arg[1].value.scalar.value.number.s;
 	
-	SetFromLong(result, GetPixelPaletteColourNative(OutputWindow(), &p), T_INT);
+	SetFromLong(result, GetPixelPaletteColourNative(win, &p), T_INT);
 }
 	
 void PSet_(BObject *arg, unsigned count)
 {
 	BasicPoint p;
 	short penID = arg[2].value.scalar.value.number.s;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(PSet_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -380,7 +385,7 @@ void PSet_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -391,12 +396,13 @@ void PSet_(BObject *arg, unsigned count)
 	p.x = arg[0].value.scalar.value.number.s;
 	p.y = arg[1].value.scalar.value.number.s;
 	
-	SetPixelNative(OutputWindow(), &p, penID);
+	SetPixelNative(win, &p, penID);
 }
 	
 void PReset_(BObject *arg, unsigned count)
 {
 	BasicPoint p;
+	PfWindowHandle win = OutputWindow();
 
 	if(!FeatureAvailable(PSet_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -404,7 +410,7 @@ void PReset_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -415,10 +421,10 @@ void PReset_(BObject *arg, unsigned count)
 	p.x = arg[0].value.scalar.value.number.s;
 	p.y = arg[1].value.scalar.value.number.s;
 	
-	SetPixelNative(OutputWindow(), &p, PEN_BG);
+	SetPixelNative(win, &p, PEN_BG);
 }
 
-static void OperateOnRectangularRegion(BObject *arg, void (*act)(unsigned char *pptr, const BasicPoint *p))
+static void OperateOnRectangularRegion(BObject *arg, void (*act)(PfWindowHandle, unsigned char *, const BasicPoint *))
 {
 	short x1 = arg[0].value.scalar.value.number.s;
 	short y1 = arg[1].value.scalar.value.number.s;
@@ -426,6 +432,7 @@ static void OperateOnRectangularRegion(BObject *arg, void (*act)(unsigned char *
 	short y2 = arg[3].value.scalar.value.number.s;
 	BObject *a = &arg[4];
 	BasicRectangle extent;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(ScreenGet_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -433,7 +440,7 @@ static void OperateOnRectangularRegion(BObject *arg, void (*act)(unsigned char *
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -481,18 +488,18 @@ static void OperateOnRectangularRegion(BObject *arg, void (*act)(unsigned char *
 		/* TODO too slow! */
 		for(p.y = y1; p.y <= y2; p.y++)
 			for(p.x = x1; p.x <= x2; p.x++)
-				act(pptr++, &p); 
+				act(win, pptr++, &p); 
 	}
 }
 
-static void ReadPt(unsigned char *pptr, const BasicPoint *p) 
+static void ReadPt(PfWindowHandle win, unsigned char *pptr, const BasicPoint *p) 
 {
-	*pptr = GetPixelPaletteColourNative(OutputWindow(), p);
+	*pptr = GetPixelPaletteColourNative(win, p);
 }
 
-static void WritePt(unsigned char *pptr, const BasicPoint *p)
+static void WritePt(PfWindowHandle win, unsigned char *pptr, const BasicPoint *p)
 {
-	SetPixelNative(OutputWindow(), p, *pptr);
+	SetPixelNative(win, p, *pptr);
 }
 
 void ScreenGet_(BObject *arg, unsigned count)
@@ -509,6 +516,7 @@ void ScreenPut_(BObject *arg, unsigned count)
 void Line_(BObject *arg, unsigned count)
 {
 	BasicPoint p1, p2;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(Line_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -516,7 +524,7 @@ void Line_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -529,12 +537,13 @@ void Line_(BObject *arg, unsigned count)
 	p2.x = arg[2].value.scalar.value.number.s;
 	p2.y = arg[3].value.scalar.value.number.s;
 	
-	DrawLineNative(OutputWindow(), &p1, &p2);
+	DrawLineNative(win, &p1, &p2);
 }
 
 static void AddPointToArea(short x, short y)
 {
 	BasicPoint p;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(Area_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -542,7 +551,7 @@ static void AddPointToArea(short x, short y)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -553,7 +562,7 @@ static void AddPointToArea(short x, short y)
 	p.x = x;
 	p.y = y;
 	
-	if(!AddVertexToPolygonNative(OutputWindow(), &p))
+	if(!AddVertexToPolygonNative(win, &p))
 		CauseError(ER_AREA);
 }
 
@@ -565,9 +574,10 @@ void Area_(BObject *arg, unsigned count)
 void AreaStep_(BObject *arg, unsigned count)
 {
 	BasicPoint pen;
+	PfWindowHandle win = OutputWindow();
 	
-	if(OutputWindow() != NULL_WINDOW_HANDLE)
-		GetCurrentPenPositionNative(OutputWindow(), &pen);
+	if(win != NULL_WINDOW_HANDLE)
+		GetCurrentPenPositionNative(win, &pen);
 	else
 		pen.x = pen.y = 0;
 	
@@ -577,13 +587,15 @@ void AreaStep_(BObject *arg, unsigned count)
 /* TODO mode parameter: 0 = fill with current pattern; 1 = invert */
 void AreaFill_(BObject *arg, unsigned count)
 {
+	PfWindowHandle win = OutputWindow();
+	
 	if(!FeatureAvailable(Area_)) {
 		CauseError(NOTIMPLEMENTED);
 		return;
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -591,7 +603,7 @@ void AreaFill_(BObject *arg, unsigned count)
 	InitGfx();
 #endif
 	
-	if(!FillPolygonNative(OutputWindow()))
+	if(!FillPolygonNative(win))
 		CauseError(ER_AREA);
 }
 
@@ -599,6 +611,7 @@ void Paint_(BObject *arg, unsigned count)
 {
 	BasicPoint p;
 	short penID = arg[2].value.scalar.value.number.s;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(Paint_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -606,7 +619,7 @@ void Paint_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -617,7 +630,7 @@ void Paint_(BObject *arg, unsigned count)
 	p.x = arg[0].value.scalar.value.number.s;
 	p.y = arg[1].value.scalar.value.number.s;
 	
-	if(!FloodFillNative(OutputWindow(), &p, penID))
+	if(!FloodFillNative(win, &p, penID))
 		CauseError(NOMEMORY); /* assume this rather than some more obscure gfx problem */
 }
 
@@ -626,6 +639,7 @@ void Circle_(BObject *arg, unsigned count)
 	BasicRectangle bounds;
 	BasicPoint centre;
 	short radius;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(Circle_)) {
 		CauseError(NOTIMPLEMENTED);
@@ -633,7 +647,7 @@ void Circle_(BObject *arg, unsigned count)
 	}
 	
 #if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -651,15 +665,16 @@ void Circle_(BObject *arg, unsigned count)
 	bounds.bottomRight.x = centre.x + radius;
 	bounds.bottomRight.y = centre.y + radius;
 	
-	DrawEllipseNative(OutputWindow(), &bounds);
+	DrawEllipseNative(win, &bounds);
 }
 
 void CircleStep_(BObject *arg, unsigned count)
 {
 	BasicPoint pen;
+	PfWindowHandle win = OutputWindow();
 	
-	if(OutputWindow() != NULL_WINDOW_HANDLE)
-		GetCurrentPenPositionNative(OutputWindow(), &pen);
+	if(win != NULL_WINDOW_HANDLE)
+		GetCurrentPenPositionNative(win, &pen);
 	else
 		pen.x = pen.y = 0;
 		
@@ -692,13 +707,14 @@ void WPrint_(BObject *arg, unsigned count)
 {
 	const int windowPrintTabSize = 4;
 	unsigned n;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(WPrint_)) {
 		CauseError(NOTIMPLEMENTED);
 		return;
 	}
 	
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -707,7 +723,7 @@ void WPrint_(BObject *arg, unsigned count)
 		/* Assume parameters preformatted as strings! */
 		const QString *s = (const QString *)GetPointer(&arg[n].value.scalar);
 		assert(arg[n].category == LITERAL && GetSimpleType(&arg[n]) == T_STRING);
-		RenderTextNative(OutputWindow(), QsGetData(s), QsGetLength(s), windowPrintTabSize); /* TODO tabsize from gui struct? */
+		RenderTextNative(win, QsGetData(s), QsGetLength(s), windowPrintTabSize); /* TODO tabsize from gui struct? */
 	}
 }
 
@@ -715,20 +731,21 @@ void WPTab_(Scalar *result, const BObject *arg, unsigned count)
 {
 	short x = arg[0].value.scalar.value.number.s;
 	BasicPoint p;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(WPrint_)) {
 		SetError(result, NOTIMPLEMENTED);
 		return;
 	}
 	
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		SetError(result, ER_NO_OUTPUT_WINDOW);
 		return;
 	}
 	
-	GetCurrentPenPositionNative(OutputWindow(), &p);
+	GetCurrentPenPositionNative(win, &p);
 	p.x = x;
-	SetPenPositionNative(OutputWindow(), &p);
+	SetPenPositionNative(win, &p);
 	
 	/* Return an empty string to avoid messing with the position. */
 	InitScalar(result, T_STRING, FALSE);
@@ -740,40 +757,42 @@ void WLocate_(BObject *arg, unsigned count)
 	short x = arg[1].value.scalar.value.number.s;
 	short width, height;
 	BasicPoint pos;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(WPrint_)) {
 		CauseError(NOTIMPLEMENTED);
 		return;
 	}
 	
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
 
-	GetFontCharacterDimensionsNative(OutputWindow(), &width, &height);
+	GetFontCharacterDimensionsNative(win, &width, &height);
 	pos.x = (x - 1) * width;
 	pos.y = (y - 1) * height;
-	SetPenPositionNative(OutputWindow(), &pos);
+	SetPenPositionNative(win, &pos);
 }
 
 void WPos_(Scalar *result, const BObject *arg, unsigned count)
 {
 	short width, height;
 	BasicPoint pen;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(WPrint_)) {
 		SetError(result, NOTIMPLEMENTED);
 		return;
 	}
 		
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		SetError(result, ER_NO_OUTPUT_WINDOW);
 		return;
 	}
 
-	GetCurrentPenPositionNative(OutputWindow(), &pen);
-	GetFontCharacterDimensionsNative(OutputWindow(), &width, &height);
+	GetCurrentPenPositionNative(win, &pen);
+	GetFontCharacterDimensionsNative(win, &width, &height);
 
 	SetFromLong(result, 1 + pen.x / width, T_INT);
 	
@@ -787,19 +806,20 @@ void WCsrLin_(Scalar *result, const BObject *arg, unsigned count)
 {
 	short width, height;
 	BasicPoint pen;
+	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(WPrint_)) {
 		SetError(result, NOTIMPLEMENTED);
 		return;
 	}
 		
-	if(OutputWindow() == NULL_WINDOW_HANDLE) {
+	if(win == NULL_WINDOW_HANDLE) {
 		SetError(result, ER_NO_OUTPUT_WINDOW);
 		return;
 	}
 
-	GetCurrentPenPositionNative(OutputWindow(), &pen);
-	GetFontCharacterDimensionsNative(OutputWindow(), &width, &height);
+	GetCurrentPenPositionNative(win, &pen);
+	GetFontCharacterDimensionsNative(win, &width, &height);
 
 	SetFromLong(result, 1 + pen.y / height, T_INT);
 	
@@ -1044,9 +1064,13 @@ void MenuState_(Scalar *result, const BObject *arg, unsigned count)
 
 bool MenuWasSelected(void)
 {
-	bool happened = Gui()->menuSelected;
-	Gui()->menuSelected = FALSE;
-	return happened;
+	struct UserInterface *gui = Gui();
+	if(gui != NULL && gui->menuSelected) {
+		gui->menuSelected = FALSE;
+		return TRUE;
+	}
+	else
+		return FALSE;
 }
 
 /*** MenuPicked_ ***/
@@ -1066,15 +1090,24 @@ void MenuPicked_(Scalar *result, const BObject *arg, unsigned count)
 		return;
 	}
 	
+	if(Gui() == NULL) {
+		SetError(result, ER_NO_MENU);
+		return;
+	}
+	
 	InitScalarAsString(result);
 	GetMenuSelectionNative(&result->value.string, &Gui()->menuChoice);
 }
 
 bool KeyWasPressed(void)
 {
-	bool happened = Gui()->keyWasPressed;
-	Gui()->keyWasPressed = FALSE;
-	return happened;
+	struct UserInterface *gui = Gui();
+	if(gui != NULL && gui->keyWasPressed) {
+		gui->keyWasPressed = FALSE;
+		return TRUE;
+	}
+	else
+		return FALSE;
 }
 
 void InKey_(Scalar *result, const BObject *arg, unsigned count)
@@ -1084,15 +1117,24 @@ void InKey_(Scalar *result, const BObject *arg, unsigned count)
 		return;
 	}
 	
+	if(Gui() == NULL) {
+		SetError(result, ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+	
 	InitScalarAsString(result);
 	GetKeyPressDataNative(&result->value.string, &Gui()->keyData);
 }
 
 bool PointerWasOperated(void)
 {
-	bool happened = Gui()->pointerOperated;
-	Gui()->pointerOperated = FALSE;
-	return happened;
+	struct UserInterface *gui = Gui();
+	if(gui != NULL && gui->pointerOperated) {
+		gui->pointerOperated = FALSE;
+		return TRUE;
+	}
+	else
+		return FALSE;
 }
 
 /*** Mouse_ ***/
@@ -1136,6 +1178,11 @@ void Mouse_(Scalar *result, const BObject *arg, unsigned count)
 
 	if(!FunctionAvailable(Mouse_)) {
 		SetError(result, NOTIMPLEMENTED);
+		return;
+	}
+	
+	if(Gui() == NULL) {
+		SetError(result, ER_NO_OUTPUT_WINDOW);
 		return;
 	}
 	

@@ -98,6 +98,8 @@ static int GetMenuItemStateNative(PfWindowHandle win, char *menuName, char *item
 
 /* Events: */
 
+PfEventNotificationHandle GetUIEventNotificationHandle(void) { return 0; }
+
 static bool GetNextWindowEventNative(PfWindowEvent *nextEvent) { *nextEvent = -1; return FALSE; }
 
 static bool TranslateKeyPressNative(const PfWindowEvent *event, PfKeypress *press) { return FALSE; }

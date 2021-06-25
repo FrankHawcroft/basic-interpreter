@@ -100,7 +100,7 @@ static void QsCopyForWrite(QString *, size_t length);
 static struct QStrData *QsAllocate(size_t);
 static const QsChar *FindOneOf(const QsChar *start, QsInternalLength length, const QString *find);
 static const QsChar *FindChar(const QsChar *start, QsInternalLength length, QsChar ch);
-static unsigned long HashFor(const QsChar *, size_t);
+static unsigned HashFor(const QsChar *, size_t);
 
 #ifdef DEBUG
 /* Memory use statistics. */
@@ -140,7 +140,7 @@ with a trivial, i.e. O(1), comparison. */
 /* Conversely, TRUE if the two strings are definitely not equivalent. */
 
 #if FAST_HASH || QSTRING_CACHE_HASH
-#define QsTriviallyUnequal(s1, s2) (QsGetLength(s1) != QsGetLength(s2) || (QsGetLength(s1) > 40 && QsHash(s1, 0) != QsHash(s2, 0)))
+#define QsTriviallyUnequal(s1, s2) (QsGetLength(s1) != QsGetLength(s2) || (QsGetLength(s1) > 40 && QsHash(s1) != QsHash(s2)))
 #else
 #define QsTriviallyUnequal(s1, s2) (QsGetLength(s1) != QsGetLength(s2))
 #endif
@@ -785,9 +785,9 @@ The algorithm used is 'djb2' by Dan Bernstein, as given at http://www.cse.yorku.
 #define Combine(h, s, n) ((((h) << 5) + (h)) ^ CToUpper((s)[n]))
 #endif
 
-static unsigned long HashFor(const QsChar *c, size_t keyLength)
+static unsigned HashFor(const QsChar *c, size_t keyLength)
 {
-	unsigned long hash = 5381;
+	unsigned hash = 5381;
 	
 #if FAST_HASH
 	/* Because most BASIC symbols are short, only 1-3 characters long,
@@ -814,9 +814,9 @@ static unsigned long HashFor(const QsChar *c, size_t keyLength)
 	return hash;
 }
 
-unsigned long QsHash(const QString *key, unsigned long modulo)
+unsigned QsHash(const QString *key)
 {
-	unsigned long hash = 5381; /* = QsIsNull(key) ? 0 : CToUpper(QsGetFirst(key)); */
+	unsigned hash = 5381; /* = QsIsNull(key) ? 0 : CToUpper(QsGetFirst(key)); */
 
 #if QSTRING_CACHE_HASH
 	hash = key->hash != 0 ? key->hash : HashFor(QsGetData(key), QsGetLength(key));
@@ -849,7 +849,7 @@ unsigned long QsHash(const QString *key, unsigned long modulo)
 	hash = HashFor(QsGetData(key), QsGetLength(key));*/
 #endif /* ! QSTRING_CACHE_HASH */
 
-	return modulo == 0 ? hash : hash % modulo;
+	return hash;
 }
 
 #ifdef DEBUG

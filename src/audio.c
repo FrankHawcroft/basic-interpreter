@@ -17,6 +17,7 @@
 void InitAudio(void) { }
 void CleanUpAudio(void) { }
 void CheckAudio(void) { }
+PfEventNotificationHandle GetAudioEventNotificationHandle(void) { return 0; }
 
 void Sound_(BObject *arg, unsigned count) { CauseError(NOTIMPLEMENTED); }
 void SoundResume_(BObject *arg, unsigned count) { CauseError(NOTIMPLEMENTED); }
@@ -144,6 +145,20 @@ void CheckAudio(struct Process *proc)
 				ch->wait = FALSE;
 			}
 		}
+	}
+}
+
+PfEventNotificationHandle GetAudioEventNotificationHandle(void)
+{
+	struct Process *proc = Proc();
+	if(proc->audio == NULL)
+		return 0;
+	else {
+		ULONG mask = 0;
+		struct AmigaChannel *ch;
+		for(ch = &proc->audio->chan[0]; ch < &proc->audio->chan[NUM_AMIGA_CHANNELS]; ch++)
+			mask |= (ch->request != NULL && ch->port != NULL ? ch->port->mp_SigBit : 0);
+		return mask;
 	}
 }
 

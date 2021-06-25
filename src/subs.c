@@ -22,14 +22,15 @@ extern int strnicmp(const char *, const char *, size_t);
 
 void CallSubprogram(const struct Statement *statement, const BObject *actual, unsigned actualCount, bool firstTime)
 {
+	struct Process *proc = Proc();
 	Error error = SUCCESS;
 	short an;
 	
 	assert(IsSubprogram(statement));
 	assert(statement->formalCount == (short)actualCount); /* Optional parameters are not supported for subs. */
 
-	++Proc()->callNestLevel;
-	Proc()->staticSubCallNesting += statement->staticSub;
+	++proc->callNestLevel;
+	proc->staticSubCallNesting += statement->staticSub;
 	PushActivationRecord(statement);
 
 	/* Create local variables and copy values or set references from actuals. */
@@ -38,19 +39,19 @@ void CallSubprogram(const struct Statement *statement, const BObject *actual, un
 		for(an = 0; an < statement->formalCount && error == SUCCESS; an++, actual++) {
 			error = AssignToStaticParameter(&statement->formal[an], statement->predefinedParameter[an], actual);
 			if(statement->predefinedParameter[an] == NULL)
-				statement->predefinedParameter[an] = VarPtr(LookUp(&statement->formal[an].name, SCOPE_STATIC)); /* vvv */
+				statement->predefinedParameter[an] = VarPtr(LookUp(&statement->formal[an].name, SCOPE_STATIC));
 		}
 	else
 		for(an = 0; an < statement->formalCount && error == SUCCESS; an++, actual++)
-			error = !firstTime || CanDefineVariable(&statement->formal[an].name, Proc()->callNestLevel) /* vvv */
+			error = !firstTime || CanDefineVariable(&statement->formal[an].name, proc->callNestLevel)
 				? CreateArgumentVariable(&statement->formal[an], actual) : REDEFINE;
 	
 	if(error == SUCCESS)
-		Proc()->currentPosition = statement->method.sub;
+		proc->currentPosition = statement->method.sub;
 	else {
 		 /* Bail out. */
-		--Proc()->callNestLevel;
-		Proc()->staticSubCallNesting -= statement->staticSub;
+		--proc->callNestLevel;
+		proc->staticSubCallNesting -= statement->staticSub;
 		DiscardCurrentControlFlow();
 		CauseError(error);
 	}

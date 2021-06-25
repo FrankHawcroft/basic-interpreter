@@ -645,7 +645,7 @@ void ConstConvert(unsigned index, const QString *token, BObject *result)
 		}
 	}
 	else
-		ConvertToObject(token, result, Proc()->callNestLevel);
+		ConvertToObject(token, result, SCOPE_CURRENT);
 }
 
 void ConvertWithArrayVarCreation(unsigned index, const QString *token, BObject *result, short callNestLevel, bool shared)
@@ -664,7 +664,7 @@ void ConvertWithArrayVarCreation(unsigned index, const QString *token, BObject *
 		}
 	}
 	else
-		ConvertToObject(token, result, Proc()->callNestLevel);
+		ConvertToObject(token, result, callNestLevel);
 }
 
 void DimConvert(unsigned index, const QString *token, BObject *result)
@@ -700,7 +700,7 @@ void AssignConvert(unsigned index, const QString *token, BObject *result)
 		}
 	}
 	else
-		ConvertToObject(token, result, Proc()->callNestLevel);
+		ConvertToObject(token, result, SCOPE_CURRENT);
 }
 
 extern BObject *LookUpLocal(const QString *symbol, short callNestLevel);
@@ -715,5 +715,5 @@ void LocalScalarAssignConvert(unsigned index, const QString *token, BObject *res
 			SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, VarPtr(existing));
 	}
 	else
-		ConvertToObject(token, result, Proc()->callNestLevel);
+		ConvertToObject(token, result, SCOPE_CURRENT);
 }

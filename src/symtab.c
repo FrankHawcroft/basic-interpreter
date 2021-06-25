@@ -108,9 +108,10 @@ BObject *LookUp(const QString *symbol, short callNestLevel)
 {
 	BObject *definition = NULL;
 	struct Process *proc = Proc();
+	unsigned hash = QsHash(symbol);
 	short scope[3], initiallyProbedScope, i;
 	
-	scope[0] = callNestLevel;
+	scope[0] = callNestLevel == SCOPE_CURRENT ? proc->callNestLevel : callNestLevel;
 	scope[1] = SCOPE_GLOBAL;
 	scope[2] = SCOPE_BUILTIN;
 
@@ -126,7 +127,7 @@ BObject *LookUp(const QString *symbol, short callNestLevel)
 	
 	for(i = initiallyProbedScope; i < 3 && definition == NULL; i++) {
 		struct HashTable *relevantTable = ProbeEnvironment(proc, scope[i]);
-		definition = relevantTable == NULL ? NULL : HtLookUp(relevantTable, symbol);
+		definition = relevantTable == NULL ? NULL : HtLookUpUsingPrecomputedHash(relevantTable, symbol, hash);
 #ifdef DEBUG
 		proc->hashTableSearches += relevantTable != NULL;
 #endif

@@ -159,7 +159,7 @@ extern void QsDispose(QString *);
 extern const QsChar *QsGetData(const QString *); /* read only! */
 extern QsChar QsGetCharAt(const QString *, size_t);
 extern QsChar QsGetLast(const QString *);
-extern unsigned long QsHash(const QString *, unsigned long modulo);
+extern unsigned QsHash(const QString *);
 extern void QsCopyToBuffer(const QString *, QsChar *, size_t);
 extern QsChar *QsDupAsNTS(const QString *);
 extern int QsTokenise(const QString *source, QString *token, size_t maxTokens, const QString *separator);

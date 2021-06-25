@@ -182,7 +182,7 @@ static void PrintFunctionInfo(const struct Function *f)
 	is necessary to allow efficient dynamic programming using global arrays. */
 static void FunctionExpressionConvert(unsigned index, const QString *token, BObject *result)
 {
-	ConvertToObject(token, result, Proc()->callNestLevel);
+	ConvertToObject(token, result, SCOPE_CURRENT);
 	if(GetSimpleType(result) == T_EMPTY) {
 		BObject *global = LookUpCheckingType(token, SCOPE_MAIN);
 		if(global != NULL) {

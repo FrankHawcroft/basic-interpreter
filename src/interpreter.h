@@ -340,7 +340,8 @@ enum SpecialScope {
 	SCOPE_BUILTIN = -3, /* built-ins: commands, functions, operators, punctuation */
 	SCOPE_GLOBAL = -2, /* globals: main program constants, SHARED arrays, DEF functions, SUBs */
 	SCOPE_STATIC = -1,
-	SCOPE_MAIN = 0 /* main program, but not implicitly globally visible */
+	SCOPE_MAIN = 0, /* main program, but not implicitly globally visible */
+	SCOPE_CURRENT = 9999 /* pseudo: behaviour for looking up things which may be locals hiding globals or built-ins */
 };
 
 /*** TokenSequence ***/

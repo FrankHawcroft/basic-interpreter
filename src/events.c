@@ -190,7 +190,6 @@ static void __cdecl RecordBreakSignal(int dummy)
 	Proc()->breakFlag = TRUE;
 }
 
-/* This is not thread-safe, but then, the program state isn't shared ... */
 static bool BreakHasOccurred(void)
 {
 	struct Process *proc = Proc();
@@ -722,11 +721,28 @@ void Forget_(const QString *toks, unsigned nToks)
 	(*trap->transition)(trap, status);
 }
 
+extern PfEventNotificationHandle GetUIEventNotificationHandle(void);
+
 void Sleep_(BObject *arg, unsigned count)
 {
-	do
-		PfSleep(10 * 1000); /* 10 milliseconds */
-	while(!CheckForEvents(Proc()));
+	struct Process *proc = Proc();
+	
+	if(proc->trap[EVT_TIMER].status != DISABLED) {
+		/* Polling is much simpler than installing a timer, on the Amiga. */
+		do
+			PfSleep(100 * 1000); /* 100 milliseconds */
+		while(!CheckForEvents(proc));
+	}
+	else {
+		PfEventNotificationHandle handle = PfCombineEventNotificationHandles(
+			PfGetBreakEventNotificationHandle(),
+			GetUIEventNotificationHandle(),
+			GetAudioEventNotificationHandle());
+	
+		do
+			PfSleepUntilEvent(handle);
+		while(!CheckForEvents(proc));
+	}
 }
 
 void Wait_(BObject *arg, unsigned count)

@@ -523,7 +523,7 @@ void EmptyStatement_(const QString *toks, unsigned nToks)
 variables and other special side effects required for particular statements. */
 void DefaultConvert(unsigned index, const QString *token, BObject *result)
 {
-	ConvertToObject(token, result, Proc()->callNestLevel);
+	ConvertToObject(token, result, SCOPE_CURRENT);
 }
 
 /* Conversion for statements which don't, i.e. macros. */

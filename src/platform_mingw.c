@@ -114,7 +114,7 @@ bool PfRepresentsStdin(const char *name)
 	return strcmp(name, "-") == 0; /* Arguably, also 'CON' etc. */
 }
 
-void PfSleep(unsigned micros)
+void PfSleep(unsigned long micros)
 {
 	Sleep((DWORD)micros / 1000);
 }

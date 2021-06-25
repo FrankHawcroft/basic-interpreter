@@ -41,6 +41,8 @@ extern void HtDelete(struct HashTable *, const QString *key);
 
 extern void *HtLookUp(const struct HashTable *, const QString *key);
 
+extern void *HtLookUpUsingPrecomputedHash(const struct HashTable *, const QString *key, unsigned hash);
+
 #ifdef DEBUG
 #define HT_VISIT_INCLUDES_BIN_PARAM 1
 #else

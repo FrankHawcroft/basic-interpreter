@@ -199,7 +199,7 @@ bool PfRepresentsStdin(const char *name)
 	return _stricmp(name, "con") == 0;
 }
 
-void PfSleep(unsigned micros)
+void PfSleep(unsigned long micros)
 {
 	Sleep((DWORD)micros / 1000);
 }

@@ -381,7 +381,7 @@ bool PfRepresentsStdin(const char *name)
 	return strcmp(name, "-") == 0;
 }
 
-void PfSleep(unsigned micros)
+void PfSleep(unsigned long micros)
 {
 	usleep(micros);
 }

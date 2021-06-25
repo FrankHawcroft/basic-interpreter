@@ -48,7 +48,7 @@ struct HashTable *HtCreate(
 
 void HtAddPreallocated(struct HashTable *ht, struct Definition *defn)
 {
-	struct Definition **bin = &ht->bin[QsHash(&defn->key, ht->numBins)];
+	struct Definition **bin = &ht->bin[QsHash(&defn->key) % ht->numBins];
 
 	assert(HtLookUp(ht, &defn->key) == NULL);
 	
@@ -69,7 +69,7 @@ void *HtTryAdd(struct HashTable *ht, struct Definition *defn)
 	assert(ht != NULL);
 	assert(defn != NULL);
 	
-	bin = &ht->bin[QsHash(&defn->key, ht->numBins)];
+	bin = &ht->bin[QsHash(&defn->key) % ht->numBins];
 	for(pair = *bin; pair != NULL; pair = pair->next)
 		if((*ht->keyEquality)(&pair->key, &defn->key))
 			return pair->value;
@@ -91,12 +91,17 @@ void HtAdd(struct HashTable *ht, const QString *key, void *value)
 
 void *HtLookUp(const struct HashTable *ht, const QString *key)
 {
+	return HtLookUpUsingPrecomputedHash(ht, key, QsHash(key));
+}
+
+void *HtLookUpUsingPrecomputedHash(const struct HashTable *ht, const QString *key, unsigned hash)
+{
 	struct Definition *pair;
 	
 	assert(ht != NULL);
 	assert(key != NULL);
 	
-	for(pair = ht->bin[QsHash(key, ht->numBins)]; pair != NULL; pair = pair->next)
+	for(pair = ht->bin[hash % ht->numBins]; pair != NULL; pair = pair->next)
 		if((*ht->keyEquality)(&pair->key, key))
 			return pair->value;
 	return NULL;
@@ -177,7 +182,7 @@ static void HtDeleteMatching(struct HashTable *ht, HtVisitor matches, const void
 
 void HtDelete(struct HashTable *ht, const QString *key)
 {
-	unsigned bin = QsHash(key, ht->numBins);
+	unsigned bin = QsHash(key) % ht->numBins;
 	struct SingleDefinitionMatchingParams params;
 	params.key = key;
 	params.keyEquality = ht->keyEquality;
