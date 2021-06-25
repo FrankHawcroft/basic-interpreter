@@ -107,4 +107,10 @@ typedef char SmallBitField;
 #endif /* not C++ or C99-compliant compiler */
 #endif /* ndef INLINE */
 
+/*** strnicmp ***/
+
+#if defined(VBCC) || defined(__clang__) || defined(__GLIBC__)
+extern int strnicmp(const char *, const char *, size_t);
+#endif
+
 #endif /* BAS_COMMON_H_INCLUDED */

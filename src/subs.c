@@ -16,10 +16,6 @@
 #include "options.h"
 #include "hashtable.h"
 
-#if defined(VBCC) || defined(__clang__)
-extern int strnicmp(const char *, const char *, size_t);
-#endif
-
 void CallSubprogram(const struct Statement *statement, const BObject *actual, unsigned actualCount, bool firstTime)
 {
 	struct Process *proc = Proc();

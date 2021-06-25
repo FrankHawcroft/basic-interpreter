@@ -13,10 +13,6 @@
 #include "process.h"
 #include "heap.h"
 
-#if defined(VBCC) || defined(__clang__)
-extern int strnicmp(const char *, const char *, size_t);
-#endif
-
 static const QString m_Rem = {"REM", 3};
 
 static bool IsLabelFirst(char c) { return isalpha(c) != 0; }

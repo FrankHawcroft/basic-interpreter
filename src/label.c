@@ -15,10 +15,6 @@
 #include "process.h"
 #include "buffer.h"
 
-#if defined(VBCC) || defined(__clang__)
-extern int strnicmp(const char *, const char *, size_t);
-#endif
-
 bool AddLabel(const QString *name, const char *labelledPosition, short callNestLevel)
 {
 	const BObject *existing = LookUp(name, callNestLevel);

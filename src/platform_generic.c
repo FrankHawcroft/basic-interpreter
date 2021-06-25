@@ -34,9 +34,11 @@
 
 #if PF_USE_GENERIC_MISCELLANEOUS_FUNCTIONS || PF_USE_GENERIC_MEMORY_ALLOCATION
 #include <unistd.h>
-#ifndef __GNUC__
+#if !(__APPLE__ && __MACH__) && (defined(_POSIX_SOURCE) || defined(_GNU_SOURCE) || defined(__GNUC__))
+#include <sys/resource.h>
+#elif !defined(__GNUC__) && !(__APPLE__ && __MACH__)
 #include <ulimit.h>	
-#endif /* ndef __GNUC__ */
+#endif /* new- or old-fashioned Unix resource limits */
 #endif /* PF_USE_GENERIC_MISCELLANEOUS_FUNCTIONS */
 
 #if PF_USE_GENERIC_PATH_CONVENTIONS
@@ -67,7 +69,7 @@ void PfJoinPath(char *path, const char *append)
 
 /****** Functions that may or may not be used, depending on the target platform ******/
 
-#if defined(VBCC) || defined(__clang__)
+#if defined(VBCC) || defined(__clang__) || defined(__GLIBC__)
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -342,7 +344,7 @@ float PfGetElapsedTimeSince(const PfHighResolutionTimeStamp *start)
 	PfHighResolutionTimeStamp end;
 	PfRecordTime(&end);
 	/* TODO not very sensical - */
-	return difftime(end->secs, start->secs) + (float)(end->clocks - start->clocks) / CLOCKS_PER_SEC;
+	return difftime(end.secs, start->secs) + (float)(end.clocks - start->clocks) / CLOCKS_PER_SEC;
 }
 
 #endif /* PF_USE_GENERIC_EXECUTION_TIMING_FUNCTIONS */
