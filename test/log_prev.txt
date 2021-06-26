@@ -11,8 +11,8 @@
 -- QString self-tests finished.
 -- Hash table self-tests running ...
 -- Hash table dump - num bins = 1087
- 356: key one => <00A93558>.
- 633: key three => <00A93588>.
+ 356: key one => <00B33558>.
+ 633: key three => <00B33588>.
 -- End of hash table dump
 -- Hash table self-tests finished.
 -- Cache self-tests running ...
@@ -64,13 +64,13 @@ Finished simple expression tests!
     0 + 1 [] [] const TRUE? = 1 <newline>.
     0 + 2 [] [] const TRUE? ; 1 |.
     0 + 3 [] [] const TRUE? 1 |.
-    0 + 4  <var(256) cat=56 @ 0: 004B13CC> <lit(4):  1>.
-    0 + 5  <var(256) cat=56 @ 0: 004B13CC> <lit(256): TRUE>.
+    0 + 4  <var(256) cat=56 @ 0: 00AD13CC> <lit(4):  1>.
+    0 + 5  <var(256) cat=56 @ 0: 00AD13CC> <lit(256): TRUE>.
    16 + 1 [] [] const FALSE? = not TRUE <newline>.
    16 + 2 [] [] const FALSE? ; not TRUE |.
    16 + 3 [] [] const FALSE? ( not TRUE ) |.
-   16 + 4  <var(256) cat=56 @ 0: 004B1D8C> <lit(256): FALSE>.
-   16 + 5  <var(256) cat=56 @ 0: 004B1D8C> <lit(256): FALSE>.
+   16 + 4  <var(256) cat=56 @ 0: 00AD1D8C> <lit(256): FALSE>.
+   16 + 5  <var(256) cat=56 @ 0: 00AD1D8C> <lit(256): FALSE>.
    40 + 1 [] [] [] <newline>.
    40 + 2 [] [] e~ |.
    41 + 1 [] [] def ABS# ( pabsx# ) static where pabsx < 0 as - pabsx <newline>.
@@ -94,13 +94,13 @@ Finished simple expression tests!
   296 + 1 [] [] const pmaxlng& = 0x7FFFFFFF <newline>.
   296 + 2 [] [] const pmaxlng& ; 0x7FFFFFFF |.
   296 + 3 [] [] const pmaxlng& 0x7FFFFFFF |.
-  296 + 4  <var(8) cat=56 @ 0: 004B256C> <lit(8):  2147483647>.
-  296 + 5  <var(8) cat=56 @ 0: 004B256C> <lit(8):  2147483647>.
+  296 + 4  <var(8) cat=56 @ 0: 00AD256C> <lit(8):  2147483647>.
+  296 + 5  <var(8) cat=56 @ 0: 00AD256C> <lit(8):  2147483647>.
   324 + 1 [] [] const pminlng& = 0x80000000 <newline>.
   324 + 2 [] [] const pminlng& ; 0x80000000 |.
   324 + 3 [] [] const pminlng& 0x80000000 |.
-  324 + 4  <var(8) cat=56 @ 0: 004B25CC> <lit(8): -2147483648>.
-  324 + 5  <var(8) cat=56 @ 0: 004B25CC> <lit(8): -2147483648>.
+  324 + 4  <var(8) cat=56 @ 0: 00AD25CC> <lit(8): -2147483648>.
+  324 + 5  <var(8) cat=56 @ 0: 00AD25CC> <lit(8): -2147483648>.
   352 + 1 [] [] [] <newline>.
   352 + 2 [] [] e~ |.
   353 + 1 [] [] def INT& ( pintx! ) static where pminlng < pintx and pintx < 0 as FIX ( pintx ) - 1 <newline>.
@@ -138,8 +138,8 @@ Finished simple expression tests!
   916 + 1 [] [] const pmaxstrlen% = 32767 <newline>.
   916 + 2 [] [] const pmaxstrlen% ; 32767 |.
   916 + 3 [] [] const pmaxstrlen% 32767 |.
-  916 + 4  <var(4) cat=56 @ 0: 004B35EC> <lit(4):  32767>.
-  916 + 5  <var(4) cat=56 @ 0: 004B35EC> <lit(4):  32767>.
+  916 + 4  <var(4) cat=56 @ 0: 00AD35EC> <lit(4):  32767>.
+  916 + 5  <var(4) cat=56 @ 0: 00AD35EC> <lit(4):  32767>.
   942 + 1 [] [] [] <newline>.
   942 + 2 [] [] e~ |.
   943 + 1 [] [] def MID2$ ( pmids$ , pmidn% ) static as mid ( pmids , pmidn , pmaxstrlen ) <newline>.
@@ -187,13 +187,13 @@ Finished simple expression tests!
  1989 + 1 [] [] const pucase$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <newline>.
  1989 + 2 [] [] const pucase$ ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
  1989 + 3 [] [] const pucase$ "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
- 1989 + 4  <var(64) cat=56 @ 0: 004B124C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
- 1989 + 5  <var(64) cat=56 @ 0: 004B124C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
+ 1989 + 4  <var(64) cat=56 @ 0: 00AD124C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
+ 1989 + 5  <var(64) cat=56 @ 0: 00AD124C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
  2034 + 1 [] [] const plcase$ = "abcdefghijklmnopqrstuvwxyz" <newline>.
  2034 + 2 [] [] const plcase$ ; "abcdefghijklmnopqrstuvwxyz" |.
  2034 + 3 [] [] const plcase$ "abcdefghijklmnopqrstuvwxyz" |.
- 2034 + 4  <var(64) cat=56 @ 0: 004B4F6C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
- 2034 + 5  <var(64) cat=56 @ 0: 004B4F6C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
+ 2034 + 4  <var(64) cat=56 @ 0: 00AD4F6C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
+ 2034 + 5  <var(64) cat=56 @ 0: 00AD4F6C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
  2079 + 1 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) <newline>.
  2079 + 2 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) |.
  2145 + 1 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) <newline>.
@@ -215,12 +215,12 @@ Finished simple expression tests!
  2751 + 1 [] [] const plittleendian? = cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 <newline>.
  2751 + 2 [] [] const plittleendian? ; cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 |.
  2751 + 3 [] [] const plittleendian? ( < ( cvi ( & "x" ( mid ( mki 0 ) 1 1 ) ) ) 255 ) |.
- 2751 + 4  <var(256) cat=56 @ 0: 004B58FC> <lit(256): TRUE>.
- 2751 + 5  <var(256) cat=56 @ 0: 004B58FC> <lit(256): TRUE>.
+ 2751 + 4  <var(256) cat=56 @ 0: 00AD58FC> <lit(256): TRUE>.
+ 2751 + 5  <var(256) cat=56 @ 0: 00AD58FC> <lit(256): TRUE>.
  2809 + 1 [] [] if plittleendian goto plechr <newline>.
  2809 + 2 [] [] IFGOTO~ plittleendian ; plechr |.
  2809 + 3 [] [] IFGOTO~ plittleendian plechr |.
- 2809 + 4  <var(256) cat=56 @ 0: 004B58FC> <label: file ..\module\prelude.bas, line 88>.
+ 2809 + 4  <var(256) cat=56 @ 0: 00AD58FC> <label: file ..\module\prelude.bas, line 88>.
  2809 + 5  <lit(256): TRUE> <label: file ..\module\prelude.bas, line 88>.
  2983 + 1 [] plechr [] <newline>.
  2983 + 2 [] plechr e~ |.
@@ -235,8 +235,8 @@ Finished simple expression tests!
  3132 + 1 [] [] const p2ndbit& = 0x40000000 <newline>.
  3132 + 2 [] [] const p2ndbit& ; 0x40000000 |.
  3132 + 3 [] [] const p2ndbit& 0x40000000 |.
- 3132 + 4  <var(8) cat=56 @ 0: 004B5F5C> <lit(8):  1073741824>.
- 3132 + 5  <var(8) cat=56 @ 0: 004B5F5C> <lit(8):  1073741824>.
+ 3132 + 4  <var(8) cat=56 @ 0: 00AD5F5C> <lit(8):  1073741824>.
+ 3132 + 5  <var(8) cat=56 @ 0: 00AD5F5C> <lit(8):  1073741824>.
  3160 + 1 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) <newline>.
  3160 + 2 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) |.
  3210 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n <newline>.
@@ -246,8 +246,8 @@ Finished simple expression tests!
  3351 + 1 [] [] const phdigit$ = "0123456789ABCDEF" <newline>.
  3351 + 2 [] [] const phdigit$ ; "0123456789ABCDEF" |.
  3351 + 3 [] [] const phdigit$ "0123456789ABCDEF" |.
- 3351 + 4  <var(64) cat=56 @ 0: 004B61CC> <lit(64): 0123456789ABCDEF>.
- 3351 + 5  <var(64) cat=56 @ 0: 004B61CC> <lit(64): 0123456789ABCDEF>.
+ 3351 + 4  <var(64) cat=56 @ 0: 00AD61CC> <lit(64): 0123456789ABCDEF>.
+ 3351 + 5  <var(64) cat=56 @ 0: 00AD61CC> <lit(64): 0123456789ABCDEF>.
  3387 + 1 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) <newline>.
  3387 + 2 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) |.
  3460 + 1 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) <newline>.
@@ -359,8 +359,8 @@ DEFined function tests completed OK
 ***** "c_deftype.bas"  
 hi there!	also a string	 1	x
 ***** "c_events.bas"  
-Timer handler called:	 0	at timer = 	 86198
-Timer handler called:	 1	at timer = 	 86199
+Timer handler called:	 0	at timer = 	 75396
+Timer handler called:	 1	at timer = 	 75397
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred

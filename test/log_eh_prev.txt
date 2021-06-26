@@ -1,0 +1,21 @@
+***** "e_rt_error.bas"  
+nb: error 119 in e_rt_error.bas line 8: type mismatch - a scalar is required.
+print x '' kind error ('type mismatch')
+---- Stack trace: ----
+---- top of stack ----
+ ? Unknown item
+---- bottom of stack ----
+***** "e_syntax_errors.bas"  
+nb: error 114 in e_syntax_errors.bas line 3: bad argument or operand count.
+3443 --
+nb: error 105 in e_syntax_errors.bas line 5, column 1: illegal literal.
+~~33DWFFD#@FAFG$%#$%>>
+nb: error 113 in e_syntax_errors.bas line 7: syntax error.
+print ()
+nb: error 112 in e_syntax_errors.bas line 9: syntax error (mismatched parentheses).
+print (
+nb: error 114 in e_syntax_errors.bas line 11, column 9: bad argument or operand count.
+print x +
+nb: error 127 in e_syntax_errors.bas line 13: IF without ENDIF.
+if x
+..\src\nb failed returncode 1

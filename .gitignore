@@ -35,8 +35,10 @@
 *.i*86
 *.x86_64
 *.hex
-nb # FH addition - BASIC interpreter executable name on Windows etc.
-nba # FH addition - BASIC interpreter executable name on the Amiga
+# FH added - BASIC interpreter executable name on Unix etc.
+nb
+# FH added - BASIC interpreter executable name on the Amiga
+src/nba
 
 # Debug files
 *.dSYM/
@@ -46,7 +48,7 @@ nba # FH addition - BASIC interpreter executable name on the Amiga
 
 # Kernel Module Compile Results
 *.mod*
-*.cmd
+#*.cmd # FH removed - Windows batch files for testing
 .tmp_versions/
 modules.order
 Module.symvers
