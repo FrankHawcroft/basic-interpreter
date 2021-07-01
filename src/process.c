@@ -158,6 +158,12 @@ Error CreateNewProcess(const struct Options *options)
 	p->readPosition = NULL;
 	p->tokenIndex = -1;
 	
+	{
+		int i;
+		for(i = 0; i < 26; i++) /* TODO ASCII ordering only ... */
+			p->defaultTypeForLetter[i] = DEFAULT_IMPLIED_TYPE;
+	}
+	
 	return SUCCESS;
 }
 

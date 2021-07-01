@@ -62,6 +62,7 @@ extern void GoTo_(BObject *, unsigned);
 extern void If_(BObject *, unsigned);
 extern void IfGoTo_(BObject *, unsigned);
 extern void IfThenElse_(const QString *, unsigned);
+extern void IfThenLet_(BObject *, unsigned);
 extern void Input_(BObject *, unsigned);
 extern void Kill_(BObject *, unsigned);
 extern void Let_(BObject *, unsigned);

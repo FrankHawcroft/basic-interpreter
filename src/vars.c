@@ -59,16 +59,23 @@ INLINE short EffectiveDefinitionCallNestLevel(short currentCallNestLevel, unsign
 		? SCOPE_GLOBAL : currentCallNestLevel;
 }
 
-void CreateOptionallyTypedVariable(BObject *obj, const QString *fullName, unsigned flags, bool isPointer)
+static void CreateOptionallyTypedVariable(const struct Process *proc,
+	BObject *obj, const QString *fullName, unsigned flags, bool isPointer)
 {
-	SimpleType type = TypeForName(fullName);
-	QString bareName;
 	BObject *var;
+	SimpleType type = TypeForName(proc, fullName);
+	short callNestLevel = EffectiveDefinitionCallNestLevel(proc->callNestLevel, flags);
+	char last = QsGetLast(fullName);
 	
-	QsGetSubstring(&bareName, fullName, 0, QsGetLength(fullName) - IsTypeSpecifier(QsGetLast(fullName)));
-	var = DefineVariable(&bareName, type, EffectiveDefinitionCallNestLevel(Proc()->callNestLevel, flags), isPointer);
-	QsDispose(&bareName);
-	
+	if(!isalnum(last) && IsTypeSpecifier(last)) {
+		QString bareName;
+		QsGetSubstring(&bareName, fullName, 0, QsGetLength(fullName) - 1);
+		var = DefineVariable(&bareName, type, callNestLevel, isPointer);
+		QsDispose(&bareName);
+	}
+	else
+		var = DefineVariable(fullName, type, callNestLevel, isPointer);
+
 	if(var == NULL)
 		SetObjectToError(obj, NOMEMORY);
 	else {
@@ -635,11 +642,12 @@ void VarPtr_(Scalar *result, const BObject *arg, unsigned count)
 
 void ConstConvert(unsigned index, const QString *token, BObject *result)
 {
+	const struct Process *proc = Proc();
 	if(index == 0 && IsValidName(token)) {
-		if(CanDefineVariable(token, Proc()->callNestLevel))
-			CreateOptionallyTypedVariable(result, token, VARIABLE_IS_CONST, FALSE);
+		if(CanDefineVariable(token, proc->callNestLevel))
+			CreateOptionallyTypedVariable(proc, result, token, VARIABLE_IS_CONST, FALSE);
 		else {
-			const BObject *existing = LookUpIgnoringType(token, Proc()->callNestLevel);
+			const BObject *existing = LookUpIgnoringType(token, proc->callNestLevel);
 			SetObjectToError(result, IsVariable(existing) && (existing->category & VARIABLE_IS_CONST)
 				? MODIFYCONST : REDEFINE);
 		}
@@ -652,11 +660,11 @@ void ConvertWithArrayVarCreation(unsigned index, const QString *token, BObject *
 {
 	if(index == 0 && IsValidName(token)) {
 		if(CanDefineVariable(token, callNestLevel))
-			CreateOptionallyTypedVariable(result, token, VARIABLE_IS_ARRAY | (shared ? VARIABLE_IS_SHARED : 0), TRUE);
+			CreateOptionallyTypedVariable(Proc(), result, token, VARIABLE_IS_ARRAY | (shared ? VARIABLE_IS_SHARED : 0), TRUE);
 		else {
 			const BObject *existing = LookUpIgnoringType(token, shared ? SCOPE_MAIN : callNestLevel);
 			if(!IsVariable(existing)
-			|| (IsTypeSpecifier(QsGetLast(token)) && NonPointer(VarData(existing)->type) != TypeForName(token))
+			|| (IsTypeSpecifier(QsGetLast(token)) && NonPointer(VarData(existing)->type) != TypeForName(Proc(), token))
 			|| !IsPointer(VarData(existing)))
 				SetObjectToError(result, REDEFINE);
 			else
@@ -682,12 +690,13 @@ void AssignConvert(unsigned index, const QString *token, BObject *result)
 	bool isArray = index == 1 && QsGetFirst(token - 1) == '(';
 	bool isScalar = index == 0 && isalpha(QsGetFirst(token));
 	if((isArray || isScalar) && IsValidName(token)) {
-		if(CanDefineVariable(token, Proc()->callNestLevel))
-			CreateOptionallyTypedVariable(result, token, isArray ? VARIABLE_IS_ARRAY : 0, FALSE);
+		const struct Process *proc = Proc();
+		if(CanDefineVariable(token, proc->callNestLevel))
+			CreateOptionallyTypedVariable(proc, result, token, isArray ? VARIABLE_IS_ARRAY : 0, FALSE);
 		else {
-			const BObject *existing = LookUpIgnoringType(token, Proc()->callNestLevel);
+			const BObject *existing = LookUpIgnoringType(token, proc->callNestLevel);
 			if(!IsVariable(existing)
-			|| (IsTypeSpecifier(QsGetLast(token)) && NonPointer(VarData(existing)->type) != TypeForName(token)))
+			|| (IsTypeSpecifier(QsGetLast(token)) && NonPointer(VarData(existing)->type) != TypeForName(proc, token)))
 				SetObjectToError(result, REDEFINE);
 			else if(existing->category & VARIABLE_IS_CONST)
 				SetObjectToError(result, MODIFYCONST);
@@ -708,9 +717,10 @@ extern BObject *LookUpLocal(const QString *symbol, short callNestLevel);
 void LocalScalarAssignConvert(unsigned index, const QString *token, BObject *result)
 {
 	if(index == 0) {
-		const BObject *existing = LookUpLocal(token, Proc()->callNestLevel);
+		const struct Process *proc = Proc();
+		const BObject *existing = LookUpLocal(token, proc->callNestLevel);
 		if(existing == NULL)
-			CreateOptionallyTypedVariable(result, token, 0, FALSE);
+			CreateOptionallyTypedVariable(proc, result, token, 0, FALSE);
 		else
 			SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, VarPtr(existing));
 	}

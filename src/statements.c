@@ -88,6 +88,11 @@ static struct Parameter m_ArgForGoToAndGoSub[1] = {
 static struct Parameter m_ArgsForIfGoTo[2] = {
 	{LITERAL, TR_LOGICAL, NULL, NO_NAME, 1, FALSE},
 	{LABEL, TR_IRRELEVANT, NULL, NO_NAME, 1, FALSE}};
+	
+static struct Parameter m_ArgsForIfThenLet[3] = {
+	{LITERAL, TR_LOGICAL, NULL, NO_NAME, 1, FALSE},
+	{SCALAR_VAR, TR_ANY, NULL, NO_NAME, 1, FALSE},
+	{LITERAL, TR_ASSIGNMENT, NULL, NO_NAME, 1, FALSE}};
 
 static Scalar m_DefInputAndLineInput1;
 static struct Parameter m_ArgsForInput[2] = {
@@ -309,6 +314,7 @@ static const struct BuiltInStatement m_StmtDefinitions[] = {
 	{KW_IF, If_, DefaultConvert, IfInactive, m_ArgForIfAndElseIf, 1},
 	{KW_IFGOTO, IfGoTo_, ConditionalJumpConvert, DefaultInactive, m_ArgsForIfGoTo, 2},
 	{KW_IFTHENELSE, IfThenElse_, EmptyConvert, DefaultInactive, NULL, TOKENISED_ARGUMENTS},
+	{KW_IFTHENLET, IfThenLet_, DefaultConvert, DefaultInactive, m_ArgsForIfThenLet, 3},
 	{KW_INPUT, Input_, DefaultConvert, DefaultInactive, m_ArgsForInput, 2},
 	{"KILL", Kill_, DefaultConvert, DefaultInactive, m_ArgForKill, 1},
 	{KW_LETQ_LOCAL, Let_, LocalScalarAssignConvert, DefaultInactive, m_ArgsForConstAndLet, 2}, /* Quicker for local scalars. */

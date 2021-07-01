@@ -698,7 +698,7 @@ void Def_(const QString *toks, unsigned nToks)
 	/* Get type from name: */
 	
 	name = toks[0];
-	outType = UsualTypeConversionToProduce(TypeForName(&name));
+	outType = UsualTypeConversionToProduce(TypeForName(Proc(), &name));
 	if(IsTypeSpecifier(QsGetLast(&name))) {
 		QString fullName;
 		QsCopy(&fullName, &name);

@@ -33,7 +33,7 @@ struct PrimitiveTypeCharacteristics {
 };
 
 #define T_IS_INTERNAL 1
-#define T_IS_DEFAULT 2 /* If the default type is changed, also change the DefaultType function! */
+#define T_IS_DEFAULT 2 /* If the default type is changed, also change DefaultType and DEFAULT_IMPLIED_TYPE! */
 #define T_IS_VISIBLE 4
 #define T_IS_NUMERIC 8
 #define T_IS_TEXTUAL 16
@@ -74,11 +74,25 @@ static const struct PrimitiveTypeCharacteristics m_Type[NUM_SIMPLE_TYPES] = {
 		T_IS_INTERNAL, NUL}
 };
 
-/* This could be encoded in the enumeration order, but that seems fragile. 
-	T_CHAR is given a bigger domain than T_ERROR, which is incorrect with one-byte chars, but keeps more of the
-	'visible' types ahead of the 'internal' ones. */
-static const SimpleType m_DomainSizeOrder[] = {T_STRING, T_DOUBLE, T_SINGLE, T_LONG, T_INT, T_CHAR, T_ERROR,  
-												T_BOOL, T_EMPTY, T_MISSING};
+/* This could be encoded in the enumeration order, but that seems more fragile than isolating it here. 
+	T_CHAR and T_BOOL are treated as having bigger domains than T_ERROR, which is incorrect based on
+	their actual sizes, but keeps 'visible' types ahead of the 'internal' ones. */
+#define STRING_CHARACTERISTICS	&m_Type[4]
+#define DOUBLE_CHARACTERISTICS	&m_Type[3]
+#define SINGLE_CHARACTERISTICS	&m_Type[2]
+#define LONG_CHARACTERISTICS	&m_Type[1]
+#define INT_CHARACTERISTICS		&m_Type[0]
+#define CHAR_CHARACTERISTICS	&m_Type[5]
+#define BOOL_CHARACTERISTICS	&m_Type[6]
+#define ERROR_CHARACTERISTICS	&m_Type[8]
+#define EMPTY_CHARACTERISTICS	&m_Type[9]
+#define MISSING_CHARACTERISTICS	&m_Type[7]
+
+static const struct PrimitiveTypeCharacteristics *const m_DomainSizeOrder[] = {
+	STRING_CHARACTERISTICS, DOUBLE_CHARACTERISTICS, SINGLE_CHARACTERISTICS,
+	LONG_CHARACTERISTICS, INT_CHARACTERISTICS, CHAR_CHARACTERISTICS,
+	BOOL_CHARACTERISTICS, ERROR_CHARACTERISTICS, EMPTY_CHARACTERISTICS,
+	MISSING_CHARACTERISTICS};
 
 /* Special parameter definitions - */
 static const struct Parameter m_ArrayIndex = {LITERAL, TR_SUBSCRIPT, NULL, NO_NAME, MAX_DIMENSIONS, FALSE};
@@ -87,14 +101,22 @@ static const struct Parameter m_AnyArgs = {LITERAL, TR_ANY, NULL, NO_NAME, MAX_T
 
 INLINE const struct PrimitiveTypeCharacteristics *GetTypeCharacteristicsByCode(SimpleType t)
 {
-	const struct PrimitiveTypeCharacteristics *ptc;
-
 	assert((t & T_POINTER) == 0);
+	assert(T_EMPTY <= t && t <= T_BOOL);
 	
-	for(ptc = m_Type; t != ptc->code && ptc < &m_Type[NUM_SIMPLE_TYPES]; ptc++)
-		;
-
-	return ptc == &m_Type[NUM_SIMPLE_TYPES] ? NULL : ptc;
+	switch(t) {
+		case T_STRING: return STRING_CHARACTERISTICS;
+		case T_DOUBLE: return DOUBLE_CHARACTERISTICS;
+		case T_SINGLE: return SINGLE_CHARACTERISTICS;
+		case T_LONG: return LONG_CHARACTERISTICS;
+		case T_INT: return INT_CHARACTERISTICS;
+		case T_CHAR: return CHAR_CHARACTERISTICS;
+		case T_ERROR: return ERROR_CHARACTERISTICS;
+		case T_BOOL: return BOOL_CHARACTERISTICS;
+		case T_EMPTY: return EMPTY_CHARACTERISTICS;
+		case T_MISSING: return MISSING_CHARACTERISTICS;
+		default: assert(FALSE); return EMPTY_CHARACTERISTICS;
+	}
 }
 
 /* Special-cased because called frequently. */
@@ -102,30 +124,15 @@ SimpleType TypeFromSpecifier(char c)
 {
 	const struct PrimitiveTypeCharacteristics *ptc;
 	
-	for(ptc = m_Type; ptc < &m_Type[NUM_SIMPLE_TYPES]; ptc++)
-		if(c != NUL && c == ptc->specifier)
+	for(ptc = &m_Type[0]; ptc <= BOOL_CHARACTERISTICS; ptc++)
+		if(c == ptc->specifier)
 			return ptc->code;
 	return T_EMPTY;
 }
 
 bool IsTypeSpecifier(char c)
 {
-	SimpleType t = TypeFromSpecifier(c);
-	return t != T_MISSING && t != T_EMPTY;
-}
-
-SimpleType DefaultType(const QString *forName)
-{
-	char initial = forName != NULL && !QsIsNull(forName) ? (char)toupper(QsGetFirst(forName)) : NUL;
-	
-	return 'A' <= initial && initial <= 'Z' && Proc()->defaultTypeForLetter[initial - 'A'] != NUL /* TODO ASCII ordering only ... */
-		? Proc()->defaultTypeForLetter[initial - 'A']
-		: T_SINGLE;
-}
-
-SimpleType TypeForName(const QString *forName)
-{
-	return IsTypeSpecifier(QsGetLast(forName)) ? TypeFromSpecifier(QsGetLast(forName)) : DefaultType(forName);
+	return !TypeIsInternal(TypeFromSpecifier(c));
 }
 
 char SpecifierFromType(SimpleType t) { return GetTypeCharacteristicsByCode(t)->specifier; }
@@ -133,8 +140,6 @@ char SpecifierFromType(SimpleType t) { return GetTypeCharacteristicsByCode(t)->s
 size_t StorageSize(SimpleType t) { return GetTypeCharacteristicsByCode(t)->storageSize; }
 
 SimpleType NextMoreCapaciousType(SimpleType t) { return GetTypeCharacteristicsByCode(t)->nextMoreCapacious; }
-
-/*bool TypeIsInternal(SimpleType t) { return (GetTypeCharacteristicsByCode(t)->properties & T_IS_INTERNAL) != 0; }*/
 
 bool TypeIsVisible(SimpleType t) { return (GetTypeCharacteristicsByCode(t)->properties & T_IS_VISIBLE) != 0; }
 
@@ -165,12 +170,25 @@ void SetDefaultType(char initialLetter, SimpleType t)
 	Proc()->defaultTypeForLetter[initialLetter - 'A'] = t;
 }
 
+static SimpleType DefaultType(const struct Process *proc, const QString *forName)
+{
+	char initial = (char)toupper(QsGetFirst(forName));
+	return 'A' <= initial && initial <= 'Z'
+		? proc->defaultTypeForLetter[initial - 'A'] : DEFAULT_IMPLIED_TYPE;
+}
+
+SimpleType TypeForName(const struct Process *proc, const QString *forName)
+{
+	SimpleType explicit = TypeFromSpecifier(QsGetLast(forName));
+	return !TypeIsInternal(explicit) ? explicit : DefaultType(proc, forName);
+}
+
 SimpleType LargerType(SimpleType t1, SimpleType t2)
 {
 	int i;
 	for(i = 0; i < NUM_SIMPLE_TYPES; i++)
-		if(t1 == m_DomainSizeOrder[i] || t2 == m_DomainSizeOrder[i])
-			return m_DomainSizeOrder[i];
+		if(t1 == m_DomainSizeOrder[i]->code || t2 == m_DomainSizeOrder[i]->code)
+			return m_DomainSizeOrder[i]->code;
 	
 	assert(FALSE);
 	return t1; /* May well be wrong ... but shouldn't happen. */
@@ -181,14 +199,14 @@ SimpleType TypeUsuallyProducedBy(enum TypeRule tc)
 	if(!Contextual(tc) && tc != TR_NON_TEXT) {
 		int i;
 		for(i = 0; i < NUM_SIMPLE_TYPES; i++)
-			if(tc & m_DomainSizeOrder[i])
-				return m_DomainSizeOrder[i];
+			if(tc & m_DomainSizeOrder[i]->code) /* favour larger types */
+				return m_DomainSizeOrder[i]->code;
 #ifdef DEBUG
 		fprintf(stderr, "[Unexpected TypeRule %d]\n", tc);
 #endif
 		assert(FALSE);
 	}
-	return DefaultType(NULL);
+	return DEFAULT_IMPLIED_TYPE;
 }
 
 /* Returns TRUE iff it is possible for some value of the simple type to 
@@ -262,28 +280,25 @@ SimpleType TargetType(enum TypeRule required, SimpleType source)
 		else if(required & stc->closestPeer)
 			return stc->closestPeer;
 		else {
-			SimpleType best = T_MISSING;
+			const struct PrimitiveTypeCharacteristics *best = MISSING_CHARACTERISTICS;
 			int closest = 0, i;
 			unsigned sourceNumeric = stc->properties & T_IS_NUMERIC, sourceExact = stc->properties & T_IS_EXACT,
 				sourceTextual = stc->properties & T_IS_TEXTUAL;
 			
-			for(i = 0; i < NUM_SIMPLE_TYPES; i++) {
-				const struct PrimitiveTypeCharacteristics *ptc;
-				SimpleType prospect = m_DomainSizeOrder[i];
-				
-				if((prospect & required)
-				&& prospect != source
-				&& !((ptc = GetTypeCharacteristicsByCode(prospect))->properties & T_IS_INTERNAL)) {
-					int closeness = ((ptc->properties & T_IS_NUMERIC) == sourceNumeric)
-						+ ((ptc->properties & T_IS_EXACT) == sourceExact)
-						+ ((ptc->properties & T_IS_TEXTUAL) == sourceTextual);
+			/* Assume not converting to an internal type - hence T_BOOL is the upper limit - */
+			for(i = 0; i <= 6; i++) {
+				const struct PrimitiveTypeCharacteristics *prospect = m_DomainSizeOrder[i];			
+				if((prospect->code & required) && prospect->code != source) {
+					int closeness = ((prospect->properties & T_IS_NUMERIC) == sourceNumeric)
+						+ ((prospect->properties & T_IS_EXACT) == sourceExact)
+						+ ((prospect->properties & T_IS_TEXTUAL) == sourceTextual);
 					if(closeness >= closest) { /* note >= here; favour smaller-sized types */
 						closest = closeness;
 						best = prospect;
 					}
 				}
 			}
-			return best;
+			return best->code;
 		}
 	}
 }
@@ -350,8 +365,10 @@ const struct Parameter *FormalForActual(const struct Parameter *formal, int form
 #define Undefined(actual) ((actual)->value.scalar.type == T_EMPTY)
 
 /* f = formal, a = actual ... */
-static Error Satisfy(const struct Parameter *f, BObject *a, SimpleType prevType, bool varArgs)
+static Error Satisfy(const struct Parameter *f, BObject *a, const BObject *prevActual, bool varArgs)
 {
+	SimpleType prevType = prevActual == NULL ? T_MISSING : GetSimpleType(prevActual);
+	
 	assert(f == NULL || f->kind == LABEL || f->kind == LITERAL || IsVarParam(f));
 	assert(a != NULL);
 
@@ -364,15 +381,10 @@ static Error Satisfy(const struct Parameter *f, BObject *a, SimpleType prevType,
 		if(error != SUCCESS)
 			return error;
 		else if(Unsupplied(a)) {
-			if(f->defaultValue != NULL) {
-				/*printf("Default retrieved: ");
-				WriteScalar(stdout, f->defaultValue);*/
+			if(f->defaultValue != NULL)
 				CopyScalar(&a->value.scalar, f->defaultValue);
-			}
-			else {
-				/*printf("Default val null\n");*/
+			else
 				return ER_PARAMETER_NOT_OPTIONAL;
-			}
 		}
 		else if(Undefined(a))
 			return UNDEFINEDVARORFUNC;
@@ -404,8 +416,7 @@ Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, 
 	unsigned an;
 	int fn;
 	unsigned long supplied = 0, allFormals = (1 << formalCount) - 1;
-	/* This would be a good place to use a dynamically sized auto array - */
-	/*bool supplied[MAX_FORMALS];*/
+	const BObject *prevActual;
 
 	assert(formal != NULL || formalCount <= 0);
 	assert(actual != NULL || actualCount == 0);
@@ -413,17 +424,11 @@ Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, 
 
 	/* First pass: match actuals to formals and check/convert/insert defaults. */
 	
-	/*if(formalCount > 0)
-		memset(supplied, 0, sizeof(bool) * formalCount);*/
-	
-	for(an = 0; an < actualCount && error == SUCCESS; an++) {
+	for(an = 0, prevActual = NULL; an < actualCount && error == SUCCESS; prevActual = &actual[an], an++) {
 		const struct Parameter *f = FormalForActual(formal, formalCount, an);
-		SimpleType typeOfPrevious = an == 0 ? T_MISSING : GetSimpleType(&actual[an - 1]);
-		
 		if(f != NULL)
-			/*supplied[f - formal] = TRUE;*/ supplied |= (1 << (f - formal));
-		
-		error = Satisfy(f, &actual[an], typeOfPrevious, formalCount < 0);
+			supplied |= (1 << (f - formal));
+		error = Satisfy(f, &actual[an], prevActual, formalCount < 0);
 	}
 	
 	if(error == ER_PARAMETER_NOT_OPTIONAL)
@@ -433,7 +438,7 @@ Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, 
 	
 	if(supplied != allFormals) {
 		for(fn = 0; fn < formalCount && error == SUCCESS; fn++)
-			if(!(supplied & (1 << fn))) { /* !supplied[fn] */
+			if(!(supplied & (1 << fn))) {
 				sprintf(Proc()->additionalErrorInfo,
 					"Parameter #%d has no default value and must be supplied", fn + 1);
 				error = BADARGCOUNT;
@@ -486,30 +491,3 @@ bool SemanticallyPredictable(const struct TokenSequence *ts)
 	}
 	return predictable;
 }
-
-#if 0
-		const struct Parameter *f;
-		const QString *t = &ts->rest[tn];
-		
-		Nest(t, &nesting);
-		an += QsGetFirst(t) == ';';
-		f = FormalForActual(ts->command->formal, ts->command->formalCount, an);
-		assert(f != NULL); /* Since should already have been run. */
-		if(f == NULL)
-			return FALSE;
-		if(f->kind == LITERAL) {
-			return FALSE;
-			/*if(nesting == 0) {
-				BObject o;
-				ConvertToObject(t, &o, Proc()->callNestLevel);
-				predictable &= (o.category == LITERAL && (f->type & GetSimpleType(&o)));
-				RemoveObject(&o, FALSE);
-			}
-			else
-				predictable = FALSE;*/
-		}
-	}
-	
-	return predictable;
-}
-#endif

@@ -40,6 +40,7 @@ const char KW_GOTO[] = "GOTO";
 const char KW_IF[] = "IF";
 const char KW_IFGOTO[] = "IFGOTO~";
 const char KW_IFTHENELSE[] = "IFTHENELSE~";
+const char KW_IFTHENLET[] = "IFTHENLET";
 const char KW_INPUT[] = "INPUT";
 const char KW_INSTR[] = "INSTR";
 const char KW_LEN[] = "LEN";
@@ -106,6 +107,7 @@ static const QString m_GoSubKeyword = {(char *)KW_GOSUB, 5};
 static const QString m_IfKeyword = {(char *)KW_IF, 2};
 static const QString m_IfGoToKeyword = {(char *)KW_IFGOTO, 7}; /* includes ~ */
 static const QString m_IfThenElseKeyword = {(char *)KW_IFTHENELSE, 11}; /* includes ~ */
+static const QString m_IfThenLetKeyword = {(char *)KW_IFTHENLET, 9};
 static const QString m_InputKeyword = {(char *)KW_INPUT, 5};
 static const QString m_InstrKeyword = {(char *)KW_INSTR, 5};
 static const QString m_Instr2Keyword = {"INSTR2", 6};
@@ -308,8 +310,25 @@ static void ExpandPrintParameters(struct TokenSequence *ts)
 	}
 }
 
+static void ReplaceEqualsUsedAsSeparator(QString *tok, unsigned short limit, const QString *replacement)
+{
+	int nestLevel = 0;
+	unsigned short i;
+	
+	for(i = 0; i != limit; i++) {
+		Nest(&tok[i], &nestLevel);
+			/* Checking the sanity of the nest level is overkill in the context of this module. */
+
+		if(nestLevel == 0 && QsGetFirst(&tok[i]) == '=') {
+			QsCopy(&tok[i], replacement);
+			return;
+		}
+	}
+}
+
 /* IF <expr> THEN <stmt> [ELSE <stmt>] --> IFTHENELSE~ ...
    IF <expr> GOTO <label> --> IFGOTO~ ...
+   IF <expr> THEN <var> = <expr> --> IFTHENLET~ <expr>; <var>; <expr>
 */
 static void MakeShortIfStatementExplicit(struct TokenSequence *ts)
 {
@@ -319,7 +338,15 @@ static void MakeShortIfStatementExplicit(struct TokenSequence *ts)
 		/* Don't detect a statement-final THEN here ... */
 		for(i = 0; i != ts->length - 2; i++) {
 			if(QsEqNoCase(&ts->rest[i], &g_ThenKeyword)) {
-				QsCopy(&ts->statementName, &m_IfThenElseKeyword);
+				const BObject *following = LookUp(&ts->rest[i + 1], SCOPE_CURRENT);
+				if(following != NULL && IsVariable(following)) {
+					/* TODO also need to check for an ELSE part; also explicit LET, to be thorough ... */
+					QsCopy(&ts->statementName, &m_IfThenLetKeyword);
+					QsCopy(&ts->rest[i], &g_Semicolon); /* replace THEN */
+					ReplaceEqualsUsedAsSeparator(&ts->rest[i + 1], ts->length - 2 - i, &g_Semicolon);
+				}
+				else
+					QsCopy(&ts->statementName, &m_IfThenElseKeyword);
 				return;
 			}
 			else if(QsEqNoCase(&ts->rest[i], &g_GoToKeyword)) {
@@ -363,22 +390,6 @@ static void TranslateOldStyleOpen(struct TokenSequence *ts)
 		else {
 			QsCopy(&ts->rest[5], &g_Pipe);
 			ts->length = 6;
-		}
-	}
-}
-
-static void ReplaceEqualsUsedAsSeparator(QString *tok, unsigned short limit, const QString *replacement)
-{
-	int nestLevel = 0;
-	unsigned short i;
-	
-	for(i = 0; i != limit; i++) {
-		Nest(&tok[i], &nestLevel);
-			/* Checking the sanity of the nest level is overkill in the context of this module. */
-
-		if(nestLevel == 0 && QsGetFirst(&tok[i]) == '=') {
-			QsCopy(&tok[i], replacement);
-			return;
 		}
 	}
 }

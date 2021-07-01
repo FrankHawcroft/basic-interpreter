@@ -757,6 +757,13 @@ void IfThenElse_(const QString *toks, unsigned nToks)
 		CauseError(error);
 }
 
+void IfThenLet_(BObject *arg, unsigned count)
+{
+	bool fired = arg[0].value.scalar.value.boolean;
+	if(fired)
+		CopyDereferencingBoth(VarData(&arg[1]), &arg[2].value.scalar);
+}
+
 void Merge_(BObject *arg, unsigned count)
 {
 	const QString *fileName = &arg[0].value.scalar.value.string;

@@ -332,13 +332,13 @@ Error CheckNameList(const QString *tok, int nTokens, bool allowExplicitValuePara
 }
 
 /* Parse a list of parameters.
-	It's assumed the syntax of the parameter list is valid (see: CheckNameList),
-and there are some parameters present.
+	It's assumed the syntax of the parameter list is valid (see: CheckNameList), and there are some parameters present.
 	Returns NULL on error (i.e. memory can't be allocated for the parameter vector). */
 struct Parameter *ParseNameList(const QString *tok, int nTokens, short *nParams, enum SymbolType defaultKind)
 {
 	struct Parameter *param = NULL, *p;
 	int paramCount = 0, i;
+	const struct Process *proc = Proc();
 	
 	assert(tok != NULL);
 	assert(nTokens > 0);
@@ -355,7 +355,7 @@ struct Parameter *ParseNameList(const QString *tok, int nTokens, short *nParams,
 	for(p = param, i = 0; i < nTokens; i++) {
 		const QString *t = &tok[i];
 		if(IsName(t)) {
-			SimpleType type = TypeForName(t);
+			SimpleType type = TypeForName(proc, t);
 		
 			if(t > tok && IsLParen(t - 1)) p->kind = LITERAL;
 			else if(i + 1 < nTokens && IsLParen(t + 1)) p->kind = ARRAY; /* vvv */

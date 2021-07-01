@@ -51,6 +51,8 @@ typedef enum SimpleType_enum {
 #define USABLE_TYPES (NUMERIC_TYPES | TEXTUAL_TYPES | T_BOOL)
 #define ALL_TYPES (T_MISSING | T_ERROR | USABLE_TYPES)
 
+#define DEFAULT_IMPLIED_TYPE T_SINGLE
+
 /*** TypeDiscipline ***/
 
 /* Define the semantics of type checking/conversion. These values must not overlap with SimpleType. */
@@ -370,6 +372,12 @@ struct TokenSequence {
 flow stack, and the (potentially numerous) expression evaluation stacks. */
 struct Stack;
 
+/*** Process ***/
+
+/* Sometimes passed in, for efficiency - defined elsewhere (process.h, natch) */
+
+struct Process;
+
 /*** Characteristics of types -- semantics.c ***/
 
 /* Yields a non-reference type. */
@@ -378,11 +386,8 @@ struct Stack;
 /* Set a default type for objects with names beginning with the given letter (A-Z). */
 extern void SetDefaultType(char initialLetter, SimpleType);
 
-/* For variables and functions that don't include a type specifier. */
-extern SimpleType DefaultType(const QString *forObjectName);
-
 /* Get the type applying to the given name, allowing for DEFtype rules as well as type specifiers. */
-extern SimpleType TypeForName(const QString *forObjectName);
+extern SimpleType TypeForName(const struct Process *, const QString *forObjectName);
 
 /* Maps '$' to T_STRING, and so on. */
 extern SimpleType TypeFromSpecifier(char);
@@ -427,7 +432,7 @@ extern bool TypeIsExact(SimpleType);
 extern bool TypeIsTextual(SimpleType);
 
 /* The type is considered the global default, regardless of SetDefaultType. */
-#define TypeIsDefault(t) ((t) == DefaultType(NULL))
+#define TypeIsDefault(t) ((t) == DEFAULT_IMPLIED_TYPE)
 
 /*** Rules about type conversion -- semantics.c ***/
 
@@ -601,9 +606,6 @@ extern void ResetStaticFunctionParams(void);
 /*** Compile and execute a statement -- repl.c ***/
 
 extern Error Prepare(struct TokenSequence *tokSeq);
-
-struct Process; /* sometimes passed in, for efficiency - defined elsewhere (process.h, natch) */
-
 extern void Do(struct Process *proc, struct TokenSequence *tokSeq, struct Stack *exprStack);
 
 /*** Performance Improving Transformations -- pit.c ***/
@@ -726,6 +728,7 @@ extern const char KW_GOTO[];
 extern const char KW_IF[];
 extern const char KW_IFGOTO[];
 extern const char KW_IFTHENELSE[];
+extern const char KW_IFTHENLET[];
 extern const char KW_INPUT[];
 extern const char KW_INSTR[];
 extern const char KW_LEN[];
