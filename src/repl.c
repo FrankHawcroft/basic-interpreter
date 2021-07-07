@@ -23,33 +23,6 @@
 /* Initial space allocated for expression evaluation. */
 #define EXPR_STACK_SPACE 20 /* (1 + (MAX_TOKENS / 2)) */
 
-static void ReplaceTokens(struct TokenSequence *tokSeq, QString *newTokens, unsigned short count)
-{
-	unsigned short i;
-	
-	assert(tokSeq != NULL);
-	assert(newTokens != NULL && count != 0);
-	
-	for(i = 0; i < tokSeq->length; i++)
-		QsDispose(&tokSeq->rest[i]);
-	
-	tokSeq->length = count;
-	
-	if(count > tokSeq->capacity) {
-		Dispose(tokSeq->rest);
-		tokSeq->rest = newTokens;
-		tokSeq->capacity = count;
-	}
-	else {
-		for(i = 0; i < count; i++) {
-			QsCopy(&tokSeq->rest[i], &newTokens[i]);
-			QsDispose(&newTokens[i]);
-		}
-		tokSeq->length = count;
-		Dispose(newTokens);
-	}
-}
-
 #ifdef DEBUG
 void PrintVerboseTracingPrefix(char pass)
 {
@@ -147,92 +120,6 @@ static Error Compile(const char **position, struct TokenSequence *tokSeq)
 	return error;
 }
 
-static bool EligibleForCaching(const struct TokenSequence *tokSeq, short callNestLevelWhenExecuted)
-{
-	return !Opts()->lowMemory 
-		/* Labels and line numbers are defined at compile time rather than execution time,
-			so labelled statements cannot be cached in subprograms. */
-		&& (callNestLevelWhenExecuted == SCOPE_MAIN || QsIsNull(&tokSeq->label))
-		&& tokSeq->next != NULL /* Not a partial 'statement', e.g. in a single-line IF. */
-		&& InPotentiallyHotPath(); /* Assumes considering caching currently executing stmt. */
-}
-
-static bool GuaranteedNotDynamic(const QString *t) { return IsLiteral(t) || LexicallyGuaranteedBuiltIn(t); }
-
-/* Whether to cache the converted form of a statement, rather than just tokens. */
-static bool ShouldCachePreconvertedObjects(const struct TokenSequence *tokSeq, short callNestLevelWhenExecuted)
-{	
-	unsigned short n;
-	bool allImmutablyExist;
-	
-	if(tokSeq->preconverted != NULL)
-		return FALSE; /* already done ... */
-		
-	/* Quick execution assumes an 'ordinary' statement; and no point preconverting if no params. */
-	if(IsMacro(tokSeq->command) || tokSeq->length <= 1)
-		return FALSE;
-	
-	/* For short-running programs, the overhead of converting objects again before caching them, generally
-		outweighs the performance gain. Static SUBs are considered an exception as they tend to be 'leaf'
-		calls which presumably will happen frequently enough to justify pre-conversion. */
-	if(callNestLevelWhenExecuted == SCOPE_STATIC) {
-		/*for(n = 0, allImmutablyExist = TRUE; n < tokSeq->length && allImmutablyExist; n++)
-			allImmutablyExist &= (GuaranteedNotDynamic(&tokSeq->rest[n])
-				|| LookUp(&tokSeq->rest[n], callNestLevelWhenExecuted) != NULL);
-		return allImmutablyExist;*/
-		return TRUE;
-	}
-
-	/* Otherwise, unless -o specified, don't bother. */
-	if(!Opts()->optimise)
-		return FALSE;
-
-	/* Outside a SUB, everything can be assumed to stick around. */
-	if(callNestLevelWhenExecuted == SCOPE_MAIN)
-		return TRUE;
-
-	/* If in a non-STATIC SUB, it's only safe to cache objects if none of them are local labels or variables -
-		erring on the side of caution, cache objects only if everything is a constant, or an operation on a
-		constant. */	
-	for(n = 0, allImmutablyExist = TRUE; n < tokSeq->length && allImmutablyExist; n++)
-		allImmutablyExist &= GuaranteedNotDynamic(&tokSeq->rest[n]);
-	
-	return allImmutablyExist;
-}
-
-static void StorePreconvertedObjects(struct TokenSequence *ts, short callNestLevelWhenExecuted)
-{
-	if(ShouldCachePreconvertedObjects(ts, callNestLevelWhenExecuted)
-	&& (ts->preconverted = TolerantNew(sizeof(BObject) * ts->length)) != NULL) {
-		unsigned short n;
-		bool allResolved = TRUE;
-		for(n = 0; n < ts->length && allResolved; n++) {
-			ConvertToObject(&ts->rest[n], &ts->preconverted[n], callNestLevelWhenExecuted);
-			allResolved &= !IsEmpty(&ts->preconverted[n]);
-		}
-		if(!allResolved) {
-			unsigned short m;
-			for(m = 0; m < n; m++)
-				RemoveObject(&ts->preconverted[m], FALSE);
-			Dispose(ts->preconverted);
-			ts->preconverted = NULL;
-		}
-	}
-}
-
-extern SimpleType TypeOfToken(const QString *);
-
-static bool NoDynamicallyAllocatedMemory(const struct TokenSequence *ts)
-{
-	unsigned short n;
-	bool noMalloc = TRUE;
-
-	for(n = 0; n < ts->length && noMalloc; n++)
-		noMalloc &= (IsPunctuation(&ts->rest[n]) || TypeIsNumeric(TypeOfToken(&ts->rest[n])));
-	
-	return noMalloc;
-}
-
 enum Ops {
 	OP_INACTIVE = 0x1,
 	OP_TRACE = 0x2,
@@ -241,22 +128,20 @@ enum Ops {
 	OP_EVAL = 0x10,
 	OP_EVALQ = 0x20,
 	OP_CONFORM = 0x40,
-	OP_MACRO = 0x80,
-	OP_SUB = 0x100,
-	OP_EXEC = 0x200,
-	OP_CACHE = 0x400,
-	OP_CLEAR = 0x800,
-	OP_CLEARQ = 0x1000,
-	OP_POLL = 0x2000,
-	OP_NEXT = 0x4000,
+	OP_CONFORMQ = 0x80,
+	OP_MACRO = 0x100,
+	OP_SUB = 0x200,
+	OP_EXEC = 0x400,
+	OP_CACHE = 0x800,
+	OP_CLEAR = 0x1000,
+	OP_CLEARQ = 0x2000,
+	OP_POLL = 0x4000,
 	OP_OPTIMISE = 0x8000
 };
 
-static short EffectiveCallNestLevel(const struct Process *proc) { return InStaticContext(proc) ? SCOPE_STATIC : proc->callNestLevel; }
-
 static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 {
-	unsigned ops = OP_INACTIVE | OP_POLL | OP_NEXT;
+	unsigned ops = OP_INACTIVE | OP_POLL;
 
 	ops |= (EligibleForCaching(ts, callNestLevel) ? OP_CACHE : 0);
 	ops |= (Opts()->optimise && !IsMacro(ts->command) && (ops & OP_CACHE) ? OP_OPTIMISE : 0);
@@ -280,11 +165,12 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 	/*if(Opts()->optimise && !StatementIsEmpty(ts->command) && GuaranteedLive())
 		ops &= ~OP_INACTIVE;*/
 	
-	if(Opts()->optimise && SemanticallyPredictable(ts))
-		ts->ops &= ~OP_CONFORM;
-	
-	if(Opts()->optimise && NoDynamicallyAllocatedMemory(ts))
-		ts->ops &= ~OP_CLEAR, ts->ops |= OP_CLEARQ;
+	if(Opts()->optimise) {
+		if(SemanticallyPredictable(ts))
+			ts->ops &= ~OP_CONFORM;
+		if(NoDynamicallyAllocatedMemory(ts))
+			ts->ops &= ~OP_CLEAR, ts->ops |= OP_CLEARQ;
+	}
 	
 	if(StatementIsEmpty(ts->command))
 		ts->ops &= ~OP_POLL; /* TODO option to only poll every n stmts? */
@@ -294,6 +180,9 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 		
 	if(ts->preconverted != NULL)
 		ts->ops &= ~OP_EVAL, ts->ops |= OP_EVALQ;
+		
+	if((ts->ops & OP_CONFORM) && IsAssignmentStatement(ts->command)) /* TODO can be a bit broader */
+		ts->ops &= ~OP_CONFORM, ts->ops |= OP_CONFORMQ;
 		
 	/*if(ts->preconverted != NULL || !ShouldCachePreconvertedObjects(ts, callNestLevel))
 		ts->ops &= ~(OP_CACHE | OP_OPTIMISE);*/
@@ -314,36 +203,7 @@ static void ShowTraceInfo(const char *statement)
 	putchar('\n');
 }
 
-static const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel)
-{
-	const BObject *vdef = NULL;
-	if(!IsSubprogram(ts->command) && !IsMacro(ts->command) && ts->command->method.builtIn == Let_) {
-		const QString *v = &ts->rest[QsGetFirst(&ts->rest[0]) == '(' ? 1 : 0];
-		vdef = LookUp(v, callNestLevel);
-	}
-	return vdef != NULL && IsVariable(vdef) ? vdef : NULL;
-}
-
-static void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted)
-{
-	if(vdef == NULL)
-		return;
-		
-	if((callNestLevelWhenExecuted == SCOPE_MAIN || callNestLevelWhenExecuted == SCOPE_STATIC)
-	|| (vdef->category & (VARIABLE_IS_SHARED | VARIABLE_IS_ARRAY | VARIABLE_IS_REF))) {
-		/* Either variable sticks around, or, if in a dynamic sub, assume it'll always be created
-			by DIM or SHARED or as a reference parameter, before being assigned to. */
-		QString letqPredef;
-		QsInitStaticNTS(&letqPredef, KW_LETQ_PREDEF);
-		RequireSuccess(GetStatement(&letqPredef, &ts->command));
-	}
-	else {
-		/* Local scalar - not quite as quick, but can avoid full lookup, and type checks. */
-		QString letqLocal;
-		QsInitStaticNTS(&letqLocal, KW_LETQ_LOCAL);
-		RequireSuccess(GetStatement(&letqLocal, &ts->command));
-	}
-}
+static short EffectiveCallNestLevel(const struct Process *proc) { return InStaticContext(proc) ? SCOPE_STATIC : proc->callNestLevel; }
 
 void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 {
@@ -381,12 +241,12 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	/* Determine if the statement should actually be executed. */
 
 	if((ops & OP_INACTIVE) && (*ts->command->inactive)(FALSE))
-		ops = OP_POLL | OP_NEXT | (ops & OP_CACHE);
+		ops = OP_POLL | (ops & OP_CACHE);
 
 	if(ops & OP_CACHE)
 		StorePreconvertedObjects(ts, initialCallNestLevel);
 
-	if(ops & (OP_EVAL | OP_EVALQ | OP_CONFORM | OP_SUB | OP_EXEC)) {
+	if(ops & (OP_EVAL | OP_EVALQ | OP_CONFORM | OP_CONFORMQ | OP_SUB | OP_EXEC)) {
 		Error error = SUCCESS;
 
 		assert(!(ops & OP_MACRO));
@@ -408,18 +268,19 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 
 		/* Check types of parameters, and attempt to convert them if value parameters - */
 
-		if(ops & OP_CONFORM) {
+		if(ops & OP_CONFORM)
 			error = Conform(ts->command->formal, ts->command->formalCount,
 				StkHeight(exprStack) > 0 ? (BObject *)exprStack->base : NULL,
 				(unsigned)StkHeight(exprStack));
+		else if(ops & OP_CONFORMQ)
+			error = ConformQuickly(ts->command->formal, (BObject *)exprStack->base, ts->command->formalCount);
 
 #ifdef DEBUG
-			if((ops & OP_VERBOSE) && error == SUCCESS) {
-				PrintVerboseTracingPrefix('5');
-				DumpExprStk(exprStack);
-			}
-#endif
+		if((ops & OP_VERBOSE) && (ops & (OP_CONFORM | OP_CONFORMQ)) && error == SUCCESS) {
+			PrintVerboseTracingPrefix('5');
+			DumpExprStk(exprStack);
 		}
+#endif
 
 		if(error == SUCCESS) {
 			/* If tracing, print trace output. */
@@ -499,8 +360,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 
 	/* Move to the next statement. */
 
-	/*if(ops & OP_NEXT)*/
-		proc->currentStatementStart = proc->currentPosition;
+	proc->currentStatementStart = proc->currentPosition;
 }
 
 static void Immediate(void)

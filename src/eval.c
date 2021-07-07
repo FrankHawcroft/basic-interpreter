@@ -9,30 +9,35 @@
 #include <stdio.h>
 #include "interpreter.h"
 #include "stack.h"
-#include "process.h"
 
 #define EXPR_STK_LIMIT 667 /* due to increasing size by scale factor of 1.5, corresponds to a limit of 1000 */
 
 /* Pushes the BObject onto the stack. The stack is extended if necessary.
-	The stack simply does a memcpy ('shallow') copy of the object, so newTop
+	The stack simply does a 'shallow' copy of the object structure, so newTop
 	should be considered discarded after this function has been called, and
 	should not be RemoveObject()d. 
 	If the stack can't be extended because it has reached the stack height
 	limit, the top object will be discarded and an overflow error pushed. 
 	
-	PopObject - defined as a macro in interpreter.h, for performance on older
-	systems - is the complement of PushObject - the unstacked BObject is memcpy()d
-	back off the stack, and the caller takes ownership of any memory
-	allocated in it. */
+	PopObject - defined as a macro in interpreter.h - is the complement of
+	PushObject - the unstacked BObject is memcpy()d back off the stack, and
+	the caller takes ownership of any memory allocated in it. */
 INLINE void PushObject(struct Stack *stack, const BObject *newTop)
 {
-	if(StkFull(stack) && StkHeight(stack) <= EXPR_STK_LIMIT) {
+	if(!StkFull(stack)) {
+		/* Special-cased rather than calling StkPush, because
+			structure assignment is quicker than memcpy with Amiga-GCC. */
+		*(BObject *)stack->top = *newTop;
+		stack->top += stack->itemSize;
+		if(stack->top > stack->highest)
+			stack->highest = stack->top;
+		++stack->height;
+	}
+	else if(StkFull(stack) && StkHeight(stack) <= EXPR_STK_LIMIT) {
 		StkResize(stack, StkHeight(stack) < 8 ? 16 : (3 * StkHeight(stack)) / 2);
 		/*fprintf(stderr, "[Stack extended from size %d --> %d]\n", height, height < 8 ? 16 : (3 * height) / 2);*/
-	}
-	
-	if(!StkFull(stack))
 		StkPush(stack, newTop);
+	}
 	else {
 		BObject err;
 		
@@ -44,27 +49,26 @@ INLINE void PushObject(struct Stack *stack, const BObject *newTop)
 
 static void Apply(const BObject *obj, BObject *param, unsigned count, BObject *result, struct Stack *stk)
 {
-	Error error = IsEmpty(obj) ? UNDEFINEDVARORFUNC : ConformForApplication(obj, param, count);
-	
-	if(error == SUCCESS) {
-		if(obj->category == OPERATOR) {
-			assert(count == OperandCount(obj->value.opRef));
-			result->category = LITERAL;
-			EvalOperation(&result->value.scalar, obj->value.opRef,
-				&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
-		}
-		else if(IsVariable(obj)) {
-			if((error = IndexArray(&result->value.variable, VarPtr(obj), param, count)) == SUCCESS)
-				result->category = (result->value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF; /* vvv */
-		}
-		else if(obj->category == FUNCTION)
-			CallFunction(result, obj->value.function, param, count, stk);
-		else
-			error = ARRAYEXPECTED;
-	}
+	Error error = ConformForApplication(obj, param, count);
 	
 	if(error != SUCCESS)
 		SetObjectToError(result, error);
+	else if(obj->category == OPERATOR) {
+		assert(count == OperandCount(obj->value.opRef));
+		result->category = LITERAL;
+		EvalOperation(&result->value.scalar, obj->value.opRef,
+			&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
+	}
+	else if(obj->category == FUNCTION)
+		CallFunction(result, obj->value.function, param, count, stk);
+	else if(IsVariable(obj)) {
+		if((error = IndexArray(&result->value.variable, VarPtr(obj), param, count)) == SUCCESS)
+			result->category = (result->value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF; /* vvv */
+		else
+			SetObjectToError(result, error);
+	}
+	else
+		SetObjectToError(result, ARRAYEXPECTED);	
 }
 
 static void EvalParameterlessFunction(BObject *f, struct Stack *stk)

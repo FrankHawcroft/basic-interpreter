@@ -12,8 +12,130 @@
 #include "interpreter.h"
 #include "builtin.h"
 #include "process.h"
+#include "heap.h"
 #include "stack.h"
 #include "hashtable.h"
+#include "options.h"
+
+bool EligibleForCaching(const struct TokenSequence *tokSeq, short callNestLevelWhenExecuted)
+{
+	return !Opts()->lowMemory 
+		/* Labels and line numbers are defined at compile time rather than execution time,
+			so labelled statements cannot be cached in subprograms. */
+		&& (callNestLevelWhenExecuted == SCOPE_MAIN || QsIsNull(&tokSeq->label))
+		&& tokSeq->next != NULL /* Not a partial 'statement', e.g. in a single-line IF. */
+		&& InPotentiallyHotPath(); /* Assumes considering caching currently executing stmt. */
+}
+
+static bool GuaranteedGlobal(const QString *t) { return IsLiteral(t) || LexicallyGuaranteedBuiltIn(t); }
+
+/* Whether to cache the converted form of a statement, rather than just tokens. */
+static bool ShouldCachePreconvertedObjects(const struct TokenSequence *tokSeq, short callNestLevelWhenExecuted)
+{	
+	unsigned short n;
+	bool allImmutablyExist;
+	
+	if(tokSeq->preconverted != NULL)
+		return FALSE; /* already done ... */
+		
+	/* Quick execution assumes an 'ordinary' statement; and no point preconverting if no params. */
+	if(IsMacro(tokSeq->command) || tokSeq->length <= 1)
+		return FALSE;
+	
+	/* For short-running programs, the overhead of converting objects again before caching them, generally
+		outweighs the performance gain. Static SUBs are considered an exception as they tend to be 'leaf'
+		calls which presumably will happen frequently enough to justify pre-conversion. */
+	if(callNestLevelWhenExecuted == SCOPE_STATIC) {
+		/*for(n = 0, allImmutablyExist = TRUE; n < tokSeq->length && allImmutablyExist; n++)
+			allImmutablyExist &= (GuaranteedNotDynamic(&tokSeq->rest[n])
+				|| LookUp(&tokSeq->rest[n], callNestLevelWhenExecuted) != NULL);
+		return allImmutablyExist;*/
+		return TRUE;
+	}
+
+	/* Otherwise, unless -o specified, don't bother. */
+	if(!Opts()->optimise)
+		return FALSE;
+
+	/* Outside a SUB, everything can be assumed to stick around. */
+	if(callNestLevelWhenExecuted == SCOPE_MAIN)
+		return TRUE;
+
+	/* If in a non-STATIC SUB, it's only safe to cache objects if none of them are local labels or variables -
+		erring on the side of caution, cache objects only if everything is a constant, or an operation on a
+		constant. */	
+	for(n = 0, allImmutablyExist = TRUE; n < tokSeq->length && allImmutablyExist; n++)
+		allImmutablyExist &= GuaranteedGlobal(&tokSeq->rest[n]);
+	
+	return allImmutablyExist;
+}
+
+void StorePreconvertedObjects(struct TokenSequence *ts, short callNestLevelWhenExecuted)
+{
+	if(ShouldCachePreconvertedObjects(ts, callNestLevelWhenExecuted)
+	&& (ts->preconverted = TolerantNew(sizeof(BObject) * ts->length)) != NULL) {
+		unsigned short n;
+		bool allResolved = TRUE;
+		for(n = 0; n < ts->length && allResolved; n++) {
+			ConvertToObject(&ts->rest[n], &ts->preconverted[n], callNestLevelWhenExecuted);
+			allResolved &= !IsEmpty(&ts->preconverted[n]);
+		}
+		if(!allResolved) {
+			unsigned short m;
+			for(m = 0; m < n; m++)
+				RemoveObject(&ts->preconverted[m], FALSE);
+			Dispose(ts->preconverted);
+			ts->preconverted = NULL;
+		}
+	}
+}
+
+bool NoDynamicallyAllocatedMemory(const struct TokenSequence *ts)
+{
+	unsigned short n;
+	bool noMalloc = TRUE;
+
+	for(n = 0; n < ts->length && noMalloc; n++)
+		noMalloc &= (IsPunctuation(&ts->rest[n]) || TypeIsNumeric(TypeOfToken(&ts->rest[n])));
+	
+	return noMalloc;
+}
+
+bool IsAssignmentStatement(const struct Statement *command)
+{
+	return !IsSubprogram(command) && !IsMacro(command) && command->method.builtIn == Let_;
+}
+
+const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel)
+{
+	const BObject *vdef = NULL;
+	if(IsAssignmentStatement(ts->command)) {
+		const QString *v = &ts->rest[QsGetFirst(&ts->rest[0]) == '(' ? 1 : 0];
+		vdef = LookUp(v, callNestLevel);
+	}
+	return vdef != NULL && IsVariable(vdef) ? vdef : NULL;
+}
+
+void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted)
+{
+	if(vdef == NULL)
+		return;
+		
+	if((callNestLevelWhenExecuted == SCOPE_MAIN || callNestLevelWhenExecuted == SCOPE_STATIC)
+	|| (vdef->category & (VARIABLE_IS_SHARED | VARIABLE_IS_ARRAY | VARIABLE_IS_REF))) {
+		/* Either variable sticks around, or, if in a dynamic sub, assume it'll always be created
+			by DIM or SHARED or as a reference parameter, before being assigned to. */
+		QString letqPredef;
+		QsInitStaticNTS(&letqPredef, KW_LETQ_PREDEF);
+		RequireSuccess(GetStatement(&letqPredef, &ts->command));
+	}
+	else {
+		/* Local scalar - not quite as quick, but can avoid full lookup, and type checks. */
+		QString letqLocal;
+		QsInitStaticNTS(&letqLocal, KW_LETQ_LOCAL);
+		RequireSuccess(GetStatement(&letqLocal, &ts->command));
+	}
+}
 
 static bool SuitableForInlining(const Scalar *s)
 {

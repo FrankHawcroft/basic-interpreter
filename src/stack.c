@@ -75,8 +75,6 @@ void StkResize(struct Stack *stk, unsigned newLimit)
 
 void StkPush(struct Stack *stk, const void *item)
 {
-	/*assert(StkIsValid(stk));*/
-	
 #ifdef DEBUG
 	/* Callers need to check this precondition - */
 	if(StkFull(stk)) {
@@ -95,7 +93,6 @@ void StkPush(struct Stack *stk, const void *item)
 
 void StkPop(struct Stack *stk, void *item)
 {
-	/*assert(StkIsValid(stk));*/
 	/* Callers need to check - */
 	assert(stk->top > stk->base);
 
@@ -107,14 +104,8 @@ void StkPop(struct Stack *stk, void *item)
 
 static int Scaled(const PfGranularType *higher, const PfGranularType *lower, const struct Stack *stk)
 {
-	/*assert(StkIsValid(stk));*/
 	return (higher - lower) / stk->itemSize;
 }
-
-/*int StkHeight(const struct Stack *stk)
-{
-	return stk->height; */ /* or: Scaled(stk->top, stk->base, stk);*/
-/*}*/
 
 int StkSpaceRemaining(const struct Stack *stk)
 {
@@ -133,38 +124,28 @@ int StkLimit(const struct Stack *stk)
 
 void *StkPeek(const struct Stack *stk, int offset)
 {
-	/*assert(StkIsValid(stk));*/
 	assert(offset < StkHeight(stk));
 
 	return stk->top - (offset + 1) * stk->itemSize;
 }
 
-#define SMALL_STK_OBJ_SIZE 64
-
 void StkDiscard(struct Stack *stk, unsigned n, StackItemDisposer dispose)
 {
-	/*assert(StkIsValid(stk));*/
 	assert(n <= (unsigned)StkHeight(stk));
 
 	if(n == 0)
 		return;
 
+	stk->height -= n;
+
 	if(dispose != NULL) {
-		PfGranularType quickStorage[SMALL_STK_OBJ_SIZE];
-		void *storage = stk->itemSize > SMALL_STK_OBJ_SIZE ? New(stk->itemSize) : &quickStorage[0];
-
 		while(n-- != 0) {
-			StkPop(stk, storage);
-			dispose(storage);
+			stk->top -= stk->itemSize;
+			dispose(stk->top);
 		}
-
-		if(stk->itemSize > SMALL_STK_OBJ_SIZE)
-			Dispose(storage);
 	}
-	else {
+	else
 		stk->top -= stk->itemSize * n;
-		stk->height -= n;
-	}
 }
 
 void StkClear(struct Stack *stk, StackItemDisposer dispose)
@@ -177,10 +158,8 @@ void StkClear(struct Stack *stk, StackItemDisposer dispose)
 to dynamically allocated memory. */
 void StkClearQuick(struct Stack *stk)
 {
-	/*assert(StkIsValid(stk));*/
 	stk->top = stk->base;
 	stk->height = 0;
-	/*assert(StkIsValid(stk));*/
 }
 
 /* Does not clear first! Use only when known to be clear,

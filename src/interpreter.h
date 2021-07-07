@@ -48,6 +48,7 @@ typedef enum SimpleType_enum {
 #define TEXTUAL_TYPES (T_STRING | T_CHAR)
 #define NUMERIC_TYPES (T_INT | T_LONG | T_SINGLE | T_DOUBLE)
 #define INTEGRAL_TYPES (T_INT | T_LONG | T_BOOL)
+#define EXACT_TYPES (INTEGRAL_TYPES | T_ERROR)
 #define USABLE_TYPES (NUMERIC_TYPES | TEXTUAL_TYPES | T_BOOL)
 #define ALL_TYPES (T_MISSING | T_ERROR | USABLE_TYPES)
 
@@ -426,10 +427,10 @@ extern bool TypeIsComparable(SimpleType);
 extern bool TypeIsOrderable(SimpleType);
 
 /* Comparison is reliable; i.e., is not a floating-point representation. */
-extern bool TypeIsExact(SimpleType);
+#define TypeIsExact(t) (((t) & EXACT_TYPES) != 0)
 
 /* Values consist of character(s). */
-extern bool TypeIsTextual(SimpleType);
+#define TypeIsTextual(t) (((t) & TEXTUAL_TYPES) != 0)
 
 /* The type is considered the global default, regardless of SetDefaultType. */
 #define TypeIsDefault(t) ((t) == DEFAULT_IMPLIED_TYPE)
@@ -610,6 +611,12 @@ extern void Do(struct Process *proc, struct TokenSequence *tokSeq, struct Stack 
 
 /*** Performance Improving Transformations -- pit.c ***/
 
+extern bool EligibleForCaching(const struct TokenSequence *, short callNestLevelWhenExecuted);
+extern bool NoDynamicallyAllocatedMemory(const struct TokenSequence *);
+extern void StorePreconvertedObjects(struct TokenSequence *, short callNestLevelWhenExecuted);
+extern bool IsAssignmentStatement(const struct Statement *);
+extern const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel);
+extern void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted);
 extern void Improve(struct TokenSequence *);
 
 /*** Control flow stack -- controlflow.c ***/
@@ -637,9 +644,11 @@ extern void FindLabelPreceding(/*out*/ QString *label, /*in*/ const char *limit)
 /*** Formal against actual parameter checking and transformation -- semantics.c ***/
 
 extern Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, unsigned actualCount);
+extern Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count);
 extern Error ConformForApplication(const BObject *applied, BObject *actual, unsigned actualCount);
 extern const struct Parameter *FormalForActual(const struct Parameter *formal, int formalCount, unsigned actual);
 extern bool SemanticallyPredictable(const struct TokenSequence *ts);
+extern SimpleType TypeOfToken(const QString *);
 
 /*** Lexical analyser -- lexer.c ***/
 
@@ -649,6 +658,7 @@ extern struct TokenSequence *Duplicate(const struct TokenSequence *);
 extern void ClearTokenSequence(struct TokenSequence *);
 extern void DisposeTokenSequence(struct TokenSequence *);
 extern void ExpandTokenSequence(struct TokenSequence *, unsigned short newSize);
+extern void ReplaceTokens(struct TokenSequence *, QString *newTokens, unsigned short count);
 extern void DeleteToken(struct TokenSequence *, unsigned short index);
 DIAGNOSTIC_FN_DECL(void PrintTokSeq(const struct TokenSequence *));
 

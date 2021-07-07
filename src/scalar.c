@@ -27,6 +27,8 @@
 /* Size of sufficiently capacious fixed-length buffer to convert any numeric value to a string - */
 #define NUM_STR_BUF_LEN 64
 
+static union EValue m_ZeroEValue;
+
 /* Useful Scalar constants: */
 static Scalar m_Empty;
 static Scalar m_ZeroInt;
@@ -93,14 +95,16 @@ static bool ScalarIsSane(const Scalar *v)
 /* Set an error in the destination (to) - from the optional source if it's already one;
 if no error in either place, don't set it.
 	Unlike SetError, assumes the destination has been initialised. */
-static void PropagateError(Scalar *to, const Scalar *from, Error newError)
+static Error PropagateError(Scalar *to, const Scalar *from, Error newError)
 {
 	/* Save the error first in case to == from: */
 	Error propagatedError = from != NULL && ScalarIsError(from) ? from->value.error : newError;
 	if(propagatedError != SUCCESS) {
 		DisposeScalar(to);
 		SetError(to, propagatedError);
+		return propagatedError;
 	}
+	return SUCCESS;
 }
 
 /* Return an error if present. */
@@ -114,6 +118,8 @@ static Error RetrieveError(const Scalar *v)
 void InitConstants(void)
 {
 	if(!m_ConstantsInitialised) {
+		memset(&m_ZeroEValue, 0, sizeof(m_ZeroEValue));
+
 		InitScalar(&m_Empty, T_EMPTY, FALSE);
 		InitScalar(&m_ZeroInt, T_INT, FALSE);
 		SetFromLong(&m_OneInt, 1L, T_INT);
@@ -139,9 +145,11 @@ void InitConstants(void)
 void InitScalar(Scalar *v, SimpleType type, bool isPointer)
 {
 	assert(v != NULL);
-	assert(NonPointer(type) == type);
 
 	v->type = type | (isPointer ? T_POINTER : 0);
+#if PF_INTUITIVE_CONCEPT_OF_ZERO_VALUES_HOLDS
+	v->value = m_ZeroEValue;
+#else
 	v->value.number.l = 0L;
 	if(isPointer)
 		v->value.pointer.lp = NULL;
@@ -151,8 +159,9 @@ void InitScalar(Scalar *v, SimpleType type, bool isPointer)
 		v->value.number.d = 0.0;
 	else if(type == T_STRING)
 		QsInitNull(&v->value.string);
-		
+
 	assert(ScalarIsSane(v));
+#endif
 }
 
 /* Dereferences the source before assigning to the destination. (I.e. looks 
@@ -173,7 +182,7 @@ void SetToValue(Scalar *dest, const Scalar *src)
 	else if(srcType == T_SINGLE || srcType == T_DOUBLE)
 		SetFromDouble(dest, GetDouble(src), srcType);
 	else if(srcType == T_STRING) {
-		InitScalar(dest, T_STRING, FALSE);
+		dest->type = T_STRING;
 		dest->value.string = *src->value.pointer.tp;
 	}
 	else if(srcType == T_CHAR)
@@ -234,7 +243,7 @@ void SetAsPointer(Scalar *dest, const Scalar *src)
 is assumed to satisfy any alignment requirement. */
 void SetPointerTo(Scalar *v, void *ptr, SimpleType type)
 {
-	InitScalar(v, type, TRUE);
+	v->type = type | T_POINTER;
 	if(type == T_INT)
 		v->value.pointer.sp = (short *)ptr;
 	else if(type == T_LONG)
@@ -263,7 +272,7 @@ void SetPointerToElement(Scalar *indexer, const Scalar *vector, long offset)
 		SetError(indexer, ARRAYEXPECTED);
 	else {
 		SimpleType type = NonPointer(vector->type);
-		InitScalar(indexer, type, TRUE);
+		indexer->type = vector->type;
 		if(type == T_INT)
 			indexer->value.pointer.sp = vector->value.pointer.sp + offset;
 		else if(type == T_LONG)
@@ -286,7 +295,7 @@ void SetPointerToElement(Scalar *indexer, const Scalar *vector, long offset)
 /* Sets the scalar from a long, but converting to a given type. */
 void SetFromLong(Scalar *dest, long value, SimpleType type)
 {
-	InitScalar(dest, type, FALSE);
+	dest->type = type;
 	if(type == T_INT) {
 		if(value > SHRT_MAX || value < SHRT_MIN) 
 			SetError(dest, OVERFLOWERR);
@@ -314,7 +323,7 @@ void SetFromLong(Scalar *dest, long value, SimpleType type)
 /* Sets the scalar from a double, but converting to a given type. */
 void SetFromDouble(Scalar *dest, double value, SimpleType type)
 {
-	InitScalar(dest, type, FALSE);
+	dest->type = type;
 	if(type == T_INT) {
 		if(value > SHRT_MAX || value < SHRT_MIN) 
 			SetError(dest, OVERFLOWERR);
@@ -353,13 +362,13 @@ Error SetError(Scalar *v, Error code)
 
 void SetCharacter(Scalar *v, char c)
 {
-	InitScalar(v, T_CHAR, FALSE);
+	v->type = T_CHAR;
 	v->value.character = c;
 }
 
 void SetBoolean(Scalar *v, bool b)
 {
-	InitScalar(v, T_BOOL, FALSE);
+	v->type = T_BOOL;
 	v->value.boolean = b;
 }
 
@@ -376,7 +385,7 @@ void SetTruncated(Scalar *dest, long v, SimpleType t1, SimpleType t2)
 {
 	assert(TypeIsNumeric(t1) && TypeIsNumeric(t2) && TypeIsExact(t1) && TypeIsExact(t2));
 
-	InitScalar(dest, LargerType(t1, t2), FALSE);
+	dest->type = LargerType(t1, t2);
 	if(t1 == T_LONG || t2 == T_LONG)
 		dest->value.number.l = v;
 	else
@@ -393,7 +402,7 @@ void CopyScalar(Scalar *dest, const Scalar *src)
 	if(src->type != T_STRING || IsPointer(src))
 		*dest = *src;
 	else {
-		InitScalar(dest, T_STRING, FALSE);
+		dest->type = T_STRING;
 		QsCopy(&dest->value.string, &src->value.string);
 	}
 	
@@ -408,7 +417,7 @@ void CopyDereferencingSource(Scalar *dest, const Scalar *src)
 	if(!(src->type & T_STRING))
 		SetToValue(dest, src);
 	else {
-		InitScalar(dest, T_STRING, FALSE);
+		dest->type = T_STRING;
 		QsCopy(&dest->value.string, (QString *)GetPointer((Scalar *)src));
 	}
 }
@@ -709,78 +718,83 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 	SimpleType newType = T_MISSING;
 	
 	assert(value != NULL);
-	assert(!IsPointer(value));
+	/*assert(!IsPointer(value));*/ /* TODO not necessarily ... */
 	assert(!Contextual(rule));
 	
 	newType = TargetType(rule, value->type);
 	result = TypeIsInternal(newType) ? BADARGTYPE : SUCCESS;
 	
-	/* Is a conversion required? */
 	if(result == SUCCESS && value->type != newType) {
 		/* TODO these conversions should respect TypeDiscipline options */
-		if((newType & NUMERIC_TYPES) && value->type == T_STRING) {
-			QString s;
-			QsCopy(&s, &value->value.string);
-			DisposeScalar(value);
-			ParseNumber(&s, value);
-			QsDispose(&s);
-			ChangeType(value, (enum TypeRule)(newType & TD_CHECKED));
-		}
-		else if(newType == T_BOOL) {
-			/* Will need to be revisited if parsing supported here - 
-				this is asymmetrical with the Boolean -> string case below */
-			bool boolValue = GetBoolean(value);
-			DisposeScalar(value);	
-			SetBoolean(value, boolValue);
-		}
-		else if(newType == T_CHAR) {
-			char code = NUL;
-		
-			if(value->type == T_STRING) {
-				if((newType & (TD_CHECKED | TD_PRECISE)) && QsGetLength(&value->value.string) > 1)
-					result = OVERFLOWERR;
-				else if(!QsIsNull(&value->value.string)) {
-					code = QsGetFirst(&value->value.string);
-					DisposeScalar(value);
+		switch(newType) {
+			case T_INT:
+				SetFromLong(value, GetLong(value), T_INT);
+				break;
+			case T_LONG:
+				SetFromLong(value, GetLong(value), T_LONG);
+				break;
+			case T_SINGLE:
+				SetFromDouble(value, GetDouble(value), T_SINGLE);
+				break;
+			case T_DOUBLE:
+				SetFromDouble(value, GetDouble(value), T_DOUBLE);
+				break;
+			case T_STRING:
+				if(value->type == T_CHAR)
+					QsCopyChar(&value->value.string, value->value.character);
+				else if(value->type == T_BOOL)
+					QsCopy(&value->value.string, value->value.boolean ? &m_TrueKeyword : &m_FalseKeyword);
+				else if(TypeIsNumeric(value->type)) {
+					char buffer[NUM_STR_BUF_LEN];
+					NumberToCString(&value->value.number, value->type, buffer, FALSE);
+					QsCopyNTS(&value->value.string, buffer);
 				}
+				value->type = T_STRING;
+				break;
+			case T_BOOL: {
+				/* Will need to be revisited if parsing supported by this function - 
+				  this is asymmetrical with the Boolean -> string case above. */
+				bool boolValue = GetBoolean(value);
+				DisposeScalar(value);	
+				SetBoolean(value, boolValue);
+				break;
 			}
-			else if(value->type == T_BOOL)
-				code = GetBoolean(value) ? '1' : '0';
-			else if(TypeIsNumeric(value->type))
-				/* If this value overflows a long, GetLong will cause an overflow error. */
-				code = (char)GetLong(value);
+			case T_CHAR: {
+				char code = NUL;
+				if(value->type == T_STRING) {
+					if((newType & (TD_CHECKED | TD_PRECISE)) && QsGetLength(&value->value.string) > 1)
+						result = OVERFLOWERR;
+					else if(!QsIsNull(&value->value.string)) {
+						code = QsGetFirst(&value->value.string);
+						DisposeScalar(value);
+					}
+				}
+				else if(value->type == T_BOOL)
+					code = GetBoolean(value) ? '1' : '0';
+				else if(TypeIsNumeric(value->type))
+					/* If this value overflows a long, GetLong will cause an overflow error. */
+					code = (char)GetLong(value);
 				
-			if((rule & (TD_CHECKED | TD_PRECISE)) && (code < CHAR_MIN || code > CHAR_MAX))
-				result = OVERFLOWERR;
+				if((rule & (TD_CHECKED | TD_PRECISE)) && (code < CHAR_MIN || code > CHAR_MAX))
+					result = OVERFLOWERR;
 			
-			if(result == SUCCESS)
-				SetCharacter(value, code);
-		}
-		else if(newType == T_INT)
-			SetFromLong(value, GetLong(value), T_INT);
-		else if(newType == T_LONG)
-			SetFromLong(value, GetLong(value), T_LONG);
-		else if(newType == T_SINGLE)
-			SetFromDouble(value, GetDouble(value), T_SINGLE);
-		else if(newType == T_DOUBLE)
-			SetFromDouble(value, GetDouble(value), T_DOUBLE);
-		else if(newType == T_STRING) {
-			if(value->type == T_CHAR)
-				QsCopyChar(&value->value.string, value->value.character);
-			else if(value->type == T_BOOL)
-				QsCopy(&value->value.string, value->value.boolean ? &m_TrueKeyword : &m_FalseKeyword);
-			else if(TypeIsNumeric(value->type)) {
-				char buffer[NUM_STR_BUF_LEN];
-				NumberToCString(&value->value.number, value->type, buffer, FALSE);
-				QsCopyNTS(&value->value.string, buffer);
+				if(result == SUCCESS)
+					SetCharacter(value, code);
 			}
-			value->type = T_STRING;
+			default:
+				if((newType & NUMERIC_TYPES) && value->type == T_STRING) {
+					QString s;
+					QsCopy(&s, &value->value.string);
+					DisposeScalar(value);
+					ParseNumber(&s, value);
+					QsDispose(&s);
+					ChangeType(value, (enum TypeRule)(newType & TD_CHECKED));
+				}
+				break;
 		}
-	} /* if conversion required */
+	}
 	
-	PropagateError(value, value, result);
-	
-	return RetrieveError(value);
+	return PropagateError(value, value, result);
 }
 
 Error ScalarToString(const Scalar *value, QString *str)

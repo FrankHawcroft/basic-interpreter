@@ -73,6 +73,10 @@ typedef char PfGranularType;
 
 #define PF_REQUIRES_STRICT_ALIGNMENT 0
 
+/* Whether all-zero-bytes represents zero for floating point types, and pointers. */
+
+#define PF_INTUITIVE_CONCEPT_OF_ZERO_VALUES_HOLDS 1
+
 /* Format string for size_t. */
 
 #if !defined(VBCC) && REASONABLY_C99_COMPLIANT

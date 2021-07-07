@@ -149,10 +149,6 @@ bool TypeIsComparable(SimpleType t) { return (GetTypeCharacteristicsByCode(t)->p
 
 bool TypeIsOrderable(SimpleType t) { return (GetTypeCharacteristicsByCode(t)->properties & T_IS_ORDERABLE) != 0; }
 
-bool TypeIsExact(SimpleType t) { return (GetTypeCharacteristicsByCode(t)->properties & T_IS_EXACT) != 0; }
-
-bool TypeIsTextual(SimpleType t) { return (GetTypeCharacteristicsByCode(t)->properties & T_IS_TEXTUAL) != 0; }
-
 bool ComparableTypes(SimpleType t1, SimpleType t2) { return (GetTypeCharacteristicsByCode(t1)->canCompareWith & (unsigned)t2) != 0; }
 
 enum TypeRule UsualTypeConversionToProduce(SimpleType t) { return GetTypeCharacteristicsByCode(t)->usuallyProducedBy; }
@@ -257,14 +253,17 @@ enum TypeRule ConcreteConversionFor(SimpleType actual, SimpleType previous, enum
 	assert((previous & T_POINTER) == 0);
 	assert(!Contextual(required) || previous != T_MISSING);
 	
-	if(required == TR_SAME)
-		/* Actually shouldn't matter, but err on the side of caution - */
-		return StrictTypeConversionFor(previous);
-	else if(required == TR_ASSIGNMENT || required == TR_PROMOTE)
-		return previous == T_LONG && actual == T_BOOL ? TR_INT_TO_LONG : UsualTypeConversionToProduce(previous);
-	else
-		/* Ensure conversion fails if haven't been able to make concrete - */
-		return Contextual(required) ? TR_IRRELEVANT : required;
+	switch(required) {
+		case TR_ASSIGNMENT:
+		case TR_PROMOTE:
+			return actual == T_BOOL && previous == T_LONG ? TR_INT_TO_LONG : UsualTypeConversionToProduce(previous);
+		case TR_SAME:
+			/* Actually shouldn't matter, but err on the side of caution - */
+			return StrictTypeConversionFor(previous);
+		default:
+			assert(!Contextual(required));
+			return required;
+	}
 }
 
 SimpleType TargetType(enum TypeRule required, SimpleType source)
@@ -308,41 +307,37 @@ static const struct Parameter *GetPrototype(const BObject *applied, int *numForm
 {
 	const struct Parameter *proto;
 	
-	*numFormals = INT_MIN;
+	assert(applied != NULL);
+	assert(numFormals != NULL);
 
-	if(applied == NULL)
-		proto = NULL;
+	if(applied->category == OPERATOR) {
+		proto = ParametersForOperator(applied->value.opRef);
+		*numFormals = OperandCount(applied->value.opRef);
+	}
+	else if(applied->category == FUNCTION) {
+		proto = applied->value.function->parameter;
+		if((*numFormals = applied->value.function->numArgs) == FN_VAR_ARGS) {
+			proto = &m_AnyArgs;
+			*numFormals = 1;
+		}
+	}
 	else if(IsVariable(applied)) {
 		bool array = IsArray(applied);
 		proto = array ? &m_ArrayIndex : NULL;
 		*numFormals = array ? 1 : 0;
 	}
 	else if(applied->category == STATEMENT) {
+		proto = applied->value.statement->formal;
+		*numFormals = applied->value.statement->formalCount;
 		if(IsMacro(applied->value.statement)) {
 			proto = &m_AnyArgs;
 			*numFormals = 1;
 		}
-		else {
-			proto = applied->value.statement->formal;
-			*numFormals = applied->value.statement->formalCount;
-		}
 	}
-	else if(applied->category == OPERATOR) {
-		proto = ParametersForOperator(applied->value.opRef);
-		*numFormals = OperandCount(applied->value.opRef);
-	}
-	else if(applied->category == FUNCTION) {
-		if(applied->value.function->numArgs == FN_VAR_ARGS) {
-			proto = &m_AnyArgs;
-			*numFormals = 1;
-		}
-		else {
-			proto = applied->value.function->parameter;
-			*numFormals = applied->value.function->numArgs;
-		}
-	}
-	else
+	else {
 		proto = NULL;
+		*numFormals = INT_MIN;
+	}
 
 	return proto;
 }
@@ -366,9 +361,7 @@ const struct Parameter *FormalForActual(const struct Parameter *formal, int form
 
 /* f = formal, a = actual ... */
 static Error Satisfy(const struct Parameter *f, BObject *a, const BObject *prevActual, bool varArgs)
-{
-	SimpleType prevType = prevActual == NULL ? T_MISSING : GetSimpleType(prevActual);
-	
+{	
 	assert(f == NULL || f->kind == LABEL || f->kind == LITERAL || IsVarParam(f));
 	assert(a != NULL);
 
@@ -389,14 +382,17 @@ static Error Satisfy(const struct Parameter *f, BObject *a, const BObject *prevA
 		else if(Undefined(a))
 			return UNDEFINEDVARORFUNC;
 		
-		return ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
+		return ChangeType(&a->value.scalar,
+			ConcreteConversionFor(a->value.scalar.type,
+				prevActual == NULL ? T_MISSING : GetSimpleType(prevActual), f->type));
 	}
 	else if(IsVarParam(f)) {
 		if(!IsVariable(a))
 			return Undefined(a) ? UNDEFINEDVARORFUNC : ER_EXPECTED_VARIABLE;
 		else if(((f->kind & VARIABLE_IS_ARRAY) != 0) != IsArray(a))
 			return (f->kind & VARIABLE_IS_ARRAY) ? ARRAYEXPECTED : SCALAREXPECTED;
-		else if(!TypeMayBeOKWithContext(NonPointer(VarData(a)->type), prevType, f->type))
+		else if(!TypeMayBeOKWithContext(NonPointer(VarData(a)->type),
+		  prevActual == NULL ? T_MISSING : GetSimpleType(prevActual), f->type))
 			return BADARGTYPE;
 	}
 	else if(f->kind == LABEL)
@@ -453,7 +449,36 @@ Error ConformForApplication(const BObject *applied, BObject *actual, unsigned ac
 	int numFormals;
 	const struct Parameter *proto = GetPrototype(applied, &numFormals);
 	/* Error result here assumes usage in expr rather than command context - */
-	return proto == NULL ? ARRAYEXPECTED : Conform(proto, numFormals, actual, actualCount);
+	if(proto == NULL)
+		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
+	else if(numFormals == actualCount) /* assumes operator or function parameter conventions! */
+		return ConformQuickly(proto, actual, numFormals);
+	else
+		return Conform(proto, numFormals, actual, actualCount);
+}
+
+Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count)
+{
+	Error error = SUCCESS;
+	int n;
+
+	assert(formal != NULL);
+	assert(actual != NULL && count >= 1);
+	assert(count <= MAX_FORMALS);
+
+	for(n = 0; n < count && error == SUCCESS; n++) {
+		const struct Parameter *f = &formal[n];
+		BObject *a = &actual[n];
+
+		if(f->kind == LITERAL && (error = DereferenceObject(a)) == SUCCESS) { /* deref propagates errors */
+			SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(&actual[n - 1]);
+			error = ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
+		}
+		else if(ObjectIsError(a))
+			error = ObjectAsError(a);
+	}
+	
+	return error;
 }
 
 SimpleType TypeOfToken(const QString *t)

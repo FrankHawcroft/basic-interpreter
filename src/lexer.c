@@ -683,6 +683,33 @@ void ExpandTokenSequence(struct TokenSequence *tokSeq, unsigned short newSize)
 	}
 }
 
+void ReplaceTokens(struct TokenSequence *tokSeq, QString *newTokens, unsigned short count)
+{
+	unsigned short i;
+	
+	assert(tokSeq != NULL);
+	assert(newTokens != NULL && count != 0);
+	
+	for(i = 0; i < tokSeq->length; i++)
+		QsDispose(&tokSeq->rest[i]);
+	
+	tokSeq->length = count;
+	
+	if(count > tokSeq->capacity) {
+		Dispose(tokSeq->rest);
+		tokSeq->rest = newTokens;
+		tokSeq->capacity = count;
+	}
+	else {
+		for(i = 0; i < count; i++) {
+			QsCopy(&tokSeq->rest[i], &newTokens[i]);
+			QsDispose(&newTokens[i]);
+		}
+		tokSeq->length = count;
+		Dispose(newTokens);
+	}
+}
+
 void DeleteToken(struct TokenSequence *tokSeq, unsigned short index)
 {
 	unsigned short i;

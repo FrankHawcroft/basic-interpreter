@@ -26,7 +26,6 @@ extern void StkResize(struct Stack *stk, unsigned newLimit); /* Only increasing 
 extern void StkPush(struct Stack *stk, const void *item);
 extern void StkPop(struct Stack *stk, void *item);
 #define StkHeight(stk) ((stk)->height)
-/*extern int StkHeight(const struct Stack *stk);*/
 extern int StkSpaceRemaining(const struct Stack *stk);
 extern int StkHighWaterMark(const struct Stack *stk);
 extern int StkLimit(const struct Stack *stk);
