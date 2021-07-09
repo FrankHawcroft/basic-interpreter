@@ -1261,13 +1261,17 @@ void Date_(Scalar *result, const BObject *arg, unsigned count)
 {
 	short year, month, day;
 	struct tm *currentTime;
-	time_t tickCount = time(NULL);
+	struct PfSystemTimeStamp stamp;
+	time_t timer;
 	QString *s = &result->value.string;
 
-	if(tickCount == -1)
-		tickCount = 0;
-	currentTime = localtime(&tickCount);
+	PfGetSystemTimeStamp(&stamp);
+	timer = PfConvertToTimeTTickCount(&stamp);
+	currentTime = localtime(&timer);
 	year = (short)currentTime->tm_year + 1900;
+#ifdef AMIGA /* TODO this is weird */
+	year += 8;
+#endif
 	month = (short)currentTime->tm_mon + 1;
 	day = (short)currentTime->tm_mday;
 
@@ -1290,10 +1294,12 @@ void Date_(Scalar *result, const BObject *arg, unsigned count)
 static double GetClock(void)
 {
 	struct tm *currentTime;
-	time_t count = time(NULL);
-	if(count == -1)
-		count = 0;
-	currentTime = localtime(&count);
+	struct PfSystemTimeStamp stamp;
+	time_t timer;
+	
+	PfGetSystemTimeStamp(&stamp);
+	timer = PfConvertToTimeTTickCount(&stamp);
+	currentTime = localtime(&timer);
 	return 3600.0 * currentTime->tm_hour + 60.0 * currentTime->tm_min + currentTime->tm_sec;
 }
 

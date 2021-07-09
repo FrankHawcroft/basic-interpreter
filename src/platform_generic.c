@@ -330,6 +330,11 @@ bool PfTimeHasElapsed(
 			&& (double)(end->clocks - start->clocks) / CLOCKS_PER_SEC >= modf(interval, &dummy));
 }
 
+time_t PfConvertToTimeTTickCount(const struct PfSystemTimeStamp *timeStamp)
+{
+	return timeStamp->secs;
+}
+
 #endif /* PF_USE_GENERIC_EVENT_TIMING_FUNCTIONS */
 
 #if PF_USE_GENERIC_EXECUTION_TIMING_FUNCTIONS

@@ -8,8 +8,6 @@
 
 #ifdef AMIGA
 
-/*#include <proto/exec.h>
-#include <proto/dos.h>*/
 #include <clib/exec_protos.h>
 #include <clib/dos_protos.h>
 #include <clib/alib_protos.h>
@@ -32,7 +30,7 @@ extern int stricmp(const char *, const char *);
 extern int strnicmp(const char *, const char *, size_t);
 #endif
 
-static const char INTERPRETER_VERSION[] = "\0$VER: BASIC 0.16A (4.30.2014)";
+static const char INTERPRETER_VERSION[] = "\0$VER: BASIC 0.16A (7.9.2021)";
 
 const char PF_PATH_SEP[] = "/";
 const char PF_CUR_DIR[] = "";
@@ -50,7 +48,7 @@ struct Library *DOSBase, *IntuitionBase, *GfxBase, *LayersBase, *DiskFontBase;
 	get away with it. */
 static int m_InstanceCount = 0;
 
-static BPTR m_OriginalCD = -1L; /* TODO re */
+static BPTR m_OriginalCD = -1L; /* TODO reentrant */
 
 struct Library *TimerBase = NULL;
 struct timerequest *TimerIO = NULL;
@@ -352,8 +350,6 @@ void PfPrintSystemTimeStamp(const struct PfSystemTimeStamp *timeStamp)
 void PfGetSystemTimeStamp(struct PfSystemTimeStamp *timeStamp)
 {
 	GetAmigaClock(&timeStamp->secs, &timeStamp->mics);
-	/*fprintf(stderr, "Polling: ");
-	PrintSystemTimeStamp(timeStamp);*/
 }
 
 bool PfTimeHasElapsed(
@@ -362,6 +358,11 @@ bool PfTimeHasElapsed(
 	float interval)
 {
 	return SubtractAmigaClock(end->secs, end->mics, start->secs, start->mics) >= interval;
+}
+
+time_t PfConvertToTimeTTickCount(const struct PfSystemTimeStamp *timeStamp)
+{
+	return timeStamp->secs + 252460800; /* seconds between Unix and Amiga epochs - 1/1/1970 and 1/1/1978 */
 }
 
 void PfRecordTime(PfHighResolutionTimeStamp *t)

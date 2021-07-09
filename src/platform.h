@@ -33,10 +33,7 @@
 
 #include <stdio.h>
 #include <limits.h>
-
-#ifndef AMIGA
-#include <time.h> /* time_t, clock_t */
-#endif
+#include <time.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -263,6 +260,7 @@ extern void PfPrintSystemTimeStamp(const struct PfSystemTimeStamp *timeStamp);
 extern void PfGetSystemTimeStamp(struct PfSystemTimeStamp *timeStamp);
 extern bool PfTimeHasElapsed(const struct PfSystemTimeStamp *start,
 	const struct PfSystemTimeStamp *end, float interval);
+extern time_t PfConvertToTimeTTickCount(const struct PfSystemTimeStamp *timeStamp);
 
 /* Execution timing for profiling: */
 
