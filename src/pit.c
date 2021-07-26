@@ -306,6 +306,34 @@ static void MakeQuotedToken(const Scalar *v, QString *t)
 		QsCopyNTS(t, convBuffer);
 	}
 }
+/*
+#define MAX_TRACKED_NESTING 10
+
+static const BObject *FunctorFor(const QString *ts, unsigned short nToks, const QString *t)
+{
+	const BObject *functor[MAX_TRACKED_NESTING];
+	unsigned short paramNumber;
+	int nesting;
+	
+	unsigned short rt;
+				int relNesting = 0, fcount = 0;
+				const struct Parameter *formal = NULL;
+				
+				actual = 0;
+				for(rt = t - 1; rt >= 1 && relNesting >= 0; rt--) {
+					QString *rtok = &tokSeq->rest[rt];
+					Nest(rtok, &relNesting);
+					actual += relNesting == 0 && (QsGetFirst(rtok) == '(' || !IsPunctuation(rtok));
+					if(relNesting == 0 && IsLParen(rtok - 1)) {
+						const struct Operator *op = ResolveOperator(rtok);
+						if(op != NULL) {
+							formal = ParametersForOperator(op);
+							fcount = OperandCount(op);
+						}
+					}
+				}
+}
+*/
 
 /* Substitution of literals for named constants
    ============================================
@@ -340,7 +368,7 @@ static bool CreateNamedConstant(QString *tok, bool inFunction)
 	static int constNumber = 0;
 	bool created = FALSE;
 	
-	if(IsNumeric(tok) && (inFunction || Proc()->callNestLevel > SCOPE_MAIN)) {
+	if(IsNumeric(tok) && Proc()->callNestLevel > SCOPE_MAIN && !InStaticContext(Proc())) {
 		Scalar n;
 		
 		ParseToken(tok, &n);
@@ -481,7 +509,7 @@ for the parameter. The aim is to avoid type checking and conversion (see: semant
 each time the operator, function, or statement is executed. */
 static bool ConvertLiteral(const struct Parameter *formal, int fcount, QString *tok, unsigned actual)
 {
-	if(IsLiteral(tok)) {
+	if(IsLiteral(tok) && formal != NULL) {
 		const struct Parameter *f = FormalForActual(formal, fcount, actual);
 		SimpleType originalType, leftContext;
 		BObject val;
@@ -546,6 +574,9 @@ static bool SubstituteDefault(const struct Statement *stmt, QString *tok, int ne
 }
 
 #define MAX_PASSES 10
+#define MAX_NESTING_TRACKED_FOR_LITERAL_CONVERSION 10
+
+extern const struct Parameter *GetPrototype(const BObject *applied, int *numFormals);
 
 void Improve(struct TokenSequence *tokSeq)
 {
@@ -554,18 +585,43 @@ void Improve(struct TokenSequence *tokSeq)
 	
 	/* Multiple passes are made over the statement, enabling optimisations that are made possible by
 		other optimisations. */
-	for(pass = 1; pass <= MAX_PASSES && changed; pass++) {
-		unsigned actual = 0;
-		int nesting = 0;
+	for(pass = 1; pass <= MAX_PASSES && changed; pass++) {	
 		unsigned short t;
-		bool inFunction = QsIsNull(&tokSeq->statementName);
 	
 		changed = FALSE;
 
+		{
+			const BObject *functor[MAX_NESTING_TRACKED_FOR_LITERAL_CONVERSION];
+			unsigned actualNumber[MAX_NESTING_TRACKED_FOR_LITERAL_CONVERSION];
+			int nesting = 0;
+			
+			functor[nesting] = NULL;
+			actualNumber[nesting] = 0;
+		
+			for(t = 0; t < tokSeq->length; t++) {
+				QString *tok = &tokSeq->rest[t];
+				
+				Nest(tok, &nesting);
+							
+				if(1 <= nesting && nesting < MAX_NESTING_TRACKED_FOR_LITERAL_CONVERSION) {
+					if(QsGetFirst(tok) == '(') {
+						functor[nesting] = LookUp(tok + 1, Proc()->callNestLevel);
+						actualNumber[nesting] = 0;
+					}
+					else if(t != 0 && QsGetFirst(tok - 1) != '(') {
+						int nFormals = 0;
+						const struct Parameter *params
+							= functor[nesting] != NULL ? GetPrototype(functor[nesting], &nFormals) : NULL;
+						changed |= ConvertLiteral(params, nFormals, tok, actualNumber[nesting]);
+						++actualNumber[nesting];
+					}
+				}		
+			}
+		}
+		
 		for(t = 0; t < tokSeq->length; t++) {
 			QString *tok = &tokSeq->rest[t];
-
-			Nest(tok, &nesting);
+			bool inFunction = QsIsNull(&tokSeq->statementName);
 			
 			changed |= InlineNamedConstant(tok);
 			
@@ -574,21 +630,6 @@ void Improve(struct TokenSequence *tokSeq)
 			changed |= RemoveRedundantFunction(tok);
 
 			changed |= EvaluateConstantValuedExpression(tok, inFunction);
-			
-			/*if(t > 1 && nesting >= 1 && IsLiteral(tok)) {
-				unsigned short rt;
-				int relNesting = 0, actual = 0, fcount = 0;
-				const struct Parameter *formal = NULL;
-				
-				for(rt = t - 1; rt >= 1 && relNesting >= 0; rt--) {
-					QString *rtok = &tokSeq->rest[rt];
-					Nest(&rtok, relNesting);
-					if(relNesting == 0 && IsLParen(rtok - 1) && IsFunctionOrOperator(rtok))
-				}
-				
-				if(formal != NULL)
-					changed |= ConvertLiteral(formal, fcount, tok, actual);
-			}*/
 		}
 		
 		if(changed) {
@@ -604,6 +645,9 @@ void Improve(struct TokenSequence *tokSeq)
 		}
 		
 		if(!QsIsNull(&tokSeq->statementName)) {
+			unsigned actual = 0;
+			int nesting = 0;
+			
 			/* If a statement is supplied, assume it's already been established to exist ... */
 			
 			if(tokSeq->command == NULL && GetStatement(&tokSeq->statementName, &tokSeq->command) != SUCCESS) {
@@ -613,9 +657,6 @@ void Improve(struct TokenSequence *tokSeq)
 			
 			/* Done after the main pass because sensitive to nesting, which might change as a result
 				of other improvements. */
-				
-			nesting = 0;
-			actual = 0;
 			
 			for(t = 0; t < tokSeq->length; t++) {			
 				QString *tok = &tokSeq->rest[t];

@@ -310,8 +310,9 @@ void ExitSub_(BObject *arg, unsigned count)
 		
 		DiscardCurrentControlFlow();
 		if(!staticSub)
-			ClearOutOfContextItems(proc->callNestLevel);
-		ReenableEventTraps(proc, --proc->callNestLevel);
+			ClearOutOfContextItems(proc->callNestLevel, proc->callNestLevel);
+		--proc->callNestLevel;
+		ReenableEventTraps(proc, proc->callNestLevel);
 		proc->staticSubCallNesting -= staticSub;
 		ReturnFromSubprogram();
 	}

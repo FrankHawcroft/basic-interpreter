@@ -95,7 +95,7 @@ static bool ScalarIsSane(const Scalar *v)
 /* Set an error in the destination (to) - from the optional source if it's already one;
 if no error in either place, don't set it.
 	Unlike SetError, assumes the destination has been initialised. */
-static Error PropagateError(Scalar *to, const Scalar *from, Error newError)
+INLINE Error PropagateError(Scalar *to, const Scalar *from, Error newError)
 {
 	/* Save the error first in case to == from: */
 	Error propagatedError = from != NULL && ScalarIsError(from) ? from->value.error : newError;
@@ -320,6 +320,16 @@ void SetFromLong(Scalar *dest, long value, SimpleType type)
 	assert(ScalarIsSane(dest));
 }
 
+void SetFromShort(Scalar *dest, short value, SimpleType type)
+{
+	if(type == T_INT) {
+		dest->type = T_INT;
+		dest->value.number.s = value;
+	}
+	else
+		SetFromLong(dest, value, type);
+}
+
 /* Sets the scalar from a double, but converting to a given type. */
 void SetFromDouble(Scalar *dest, double value, SimpleType type)
 {
@@ -370,26 +380,6 @@ void SetBoolean(Scalar *v, bool b)
 {
 	v->type = T_BOOL;
 	v->value.boolean = b;
-}
-
-void SetIntOrLong(Scalar *dest, long actualValue)
-{
-	SetFromLong(dest, actualValue, actualValue > SHRT_MAX || actualValue < SHRT_MIN ? T_LONG : T_INT);
-}
-
-/* Set the value to the long integer provided; the type of the result is the
-'largest' of the two types provided. The magnitude of the value is not
-considered. If it is too large to fit in the result type, it will be 
-truncated, rather than an error being set. */
-void SetTruncated(Scalar *dest, long v, SimpleType t1, SimpleType t2)
-{
-	assert(TypeIsNumeric(t1) && TypeIsNumeric(t2) && TypeIsExact(t1) && TypeIsExact(t2));
-
-	dest->type = LargerType(t1, t2);
-	if(t1 == T_LONG || t2 == T_LONG)
-		dest->value.number.l = v;
-	else
-		dest->value.number.s = (short)v; /* No overflow checking! */
 }
 
 /* Duplicates string values; in other respects, exactly like a straight
@@ -661,48 +651,45 @@ static int CompareDirectly(const Scalar *l, const Scalar *r)
 /* Compare two scalar values.
 	The return value is as for strcmp().
 	This function tolerates type differences where possible. If a comparable supertype
-can't be found, -1 is returned and the result parameter will receive an error if it is
-non-NULL. If comparison is possible, it'll receive the result (-1, 0, or 1) as a T_INT.
+can't be found, -1 is returned and an error will be set in that parameter.
 	Pointers are allowed, and will be dereferenced prior to comparison. */
-int Compare(Scalar *result, const Scalar *left, const Scalar *right)
+int Compare(const Scalar *left, const Scalar *right, Error *error)
 {
 	int comparison = -1;
-	Error error = SUCCESS;
 	
 	assert(left != NULL && right != NULL);
+	assert(error != NULL);
+	assert(TypeIsOrderable(NonPointer(left->type)) && TypeIsOrderable(NonPointer(right->type)));
+	
+	*error = SUCCESS;
 	
 	if(left == right || memcmp(left, right, sizeof(*left)) == 0)
 		comparison = 0;
-	else if(left->type == right->type && TypeIsOrderable(left->type) && !IsPointer(left))
+	else if(left->type == right->type && !IsPointer(left))
 		comparison = CompareDirectly(left, right);
 	else {
 		Scalar l, r;
-		
+
 		InitScalar(&l, NonPointer(left->type), FALSE);
 		InitScalar(&r, NonPointer(right->type), FALSE);
 		CopyDereferencingBoth(&l, left);
 		CopyDereferencingBoth(&r, right);
 		
-		if(TypeIsOrderable(l.type) && TypeIsOrderable(r.type) && ComparableTypes(l.type, r.type)) {
+		if(ComparableTypes(l.type, r.type)) {
 			SimpleType comparisonType = LargerType(l.type, r.type);
 			enum TypeRule conversion = UsualTypeConversionToProduce(comparisonType);
 
-			if((error = ChangeType(&l, conversion)) == SUCCESS
-			&& (error = ChangeType(&r, conversion)) == SUCCESS)
+			if((*error = ChangeType(&l, conversion)) == SUCCESS
+			&& (*error = ChangeType(&r, conversion)) == SUCCESS)
 				comparison = CompareDirectly(&l, &r);
 		}
 		else
-			error = BADARGTYPE;
+			*error = BADARGTYPE;
 		
 		DisposeScalar(&l);
 		DisposeScalar(&r);
 	}
-		
-	if(result != NULL) {
-		SetFromLong(result, comparison, T_INT);
-		PropagateError(result, NULL, error);
-	}
-	
+
 	return comparison;
 }
 
@@ -762,7 +749,7 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 			case T_CHAR: {
 				char code = NUL;
 				if(value->type == T_STRING) {
-					if((newType & (TD_CHECKED | TD_PRECISE)) && QsGetLength(&value->value.string) > 1)
+					if((rule & (TD_CHECKED | TD_PRECISE)) && QsGetLength(&value->value.string) > 1)
 						result = OVERFLOWERR;
 					else if(!QsIsNull(&value->value.string)) {
 						code = QsGetFirst(&value->value.string);

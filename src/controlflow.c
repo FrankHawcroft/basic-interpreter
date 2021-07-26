@@ -450,7 +450,7 @@ void Clear_(BObject *arg, unsigned count)
 			more like in a traditional BASIC where there's no concept of variable lifetime
 			because they just always exist - i.e. set vars back to 0/"" and leave functions and
 			subs alone */
-		/*ClearOutOfContextItems(SCOPE_GLOBAL);*/
+		/*ClearOutOfContextItems(SCOPE_GLOBAL, SCOPE_CURRENT);*/
 			/* Will also obviously cause problems down the track if in a SUB. */
 		CloseAllStreams();
 			/* Close all files opened by program. */
@@ -471,7 +471,7 @@ void End_(BObject *arg, unsigned count)
 {
 	ClearControlFlowStack();
 	CloseAllStreams();
-	ClearOutOfContextItems(SCOPE_MAIN + 1);	/* TODO main, global non-prelude stuff cleared from symtab */
+	ClearOutOfContextItems(SCOPE_MAIN + 1, SCOPE_CURRENT); /* TODO main, global non-prelude stuff cleared from symtab */
 	
 	Proc()->mode = MODE_INTERACTIVE;
 }
@@ -841,8 +841,10 @@ void Case_(BObject *arg, unsigned count)
 
 		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
 
-		for(i = 0; i != count && !matchedOne; i++)
-			matchedOne = Compare(NULL, selectVal, &arg[i].value.scalar) == 0;
+		for(i = 0; i != count && !matchedOne; i++) {
+			Error ignored;
+			matchedOne = Compare(selectVal, &arg[i].value.scalar, &ignored) == 0;
+		}
 			
 		if(matchedOne) {
 			struct StackNode node;

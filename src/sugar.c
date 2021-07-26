@@ -332,15 +332,21 @@ static void ReplaceEqualsUsedAsSeparator(QString *tok, unsigned short limit, con
 */
 static void MakeShortIfStatementExplicit(struct TokenSequence *ts)
 {
-	if(ts->length > 3 && QsEqNoCase(&ts->statementName, &m_IfKeyword)) {
+	if(ts->length > 3
+	&& QsEqNoCase(&ts->statementName, &m_IfKeyword)
+	&& !QsEqNoCase(&ts->rest[ts->length - 2], &g_ThenKeyword)) { /* THEN at end of line in a block IF is left alone */
 		unsigned short i;
 	
-		/* Don't detect a statement-final THEN here ... */
-		for(i = 0; i != ts->length - 2; i++) {
-			if(QsEqNoCase(&ts->rest[i], &g_ThenKeyword)) {
+		/* Scan backwards so that ELSE is detected before 'IF cond THEN x = ...' or 'IF cond GOTO label' */
+		for(i = ts->length - 2; i != 0; i--) {
+			if(QsEqNoCase(&ts->rest[i], &g_ElseKeyword)) {
+				QsCopy(&ts->statementName, &m_IfThenElseKeyword);
+				return;
+			}
+			else if(QsEqNoCase(&ts->rest[i], &g_ThenKeyword)) {
 				const BObject *following = LookUp(&ts->rest[i + 1], SCOPE_CURRENT);
 				if(following != NULL && IsVariable(following)) {
-					/* TODO also need to check for an ELSE part; also explicit LET, to be thorough ... */
+					/* TODO detect explicit LET as well */
 					QsCopy(&ts->statementName, &m_IfThenLetKeyword);
 					QsCopy(&ts->rest[i], &g_Semicolon); /* replace THEN */
 					ReplaceEqualsUsedAsSeparator(&ts->rest[i + 1], ts->length - 2 - i, &g_Semicolon);

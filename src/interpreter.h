@@ -85,10 +85,12 @@ enum TypeRule {
 	TR_DOUBLE_ONLY = TD_STRICT | T_DOUBLE,
 	TR_CHAR_ONLY = TD_STRICT | T_CHAR,
 	TR_BOOL_ONLY = TD_STRICT | T_BOOL,
-	TR_NUMERIC = TD_STRICT | NUMERIC_TYPES,
 	TR_INTEGRAL = TD_STRICT | INTEGRAL_TYPES,
 	TR_NON_TEXT = TD_STRICT | NUMERIC_TYPES | T_BOOL,
 	TR_INT_TO_LONG = TD_PRECISE | T_LONG,
+	TR_INT_OR_LONG = TD_CHECKED | T_INT | T_LONG,
+	TR_FLOATING = TD_CHECKED | T_SINGLE | T_DOUBLE,
+	TR_NUMERIC = TD_CHECKED | NUMERIC_TYPES,
 	TR_CHAR_TO_STRING = TD_CHECKED | T_STRING,
 	TR_STRING_TO_CHAR = TD_CHECKED | T_CHAR,
 #if BIG_ARRAYS
@@ -469,12 +471,11 @@ extern void SetAsPointer(Scalar *d, const Scalar *s);
 extern void SetPointerTo(Scalar *v, void *p, SimpleType t);
 extern void SetPointerToElement(Scalar *indexer, const Scalar *vector, long offset);
 extern void SetFromLong(Scalar *v, long val, SimpleType t);
+extern void SetFromShort(Scalar *v, short val, SimpleType t);
 extern void SetFromDouble(Scalar *v, double val, SimpleType t);
 extern void SetCharacter(Scalar *v, char c);
 extern void SetBoolean(Scalar *v, bool b);
 extern Error SetError(Scalar *v, Error e);
-extern void SetIntOrLong(Scalar *v, long value);
-extern void SetTruncated(Scalar *v, long value, SimpleType t1, SimpleType t2);
 extern void CopyScalar(Scalar *dest, const Scalar *src);
 extern void CopyDereferencingSource(Scalar *dest, const Scalar *src);
 extern void CopyDereferencingBoth(Scalar *dest, const Scalar *src);
@@ -504,7 +505,7 @@ extern Error WriteScalar(FILE *, const Scalar *);
 
 /* Comparison: */
 
-extern int Compare(Scalar *result, const Scalar *left, const Scalar *right);
+extern int Compare(const Scalar *left, const Scalar *right, Error *error);
 
 /*** Useful scalar constant values -- scalar.c ***/
 
@@ -552,7 +553,7 @@ extern BObject *LookUpIgnoringType(const QString *, short callNestLevel);
 extern BObject *LookUpCheckingType(const QString *, short callNestLevel);
 extern BObject *CreateDefinition(const QString *, void *value, enum SymbolType, short callNestLevel);
 extern Error DefineSymbol(const QString *, void *value, enum SymbolType, short callNestLevel);
-extern void ClearOutOfContextItems(short);
+extern void ClearOutOfContextItems(short minimumCallNestLevel, short maximumCallNestLevel);
 extern void EnsureExistsIfBuiltIn(const QString *);
 /* Is the symbol guaranteed to be defined by the interpreter as part of the language'n'runtime, rather than programmatically? */
 #define LexicallyGuaranteedBuiltIn(name) !isalnum(QsGetFirst(name))
@@ -706,7 +707,7 @@ extern void CreateExprStk(struct Stack *, unsigned maxHeight);
 extern void ClearExprStk(struct Stack *);
 extern void DisposeExprStk(struct Stack *);
 extern void CutExprStk(struct Stack *, int count);
-#define PeekExprStk(stk, offset) ((BObject *)StkPeek(stk, offset))
+#define PeekExprStk(stk, offset) ((BObject *)(stk)->top - ((offset) + 1)) /* ((BObject *)StkPeek(stk, offset)) */
 DIAGNOSTIC_FN_DECL(void DumpExprStk(const struct Stack *));
 
 /*** Some keywords and other special symbols -- sugar.c ***/

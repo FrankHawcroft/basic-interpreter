@@ -303,7 +303,7 @@ SimpleType TargetType(enum TypeRule required, SimpleType source)
 }
 
 /* applied may be a subprogram, function, operator, or array variable */
-static const struct Parameter *GetPrototype(const BObject *applied, int *numFormals)
+const struct Parameter *GetPrototype(const BObject *applied, int *numFormals)
 {
 	const struct Parameter *proto;
 	
@@ -480,6 +480,25 @@ Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count)
 	
 	return error;
 }
+
+#if 0
+Error ConformForAssignment(BObject *actual)
+{
+	Error error = SUCCESS;
+	
+	assert(actual != NULL);
+	
+	if(ObjectIsError(&actual[0])) /* array index out of bounds, or variable not found */
+		error = ObjectAsError(&actual[0]);
+	else {
+		error = DereferenceObject(&actual[1]);
+		if(error == SUCCESS)
+			error = ChangeType(&actual[1]->value.scalar, TD_CHECKED | NonPointer(VarData(&actual[0])->type));
+	}
+	
+	return error;
+}
+#endif
 
 SimpleType TypeOfToken(const QString *t)
 {

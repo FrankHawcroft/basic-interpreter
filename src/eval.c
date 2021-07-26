@@ -10,6 +10,14 @@
 #include "interpreter.h"
 #include "stack.h"
 
+INLINE void AdjustStackPointersFollowingDirectPush(struct Stack *stack)
+{
+	stack->top += stack->itemSize;
+	if(stack->top > stack->highest)
+		stack->highest = stack->top;
+	++stack->height;
+}
+
 #define EXPR_STK_LIMIT 667 /* due to increasing size by scale factor of 1.5, corresponds to a limit of 1000 */
 
 /* Pushes the BObject onto the stack. The stack is extended if necessary.
@@ -28,10 +36,7 @@ INLINE void PushObject(struct Stack *stack, const BObject *newTop)
 		/* Special-cased rather than calling StkPush, because
 			structure assignment is quicker than memcpy with Amiga-GCC. */
 		*(BObject *)stack->top = *newTop;
-		stack->top += stack->itemSize;
-		if(stack->top > stack->highest)
-			stack->highest = stack->top;
-		++stack->height;
+		AdjustStackPointersFollowingDirectPush(stack);
 	}
 	else if(StkFull(stack) && StkHeight(stack) <= EXPR_STK_LIMIT) {
 		StkResize(stack, StkHeight(stack) < 8 ? 16 : (3 * StkHeight(stack)) / 2);
@@ -73,10 +78,12 @@ static void Apply(const BObject *obj, BObject *param, unsigned count, BObject *r
 
 static void EvalParameterlessFunction(BObject *f, struct Stack *stk)
 {
+	/* Evaluate in-place, using the supplied function object to store the result - */
 	if(f->value.function->numArgs == 0)
 		CallFunction(f, f->value.function, NULL, 0, stk);
 	else
 		SetObjectToError(f, BADARGCOUNT);
+	PushObject(stk, f);
 }
 
 /* Evaluate a sequence of expressions, pushing the results on the stack. */
@@ -106,7 +113,7 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			const QString *post;
 			BObject result;
 			unsigned preHeight = StkHeight(exprStack), count;
-
+			
 			intern(tokIndex + 1, ct + 1, &obj);
 			post = Eval(ct + 2, intern, tokIndex + 2, exprStack);
 			
@@ -119,7 +126,12 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 
 			count = StkHeight(exprStack) - preHeight;
 			Apply(&obj, PeekExprStk(exprStack, count - 1), count, &result, exprStack);
-			RemoveObject(&obj, FALSE);
+			/* Strictly, the applied object should be disposed of, but not doing it saves time for all
+				valid objects (arrays, functions, operators). If a string literal was appplied, it would
+				need to be disposed of, but this is caught by syntax checking, and the risk of a memory
+				leak (if syntax checking is bypassed or buggy) isn't worth the overhead on every
+				legitimate application. */
+			/*RemoveObject(&obj, FALSE);*/
 			CutExprStk(exprStack, count);
 			PushObject(exprStack, &result);
 			
@@ -127,17 +139,30 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			DumpObject(&result);
 			fprintf(stderr, "]\n");*/
 		}
-		else {
-			/* An unsubscripted variable, a literal, a label, or a parameterless function. */
-
-			intern(tokIndex, ct, &obj);
-			if(obj.category == FUNCTION)
+		else if(!StkFull(exprStack)) {
+			/* If not an 'apply' (f a b c ...) form, it's an unsubscripted variable, a literal, a label,
+				or a parameterless function. Special-cased to intern directly to the TOS, to avoid copying
+				the object to a temporary location. */
+			
+			intern(tokIndex, ct, (BObject *)exprStack->top);
+			
+			if(((BObject *)exprStack->top)->category == FUNCTION) {
+				obj = *(BObject *)exprStack->top;
 				EvalParameterlessFunction(&obj, exprStack);
-			PushObject(exprStack, &obj);
+			}
+			else
+				AdjustStackPointersFollowingDirectPush(exprStack);
 			
 			/*fprintf(stderr, "[Eval-->: ");
 			DumpObject(&obj);
 			fprintf(stderr, "]\n");*/
+		}
+		else {
+			intern(tokIndex, ct, &obj);
+			if(obj.category == FUNCTION)
+				EvalParameterlessFunction(&obj, exprStack);
+			else
+				PushObject(exprStack, &obj);
 		}
 	}
 	
@@ -158,7 +183,7 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack)
 
 			const BObject *post;
 			unsigned preHeight = StkHeight(exprStack), count;
-
+			
 			post = EvalPreconverted(cobj + 2, exprStack);
 			
 			assert(post > cobj + 2);
@@ -168,15 +193,25 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack)
 			Apply(cobj + 1, PeekExprStk(exprStack, count - 1), count, &result, exprStack);
 			
 			cobj = post;
-			CutExprStk(exprStack, count);	
+			CutExprStk(exprStack, count);
+			PushObject(exprStack, &result);
+		}
+		else if(!StkFull(exprStack)) {
+			CopyObject((BObject *)exprStack->top, cobj);			
+			if(cobj->category == FUNCTION) {
+				result = *cobj;
+				EvalParameterlessFunction(&result, exprStack);
+			}
+			else
+				AdjustStackPointersFollowingDirectPush(exprStack);
 		}
 		else {	
 			CopyObject(&result, cobj);
 			if(cobj->category == FUNCTION)
-				EvalParameterlessFunction(&result, exprStack); /* Eval in-place */
+				EvalParameterlessFunction(&result, exprStack); /* eval in-place */
+			else
+				PushObject(exprStack, &result);
 		}
-		
-		PushObject(exprStack, &result);
 	}
 	
 	return cobj;

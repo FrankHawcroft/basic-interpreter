@@ -30,7 +30,7 @@ static void InitSymbolTable(void)
 {
 	Proc()->envCount = Opts()->lowMemory ? -SCOPE_NONEXISTENT : 10;
 	Proc()->environment = AllocEnvTable(Proc()->envCount);
-	Proc()->retainedWarmEnvs = Opts()->lowMemory ? -SCOPE_NONEXISTENT - 1 : 10;
+	Proc()->retainedWarmEnvs = Opts()->lowMemory ? 1 : 10;
 #ifdef DEBUG
 	Proc()->maxNestLevel = SCOPE_NONEXISTENT;
 	Proc()->definitions = Proc()->hashTableSearches = Proc()->lookUps = 0;
@@ -41,7 +41,7 @@ static void InitSymbolTable(void)
 void DisposeSymbolTable(void)
 {
 	if(Proc()->environment != NULL) {
-		ClearOutOfContextItems(SCOPE_BUILTIN);
+		ClearOutOfContextItems(SCOPE_BUILTIN, SCOPE_CURRENT);
 		Dispose(Proc()->environment);
 		Proc()->environment = NULL;
 		Proc()->envCount = 0;
@@ -56,12 +56,7 @@ INLINE short EnvironmentIndex(short callNestLevel)
 
 INLINE struct HashTable *ProbeEnvironment(struct Process *proc, short callNestLevel)
 {
-	/*struct HashTable *staticEnv;*/
 	if(callNestLevel == SCOPE_STATIC || (callNestLevel > SCOPE_MAIN && InStaticContext(proc)))
-	/*|| (proc->functionCallNesting == SCOPE_MAIN
-	  && callNestLevel > SCOPE_MAIN
-	  && (staticEnv = CurrentStaticContext(proc)) != NULL))*/
-		/* callNestLevel > SCOPE_MAIN && InStaticContext(proc))) */
 		return CurrentStaticContext(proc);
 	else {
 		short index = EnvironmentIndex(callNestLevel);
@@ -72,10 +67,12 @@ INLINE struct HashTable *ProbeEnvironment(struct Process *proc, short callNestLe
 INLINE struct HashTable *ResolveEnvironment(struct Process *proc, short callNestLevel)
 {
 	struct HashTable *env = ProbeEnvironment(proc, callNestLevel);
+
 #ifdef DEBUG
 	if(callNestLevel > proc->maxNestLevel)
 		proc->maxNestLevel = callNestLevel;
 #endif
+	
 	if(env != NULL)
 		return env;
 	else if(EnvironmentIndex(callNestLevel) >= proc->envCount) {
@@ -260,20 +257,23 @@ Error DefineSymbol(const QString *name, void *value, enum SymbolType kind, short
 	return CreateDefinition(name, value, kind, callNestLevel) != NULL ? SUCCESS : NOMEMORY;
 }
 
-INLINE short MaxEnvIndex(const struct Process *proc)
-{
-	return proc->envCount + SCOPE_BUILTIN - 1;
-}
-
-void ClearOutOfContextItems(short minimumCallNestLevel)
+/* Avoid using SCOPE_CURRENT unless clearing all envs at program exit or reset, because it iterates
+	down from the maximum possible number of envs. */
+void ClearOutOfContextItems(short minimumCallNestLevel, short maximumCallNestLevel)
 {
 	struct Process *proc = Proc();
 	short i;
 
-	for(i = MaxEnvIndex(proc); i >= minimumCallNestLevel; i--) {
+	assert(minimumCallNestLevel >= SCOPE_BUILTIN);
+	assert(maximumCallNestLevel >= minimumCallNestLevel);
+
+	if(maximumCallNestLevel == SCOPE_CURRENT)
+		maximumCallNestLevel = proc->envCount;
+
+	for(i = maximumCallNestLevel; i >= minimumCallNestLevel; i--) {
 		struct HashTable *relevantTable = ProbeEnvironment(proc, i);
 		if(relevantTable != NULL) {
-			if(minimumCallNestLevel == SCOPE_BUILTIN || i >= proc->retainedWarmEnvs) {
+			if(i >= proc->retainedWarmEnvs || minimumCallNestLevel == SCOPE_BUILTIN) {
 				HtDispose(relevantTable);
 				proc->environment[EnvironmentIndex(i)] = NULL;
 			}
@@ -326,7 +326,7 @@ void PrintSymTabStatus(void)
 	struct Process *proc = Proc();
 	short i;
 	
-	for(i = MaxEnvIndex(proc); i >= SCOPE_BUILTIN; i--) {
+	for(i = proc->maxNestLevel; i >= SCOPE_BUILTIN; i--) {
 		struct HashTable *relevantTable = ProbeEnvironment(proc, i);
 		if(relevantTable != NULL) {
 			unsigned bins, defns, maxDefns, collisions;
@@ -347,7 +347,7 @@ void PrintSymTab(void)
 	struct Process *proc = Proc();
 	short i;
 
-	for(i = MaxEnvIndex(proc); i >= SCOPE_BUILTIN; i--) {
+	for(i = proc->maxNestLevel; i >= SCOPE_BUILTIN; i--) {
 		struct HashTable *relevantTable = ProbeEnvironment(proc, i);
 		if(relevantTable != NULL) {
 			fprintf(stderr, "-- Symbol table for scope %hd:\n", i);
@@ -362,7 +362,7 @@ void VisitAllDefinitions(short minimumCallNestLevel, HtVisitor visitor)
 	struct Process *proc = Proc();
 	short i;
 
-	for (i = MaxEnvIndex(proc); i >= minimumCallNestLevel; i--) {
+	for (i = proc->maxNestLevel; i >= minimumCallNestLevel; i--) {
 		struct HashTable *relevantTable = ProbeEnvironment(proc, i);
 		if (relevantTable != NULL)
 			HtVisit(relevantTable, visitor, NULL);

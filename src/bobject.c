@@ -37,11 +37,13 @@ void CopyObject(BObject *dest, const BObject *source)
 {
 	assert(dest != NULL && source != NULL);
 
-	if(source->category == LITERAL
-	 || ((source->category & IS_VARIABLE) && !(source->category & VARIABLE_IS_POINTER))) {
+	if(source->category == LITERAL) {
+		dest->category = LITERAL;
+		CopyScalar(&dest->value.scalar, &source->value.scalar);
+	}
+	else if((source->category & IS_VARIABLE) && !(source->category & VARIABLE_IS_POINTER)) {
 		dest->category = source->category;
-		CopyScalar(source->category & IS_VARIABLE ? &dest->value.variable.value : &dest->value.scalar,
-			source->category & IS_VARIABLE ? &source->value.variable.value : &source->value.scalar);
+		CopyScalar(&dest->value.variable.value, &source->value.variable.value);
 	}
 	else
 		*dest = *source;

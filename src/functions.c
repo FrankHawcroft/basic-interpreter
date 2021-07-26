@@ -427,7 +427,8 @@ static Error CreateArguments(struct Process *proc, bool tailCall, const struct F
 static void ClearArguments(struct Process *proc, bool tailCall)
 {
 	if(!tailCall) {
-		ClearOutOfContextItems(proc->callNestLevel--);
+		ClearOutOfContextItems(proc->callNestLevel, proc->callNestLevel);
+		--proc->callNestLevel;
 		--proc->functionCallNesting;
 	}
 }

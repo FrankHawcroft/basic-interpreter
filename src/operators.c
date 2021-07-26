@@ -89,16 +89,16 @@ struct OperatorDefinition {
 #define OPIMPL(f) {(void (*)(Scalar *, const Scalar *, const Scalar *))f}
 
 static const struct OperatorDefinition m_OperatorDefinition[] = {
-	{"^", {BINARY, RIGHTTOLEFT, EXPONENTIATION, BOPD(TR_EXTEND_NUM, TR_EXTEND_NUM), T_SINGLE | T_DOUBLE, OPIMPL(Exponentiation_)}},
+	{"^", {BINARY, RIGHTTOLEFT, EXPONENTIATION, BOPD(TR_NUMERIC, TR_NUMERIC), T_SINGLE | T_DOUBLE, OPIMPL(Exponentiation_)}},
 	{KW_UNAMBIGUOUS_UNARY_MINUS, {UNARY, RIGHTTOLEFT, UNARYARITHMETIC, UOPD(TR_NUMERIC), NUMERIC_TYPES, OPIMPL(UnaryNegation_)}},
 		/* Note artificial name to avoid overloading. */
-	{KW_MINUS, {BINARY, LEFTTORIGHT, ADDITION, BOPD(TR_EXTEND_NUM, TR_EXTEND_NUM), NUMERIC_TYPES, OPIMPL(Subtraction_)}},
+	{KW_MINUS, {BINARY, LEFTTORIGHT, ADDITION, BOPD(TR_NUMERIC, TR_NUMERIC), NUMERIC_TYPES, OPIMPL(Subtraction_)}},
 	{KW_UNAMBIGUOUS_UNARY_PLUS, {UNARY, RIGHTTOLEFT, UNARYARITHMETIC, UOPD(TR_NUMERIC), NUMERIC_TYPES, OPIMPL(UnaryPlus_)}},
 		/* Note artificial name to avoid overloading. */
 	{KW_PLUS, {BINARY, LEFTTORIGHT, ADDITION, BOPD(TR_ANY, TR_ANY), NUMERIC_TYPES | T_STRING, OPIMPL(Addition_)}},
 	{"&", {BINARY, LEFTTORIGHT, ADDITION, BOPD(TR_ANY_TO_STRING, TR_ANY_TO_STRING), T_STRING, OPIMPL(Concatenation_)}},
-	{"*", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_EXTEND_NUM, TR_EXTEND_NUM), NUMERIC_TYPES, OPIMPL(Multiplication_)}},
-	{"/", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_SINGLE_TO_DOUBLE, TR_SINGLE_TO_DOUBLE), T_SINGLE | T_DOUBLE, OPIMPL(Division_)}},
+	{"*", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_NUMERIC, TR_NUMERIC), NUMERIC_TYPES, OPIMPL(Multiplication_)}},
+	{"/", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_FLOATING, TR_FLOATING), T_SINGLE | T_DOUBLE, OPIMPL(Division_)}},
 	{"AND", {BINARY, LEFTTORIGHT, LOGICALBINARY, BOPD(TR_LOGICAL, TR_LOGICAL), T_BOOL, OPIMPL(LogicalConjunction_)}},
 	{"OR", {BINARY, LEFTTORIGHT, LOGICALBINARY, BOPD(TR_LOGICAL, TR_LOGICAL), T_BOOL, OPIMPL(LogicalDisjunction_)}},
 	{"XOR", {BINARY, LEFTTORIGHT, LOGICALBINARY, BOPD(TR_LOGICAL, TR_LOGICAL), T_BOOL, OPIMPL(LogicalExclusiveDisjunction_)}},
@@ -110,8 +110,8 @@ static const struct OperatorDefinition m_OperatorDefinition[] = {
 	{"BITXOR", {BINARY, LEFTTORIGHT, BITXOR, BOPD(TR_INTEGRAL, TR_INTEGRAL), T_INT | T_LONG, OPIMPL(BitwiseXOR_)}},
 	{"BITNOT", {UNARY, RIGHTTOLEFT, UNARYARITHMETIC, UOPD(TR_INTEGRAL), T_INT | T_LONG, OPIMPL(BitwiseNOT_)}},
 	{"IN", {BINARY, LEFTTORIGHT, ADDITION, BOPD(TR_STRING_TO_CHAR, TR_STRING_ONLY), T_BOOL, OPIMPL(CharSetMembership_)}},
-	{"MOD", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_INT_TO_LONG, TR_INT_TO_LONG), T_INT | T_LONG, OPIMPL(Modulo_)}},
-	{"\\", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_INT_TO_LONG, TR_INT_TO_LONG), T_INT | T_LONG, OPIMPL(WholeDivision_)}},
+	{"MOD", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_INT_OR_LONG, TR_INT_OR_LONG), T_INT | T_LONG, OPIMPL(Modulo_)}},
+	{"\\", {BINARY, LEFTTORIGHT, MULTIPLICATION, BOPD(TR_INT_OR_LONG, TR_INT_OR_LONG), T_INT | T_LONG, OPIMPL(WholeDivision_)}},
 	{">=", {BINARY, LEFTTORIGHT, ORDERING, BOPD(TR_ANY, TR_ANY), T_BOOL, OPIMPL(GreaterOrEqual_)}},
 	{KW_EQUALS, {BINARY, LEFTTORIGHT, EQUALITY, BOPD(TR_ANY, TR_ANY), T_BOOL, OPIMPL(Equal_)}},
 	{"<=", {BINARY, LEFTTORIGHT, ORDERING, BOPD(TR_ANY, TR_ANY), T_BOOL, OPIMPL(LessOrEqual_)}},
@@ -211,14 +211,20 @@ const struct Operator *ResolveOperator(const QString *token)
 	}
 }
 
+/* Assume that if the result can't be stored as an int or long, will then attempt floating point. */
 INLINE void SetIntResult(Scalar *result, long val, bool overflow, SimpleType t1, SimpleType t2)
 {
-	if(overflow)
-		SetError(result, OVERFLOWERR);
-	else
+	if(!overflow)
 		SetFromLong(result, val, 
 			t1 == T_INT && t2 == T_INT && val >= SHRT_MIN && val <= SHRT_MAX ? T_INT : T_LONG);
 }
+
+/* Floating point overflow detection is avoided on the Amiga because a bit slow. */
+#if defined(FP_NORMAL) && !defined(VBCC) && !defined(AMIGA)
+#define DetectFloatOverflow(val) ((fpclassify(val) != FP_NORMAL && fpclassify(val) != FP_ZERO))
+#else
+#define DetectFloatOverflow(val) FALSE
+#endif
 
 INLINE void SetFPResult(Scalar *result, double val, SimpleType t1, SimpleType t2)
 {
@@ -252,29 +258,48 @@ static void UnaryPlus_(Scalar *result, const Scalar *a)
 
 static void UnaryNegation_(Scalar *result, const Scalar *a)
 {
-	if(TypeIsExact(a->type) && GetLong(a) != LONG_MIN)	
-		SetIntResult(result, -GetLong(a), FALSE, a->type, a->type);
+	long la;
+	if(TypeIsExact(a->type) && (la = GetLong(a)) != LONG_MIN)
+		SetIntResult(result, -la, FALSE, a->type, a->type);
+	else if(a->type == T_SINGLE) {
+		result->type = T_SINGLE;
+		result->value.number.f = -a->value.number.f;
+	}
 	else
 		SetFPResult(result, -GetDouble(a), a->type, a->type);
 }
 
 static void Multiplication_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	bool intOverflow = TRUE; /* i.e. assume f.p. */
+	bool overflow = TRUE; /* assume f.p. unless both integral */
 	
 	if(TypeIsExact(a->type) && TypeIsExact(b->type)) {
-		long product = GetLong(a) * GetLong(b);
-		intOverflow = Sign(GetLong(a)) * Sign(GetLong(b)) != Sign(product);
-		SetIntResult(result, product, intOverflow, a->type, b->type);	
+		long la = GetLong(a), lb = GetLong(b); 
+		long product = la * lb;
+		overflow = Sign(la) * Sign(lb) != Sign(product);
+		SetIntResult(result, product, overflow, a->type, b->type);	
 	}
-	
-	if(intOverflow)
+	else if(a->type == T_SINGLE && b->type == T_SINGLE) {
+		result->type = T_SINGLE;
+		result->value.number.f = a->value.number.f * b->value.number.f;
+		overflow = DetectFloatOverflow(result->value.number.f);
+	}
+
+	if(overflow)
 		SetFPResult(result, GetDouble(a) * GetDouble(b), a->type, b->type);
 }
 
 static void Division_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(GetDouble(b) == 0.0)
+	if(a->type == T_SINGLE && b->type == T_SINGLE) {
+		if(b->value.number.f == 0.0)
+			SetError(result, ZERODIVISOR);
+		else {
+			result->type = T_SINGLE;
+			result->value.number.f = a->value.number.f / b->value.number.f;
+		}
+	}
+	else if(GetDouble(b) == 0.0)
 		SetError(result, ZERODIVISOR);
 	else
 		SetFPResult(result, GetDouble(a) / GetDouble(b), a->type, b->type);
@@ -294,32 +319,42 @@ static void Addition_(Scalar *result, const Scalar *a, const Scalar *b)
 		DisposeScalar(&op2str);
 	}
 	else {
-		bool intOverflow = TRUE; /* i.e. assume f.p. */
+		bool overflow = TRUE; /* assume f.p. unless both integral */
 
 		if(TypeIsExact(a->type) && TypeIsExact(b->type)) {
-			long sum = GetLong(a) + GetLong(b);
-			intOverflow = (GetLong(b) > 0 && sum < GetLong(a))
-						|| (GetLong(b) < 0 && sum > GetLong(a));
-			SetIntResult(result, sum, intOverflow, a->type, b->type);	
+			long la = GetLong(a), lb = GetLong(b);
+			long sum = la + lb;
+			overflow = (lb > 0 && sum < la) || (lb < 0 && sum > la);
+			SetIntResult(result, sum, overflow, a->type, b->type);	
+		}
+		else if(a->type == T_SINGLE && b->type == T_SINGLE) {
+			result->type = T_SINGLE;
+			result->value.number.f = a->value.number.f + b->value.number.f;
+			overflow = DetectFloatOverflow(result->value.number.f);
 		}
 
-		if(intOverflow)
+		if(overflow)
 			SetFPResult(result, GetDouble(a) + GetDouble(b), a->type, b->type);
 	}
 }
 
 static void Subtraction_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	bool intOverflow = TRUE; /* i.e. assume f.p. */
+	bool overflow = TRUE; /* assume f.p. unless both integral */
 
 	if(TypeIsExact(a->type) && TypeIsExact(b->type)) {
-		long diff = GetLong(a) - GetLong(b);
-		intOverflow = (GetLong(b) > 0 && diff > GetLong(a))
-					|| (GetLong(b) < 0 && diff < GetLong(a));
-		SetIntResult(result, diff, intOverflow, a->type, b->type);	
+		long la = GetLong(a), lb = GetLong(b);
+		long diff = la - lb;
+		overflow = (lb > 0 && diff > la) || (lb < 0 && diff < la);
+		SetIntResult(result, diff, overflow, a->type, b->type);	
+	}
+	else if(a->type == T_SINGLE && b->type == T_SINGLE) {
+		result->type = T_SINGLE;
+		result->value.number.f = a->value.number.f - b->value.number.f;
+		overflow = DetectFloatOverflow(result->value.number.f);
 	}
 
-	if(intOverflow)
+	if(overflow)
 		SetFPResult(result, GetDouble(a) - GetDouble(b), a->type, b->type);
 }
 
@@ -351,6 +386,20 @@ static void LogicalEquivalence_(Scalar *result, const Scalar *a, const Scalar *b
 static void LogicalNegation_(Scalar *result, const Scalar *a)
 {
 	SetBoolean(result, !GetBoolean(a));
+}
+
+/* Set the value to the long integer provided; the type of the result is the
+'largest' of the two types provided. The magnitude of the value is not
+considered. If it is too large to fit in the result type, it will be 
+truncated, rather than an error being set. */
+INLINE void SetTruncated(Scalar *dest, long v, SimpleType t1, SimpleType t2)
+{
+	assert(TypeIsNumeric(t1) && TypeIsNumeric(t2) && TypeIsExact(t1) && TypeIsExact(t2));
+
+	if(t1 == T_LONG || t2 == T_LONG)
+		SetFromLong(dest, v, T_LONG);
+	else
+		SetFromShort(dest, (short)v, T_INT);
 }
 
 static void BitwiseOR_(Scalar *result, const Scalar *a, const Scalar *b)
@@ -387,58 +436,66 @@ static void CharSetMembership_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void Modulo_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(GetLong(b) == 0)
+	long modulus = GetLong(b);
+	if(modulus == 0)
 		SetError(result, ZERODIVISOR);
+	else if(a->type == T_INT && b->type == T_INT)
+		SetFromShort(result, a->value.number.s % b->value.number.s, T_INT);
 	else
-		SetIntOrLong(result, GetLong(a) % GetLong(b));
+		SetFromLong(result, GetLong(a) % modulus, T_LONG);
 }
 
 static void WholeDivision_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(GetLong(b) == 0)
+	long divisor = GetLong(b);
+	if(divisor == 0)
 		SetError(result, ZERODIVISOR);
+	else if(a->type == T_INT && b->type == T_INT)
+		SetFromShort(result, a->value.number.s / b->value.number.s, T_INT);
 	else
-		SetIntOrLong(result, GetLong(a) / GetLong(b));
+		SetFromLong(result, GetLong(a) / divisor, T_LONG);
+}
+
+INLINE void SetBooleanOrError(Scalar *result, bool val, Error error)
+{
+	if(error == SUCCESS)
+		SetBoolean(result, val);
+	else
+		SetError(result, error);
 }
 
 static void GreaterOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	int comparison = Compare(result, a, b);
-	if(!ScalarIsError(result))
-		SetBoolean(result, comparison >= 0);
+	Error error;
+	SetBooleanOrError(result, Compare(a, b, &error) >= 0, error);
 }
 
 static void Equal_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	int comparison = Compare(result, a, b);
-	if(!ScalarIsError(result))
-		SetBoolean(result, comparison == 0);
+	Error error;
+	SetBooleanOrError(result, Compare(a, b, &error) == 0, error);
 }
 
 static void LessOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	int comparison = Compare(result, a, b);
-	if(!ScalarIsError(result))
-		SetBoolean(result, comparison <= 0);
+	Error error;
+	SetBooleanOrError(result, Compare(a, b, &error) <= 0, error);
 }
 
 static void Greater_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	int comparison = Compare(result, a, b);
-	if(!ScalarIsError(result))
-		SetBoolean(result, comparison > 0);
+	Error error;
+	SetBooleanOrError(result, Compare(a, b, &error) > 0, error);
 }
 
 static void Less_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	int comparison = Compare(result, a, b);
-	if(!ScalarIsError(result))
-		SetBoolean(result, comparison < 0);
+	Error error;
+	SetBooleanOrError(result, Compare(a, b, &error) < 0, error);
 }
 
 static void NotEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	int comparison = Compare(result, a, b);
-	if(!ScalarIsError(result))
-		SetBoolean(result, comparison != 0);
+	Error error;
+	SetBooleanOrError(result, Compare(a, b, &error) != 0, error);
 }

@@ -48,10 +48,9 @@ struct Process {
 		tracking subprogram calls as well as block control structures and GOSUBs. */
 	struct HashTable **environment;
 	short envCount;
-	/* Up to this number of environments will be kept 'warm' for reuse for future
-		subprogram and function calls, rather than being deleted completely.
-		Beyond this limit, the entire environment will be deleted on sub/function exit,
-		to save memory in case of deeply-nested call sequences. */
+	/* Beyond this call nest level limit, the entire environment will be deleted on sub/function exit,
+		to save memory in case of deeply-nested call sequences. Keeping some active saves time allocating
+		the hash tables. */
 	short retainedWarmEnvs;
 	
 	/* Static function parameters are not unique per function.
