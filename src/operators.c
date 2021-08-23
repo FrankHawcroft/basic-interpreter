@@ -466,36 +466,36 @@ INLINE void SetBooleanOrError(Scalar *result, bool val, Error error)
 
 static void GreaterOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error;
+	Error error = SUCCESS;
 	SetBooleanOrError(result, Compare(a, b, &error) >= 0, error);
 }
 
 static void Equal_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error;
+	Error error = SUCCESS;
 	SetBooleanOrError(result, Compare(a, b, &error) == 0, error);
 }
 
 static void LessOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error;
+	Error error = SUCCESS;
 	SetBooleanOrError(result, Compare(a, b, &error) <= 0, error);
 }
 
 static void Greater_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error;
+	Error error = SUCCESS;
 	SetBooleanOrError(result, Compare(a, b, &error) > 0, error);
 }
 
 static void Less_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error;
+	Error error = SUCCESS;
 	SetBooleanOrError(result, Compare(a, b, &error) < 0, error);
 }
 
 static void NotEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error;
+	Error error = SUCCESS;
 	SetBooleanOrError(result, Compare(a, b, &error) != 0, error);
 }

@@ -16,7 +16,7 @@
 
 void InitAudio(void) { }
 void CleanUpAudio(void) { }
-void CheckAudio(void) { }
+void CheckAudio(struct Process *proc) { }
 PfEventNotificationHandle GetAudioEventNotificationHandle(void) { return 0; }
 
 void Sound_(BObject *arg, unsigned count) { CauseError(NOTIMPLEMENTED); }
