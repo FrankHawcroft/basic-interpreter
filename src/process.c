@@ -16,8 +16,6 @@
 #include "hashtable.h"
 #include "platform.h"
 
-/*extern void InitUI(void);
-extern void InitAudio(void);*/
 extern void CleanUpUI(void);
 extern void CleanUpAudio(void);
 
@@ -39,28 +37,34 @@ static int m_PTUsedCount = 0;
 
 #define PROCESS_SIZE sizeof(struct Process)
 
-struct Process *Proc(void)
+INLINE struct Process *FindCurrent(void)
 {
+	int i;
+	PfTaskIdentifier self = PfGetCurrentTaskIdentifier();
+		
 	/* For performance, doesn't lock in PF_REENTRANT mode. This is in practice, if not in theory, safe,
 	because of the way the process table is accessed - m_PTUsedCount is never decreased. */
+	for(i = 0; i < m_PTUsedCount; i++) {
+		if(m_PT[i].owner == self) {
+			assert(m_PT[i].proc != NULL);
+			return m_PT[i].proc;
+		}
+	}
+	return NULL;
+}
+
+struct Process *Proc(void)
+{
 	if(m_PTUsedCount == 1) {
 		/* If not running the same code from more than one task, avoid getting the task identifier,
 		which may be slow. */
 		assert(m_PT[0].proc != NULL);
 		return m_PT[0].proc;
 	}
-	else {	
-		int i;
-		PfTaskIdentifier self = PfGetCurrentTaskIdentifier();
-		
-		for(i = 0; i < m_PTUsedCount; i++) {
-			if(m_PT[i].owner == self) {
-				assert(m_PT[i].proc != NULL);
-				return m_PT[i].proc;
-			}
-		}
-		assert(FALSE);
-		return NULL;
+	else {
+		struct Process *proc = FindCurrent();
+		assert(proc != NULL);
+		return proc;
 	}
 }
 
@@ -125,8 +129,6 @@ Error CreateNewProcess(const struct Options *options)
 	
 	p->gui = NULL;
 	p->audio = NULL;
-	/*InitUI();
-	InitAudio();*/
 	
 	CreateControlFlowStack(0);
 	
@@ -169,7 +171,10 @@ Error CreateNewProcess(const struct Options *options)
 
 void DisposeProcess(void)
 {
-	struct Process *p = Proc(); /* TODO don't use Proc() - shouldn't fail if no, or an incomplete, proc table entry */
+	struct Process *p = FindCurrent();
+	
+	if(p == NULL)
+		return;
 	
 	if(Opts()->profileDest != NULL) {
 		FILE *profileDump = fopen(p->opts->profileDest, "w");
@@ -276,14 +281,12 @@ void AttemptToCache(const struct TokenSequence *tokSeq)
 		p->statementCache = CreateCache(expectedCacheableStatements, 0, &DisposeEntry);
 	}
 
-	{	
+	{
 		struct TokenSequence *cached = Duplicate(tokSeq);
 		
 		/* Don't end the program due to failing to alloc a cache entry. */
-		if(cached == NULL)
-			return;
-		
-		SetInCache(p->statementCache, tokSeq->start, cached);
+		if(cached != NULL)
+			SetInCache(p->statementCache, tokSeq->start, cached);
 	}
 }
 
