@@ -37,8 +37,6 @@ TRUE
 TRUE
 TRUE
 Finished!
-+++++ c_lexer.bas
-Total tokens in program:	 3219
 +++++ c_xhtml.bas
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -139,7 +137,7 @@ CINT	: Passed!
 Numeric literal tests completed.
 +++++ c_mm.bas
 Platform is Amiga
- 64	 files processed OK!
+ 65	 files processed OK!
 +++++ c_lisp.bas
 ( 1  2  3 ( 1 .  2) ( 3 .  4))
 X
@@ -147,6 +145,8 @@ X
  31
  4
 ( 1 .  2)
++++++ c_lexer.bas
+Total tokens in program:	 3219
 +++++ c_io_seq.bas
 Sequential I/O test completed.
 +++++ c_io_rand.bas
@@ -160,8 +160,8 @@ Random access I/O test completed.
 Forward GOTO arrived
 Forward GOSUB arrived
 +++++ c_events.bas
-Timer handler called:	 0	at timer = 	 60392
-Timer handler called:	 1	at timer = 	 60392
+Timer handler called:	 0	at timer = 	 76169
+Timer handler called:	 1	at timer = 	 76170
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred

@@ -43,7 +43,7 @@ and means a slightly larger executable. */
 #ifdef DEBUG
 #define DIAGNOSTIC_FN_DECL(fn) extern fn
 #else
-#define DIAGNOSTIC_FN_DECL(fn) extern int main(int argc, char **argv) /* Because VBCC doesn't like 'empty declarations'. */
+#define DIAGNOSTIC_FN_DECL(fn) extern int main(int argc, const char *argv[]) /* Because VBCC doesn't like 'empty declarations'. */
 #endif
 
 /* The standard assert() macro - */

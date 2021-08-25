@@ -269,6 +269,8 @@ static void UnaryNegation_(Scalar *result, const Scalar *a)
 		SetFPResult(result, -GetDouble(a), a->type, a->type);
 }
 
+/* No special cases for single precision floats here because the GCC M68K code generator or Amiga runtime has a bug in
+	float multiplication and division when compiling with -Os */
 static void Multiplication_(Scalar *result, const Scalar *a, const Scalar *b)
 {
 	bool overflow = TRUE; /* assume f.p. unless both integral */
@@ -279,11 +281,6 @@ static void Multiplication_(Scalar *result, const Scalar *a, const Scalar *b)
 		overflow = Sign(la) * Sign(lb) != Sign(product);
 		SetIntResult(result, product, overflow, a->type, b->type);	
 	}
-	else if(a->type == T_SINGLE && b->type == T_SINGLE) {
-		result->type = T_SINGLE;
-		result->value.number.f = a->value.number.f * b->value.number.f;
-		overflow = DetectFloatOverflow(result->value.number.f);
-	}
 
 	if(overflow)
 		SetFPResult(result, GetDouble(a) * GetDouble(b), a->type, b->type);
@@ -291,15 +288,7 @@ static void Multiplication_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void Division_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(a->type == T_SINGLE && b->type == T_SINGLE) {
-		if(b->value.number.f == 0.0)
-			SetError(result, ZERODIVISOR);
-		else {
-			result->type = T_SINGLE;
-			result->value.number.f = a->value.number.f / b->value.number.f;
-		}
-	}
-	else if(GetDouble(b) == 0.0)
+	if(GetDouble(b) == 0.0)
 		SetError(result, ZERODIVISOR);
 	else
 		SetFPResult(result, GetDouble(a) / GetDouble(b), a->type, b->type);

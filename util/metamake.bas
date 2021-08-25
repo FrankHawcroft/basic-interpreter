@@ -283,9 +283,10 @@ elseif Format = "AMIGA-GCC" '' cross-compiling on Windows
 	OFE$ = "o"
 	AFE$ = "s"
 	Compile$ = "m68k-amigaos-gcc"
-	DefaultActionOptions$ = "-o $@ -c $*.c -resident -noixemul"
-	LinkOptions$ = "-o $@ -resident -noixemul -lnixmain -lm" '' TODO now want this order: -resident -noixemul $(NBA_OBJS) -o $@ -lnixmain -lm
-	Clean$ = "del *.o"
+	OptimisationOptions$ = "" ' "-DNDEBUG -s -Os -fomit-frame-pointer " '' needs space at end!
+	DefaultActionOptions$ = OptimisationOptions + "-o $@ -c $*.c -noixemul"
+	LinkOptions$ = OptimisationOptions + "-o $@ -noixemul -lm" '' TODO now want this order: -resident -noixemul -lnixmain $(NBA_OBJS) -o $@ -lnixmain -lm
+	Clean$ = "rm *.o"
 else
 	print "Error: unknown output format "; Format
 	system 1

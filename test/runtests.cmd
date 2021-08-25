@@ -6,7 +6,6 @@ rem Module path is set locally - comment out to use the environment variable -
 set BAS_MODULE_PATH=..\module
 
 set intpath=..\src\nb
-rem C:\Dev\bas\016A\Debug\Basic.exe
 
 echo Testing %intpath%
 
