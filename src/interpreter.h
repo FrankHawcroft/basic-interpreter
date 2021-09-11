@@ -247,6 +247,18 @@ typedef struct BObject_struct {
 
 typedef void (*Interner)(unsigned, const QString *, BObject *);
 
+/*** Stack ***/
+
+/* Used for the interpreter's two kinds of stack - the (singleton) control
+flow stack, and the (potentially numerous) expression evaluation stacks. */
+struct Stack;
+
+/*** Process ***/
+
+/* Sometimes passed in, for efficiency - defined elsewhere (process.h, natch) */
+
+struct Process;
+
 /*** Parameter ***/
 
 /* Defines a formal parameter for a statement, function, or subprogram. */
@@ -277,7 +289,8 @@ struct Statement {
 		void (*macro)(const QString *token, unsigned nToken);
 	} method; /* The start of the subprogram's body, or the implementation of the command. */
 	Interner convert; /* Token --> BObject conversion. */
-	bool (*inactive)(bool); /* Control flow management for block statements. Called when in non-taken branch. */
+	bool (*inactive)(struct Process *, bool);
+		/* Control flow management for block statements, called when in non-taken branch. */
 	struct Parameter *formal;
 	short formalCount;
 	bool userDefined; /* Subprogram? */
@@ -368,18 +381,6 @@ struct TokenSequence {
 	const struct Statement *command;
 	BObject *preconverted; /* Tokens converted to objects. */	
 };
-
-/*** Stack ***/
-
-/* Used for the interpreter's two kinds of stack - the (singleton) control
-flow stack, and the (potentially numerous) expression evaluation stacks. */
-struct Stack;
-
-/*** Process ***/
-
-/* Sometimes passed in, for efficiency - defined elsewhere (process.h, natch) */
-
-struct Process;
 
 /*** Characteristics of types -- semantics.c ***/
 

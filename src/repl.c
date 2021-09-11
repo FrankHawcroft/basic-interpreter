@@ -28,7 +28,7 @@ void PrintVerboseTracingPrefix(char pass)
 {
 	fprintf(stderr, "%5hu %c %c ",
 		(unsigned short)(Proc()->currentStatementStart - FileBufferBase(Proc()->buffer)),
-		DefaultInactive(FALSE) ? '-' : '+',
+		DefaultInactive(Proc(), FALSE) ? '-' : '+',
 		pass);
 }
 #endif
@@ -240,7 +240,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	
 	/* Determine if the statement should actually be executed. */
 
-	if((ops & OP_INACTIVE) && (*ts->command->inactive)(FALSE))
+	if((ops & OP_INACTIVE) && (*ts->command->inactive)(proc, FALSE))
 		ops = OP_POLL | (ops & OP_CACHE);
 
 	if(ops & OP_CACHE)

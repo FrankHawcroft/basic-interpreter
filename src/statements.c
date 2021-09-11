@@ -255,7 +255,7 @@ struct BuiltInStatement {
 	const char *name; /* Converted to a QString. */
 	void (*method)();
 	void (*convert)(unsigned, const QString *, BObject *);
-	bool (*inactive)(bool);
+	bool (*inactive)(struct Process *, bool);
 	struct Parameter *formal;
 	short formalCount; /* The number of items in 'formal', NOT the actual parameter count
 						which must be supplied when used. (See semantics.c) */

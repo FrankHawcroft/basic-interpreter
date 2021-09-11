@@ -245,6 +245,9 @@ void Shared_(const QString *toks, unsigned nToks)
 	struct Process *proc = Proc();
 	bool previouslyExecuted = GetFromCache(proc, proc->currentStatementStart) != NULL;
 	
+	if(InStaticContext(proc) && (previouslyExecuted || LookUp(&toks[0], SCOPE_STATIC) != NULL))
+		return; /* locals already created */
+	
 	if(!previouslyExecuted) {
 		if(proc->callNestLevel <= SCOPE_MAIN) {
 			CauseError(SHAREDOUTSIDESUB);
@@ -256,8 +259,6 @@ void Shared_(const QString *toks, unsigned nToks)
 			return;
 		}
 	}
-	else if(InStaticContext(proc)) /* locals already created, so do nothing */
-		return;
 	
 	if(nToks > 1 && (params = ParseNameList(toks, nToks - 1, &numParams, SHARED_VAR)) == NULL) {
 		CauseError(NOMEMORY);

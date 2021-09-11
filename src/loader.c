@@ -178,9 +178,10 @@ extern bool CanAssumeCommonSyntax(const struct Statement *cmd);
 
 bool ProgramSyntaxCheckPassed(void)
 {
+	struct Process *proc = Proc();
 	/* Only bother syntax checking the prelude if this option is chosen - */
 	const char *position = Opts()->prelude == NULL || Opts()->preludeDebugging 
-		? FileBufferBase(Proc()->buffer) : PrimaryBufferBase(Proc()->buffer);
+		? FileBufferBase(proc->buffer) : PrimaryBufferBase(proc->buffer);
 	Error error;
 	int errorCount = 0, line;
 	const char *file;
@@ -191,7 +192,7 @@ bool ProgramSyntaxCheckPassed(void)
 
 	CreateTokenSequence(&tokens, Opts()->lowMemory ? 6 : 40);
 	
-	while(WithinFileBuffer(Proc()->buffer, position) && errorCount < MAX_REPORTED_SYNTAX_ERRORS) {
+	while(WithinFileBuffer(proc->buffer, position) && errorCount < MAX_REPORTED_SYNTAX_ERRORS) {
 		error = Tokenise(&position, &tokens, TRUE);
 		
 		/*PrintTokSeq(&tokens);*/
@@ -207,35 +208,35 @@ bool ProgramSyntaxCheckPassed(void)
 			error = CheckStatementSyntax(&tokens);
 		
 		if(error != SUCCESS) {
-			GetLocationInfo(Proc()->buffer, tokens.start, &line, &file);
-			ReportError(error, file, line, tokens.start, Proc()->additionalErrorInfo);
+			GetLocationInfo(proc->buffer, tokens.start, &line, &file);
+			ReportError(error, file, line, tokens.start, proc->additionalErrorInfo);
 			
 			++errorCount;
 		}
 		
 		/* Track nested block control statements. */
-		Proc()->currentStatementStart = tokens.start; /* So that tag is set in CF stack record. */
+		proc->currentStatementStart = tokens.start; /* So that tag is set in CF stack record. */
 		if(tokens.command != NULL)
-			(*tokens.command->inactive)(TRUE);
+			(*tokens.command->inactive)(proc, TRUE);
 		
 		ClearTokenSequence(&tokens);
 	}
 	
 	DisposeTokenSequence(&tokens);
 	
-	if(WithinFileBuffer(Proc()->buffer, Proc()->currentStatementStart) && errorCount >= MAX_REPORTED_SYNTAX_ERRORS) {
-		GetLocationInfo(Proc()->buffer, Proc()->currentStatementStart, &line, &file);
+	if(WithinFileBuffer(proc->buffer, proc->currentStatementStart) && errorCount >= MAX_REPORTED_SYNTAX_ERRORS) {
+		GetLocationInfo(proc->buffer, proc->currentStatementStart, &line, &file);
 		ReportError(ER_TOO_MANY_SYNTAX_ERRORS, file, line, NULL, NULL);
 	}
 	
 	/* Report any unclosed block control statements. */
 	if(errorCount < MAX_REPORTED_SYNTAX_ERRORS && (error = CheckForUnbalancedBlocks(FALSE)) != SUCCESS) {
-		GetLocationInfo(Proc()->buffer, Proc()->currentStatementStart, &line, &file);
-		ReportError(error, file, line, Proc()->currentStatementStart, Proc()->additionalErrorInfo);
+		GetLocationInfo(proc->buffer, proc->currentStatementStart, &line, &file);
+		ReportError(error, file, line, proc->currentStatementStart, proc->additionalErrorInfo);
 	}
 	
 	/* Reset current position for start of execution. */
-	Proc()->currentStatementStart = Proc()->currentPosition = FileBufferBase(Proc()->buffer);
+	proc->currentStatementStart = proc->currentPosition = FileBufferBase(proc->buffer);
 	
 	return errorCount == 0;
 }

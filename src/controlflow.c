@@ -122,74 +122,49 @@ void DisposeControlFlowStack(void)
 	}
 }
 
-static int ControlFlowStackHeight(void)
+#define ControlFlowStackHeight(proc) StkHeight((proc)->controlFlowStack)
+#define PeekAt(proc, offset) ((struct StackNode *)StkPeek((proc)->controlFlowStack, (offset)))
+#define Peek(proc, offset) PeekAt((proc), (offset))
+#define PeekTop(proc) Peek((proc), 0)
+#define CurrentContext(proc) ((enum ControlFlow)(proc)->currentContext)
+
+static struct ForLoopControl *PeekForLoopControl(struct Process *proc)
 {
-	return StkHeight(Proc()->controlFlowStack);
+	return ControlFlowStackHeight(proc) > 1 ? &(PeekTop(proc)->extension.forLoop) : NULL;
 }
 
-#define PeekAt(proc, offset) ((struct StackNode *)StkPeek(proc->controlFlowStack, offset))
-
-static struct StackNode *Peek(int offset)
+static const Scalar *PeekSelectValue(struct Process *proc)
 {
-	return PeekAt(Proc(), offset);
+	assert(ControlFlowStackHeight(proc) <= 1 || (CurrentContext(proc) & STMT_SELECT));
+
+	return ControlFlowStackHeight(proc) > 1 ? &(PeekTop(proc)->extension.selectValue) : NULL;
 }
 
-static struct StackNode *PeekTop(void)
+static void RemoveTop(struct Process *proc)
 {
-	return Peek(0);
-}
-
-static enum ControlFlow CurrentContext(void)
-{
-	return (enum ControlFlow)Proc()->currentContext; /* ControlFlowStackHeight() > 0 ? PeekTop()->kind : NO_CONTROL*/;
-}
-
-static struct ForLoopControl *PeekForLoopControl(void)
-{
-	return ControlFlowStackHeight() > 1 ? &(PeekTop()->extension.forLoop) : NULL;
-}
-
-static const Scalar *PeekSelectValue(void)
-{
-	assert(ControlFlowStackHeight() <= 1 || (CurrentContext() & STMT_SELECT));
-
-	return ControlFlowStackHeight() > 1 ? &(PeekTop()->extension.selectValue) : NULL;
-}
-
-static void RemoveTop(void)
-{
-	struct Process *proc = Proc();
 	StkDiscard(proc->controlFlowStack, 1, DisposeNode);
-	proc->currentContext = PeekTop()->kind;
+	proc->currentContext = PeekTop(proc)->kind;
 }
 
-static bool InSelectionStatement(void)
+static bool InSelectionStatement(const struct Process *proc)
 {
-	enum ControlFlow nodeKind = CurrentContext();
+	enum ControlFlow nodeKind = CurrentContext(proc);
 	return (nodeKind & STMT_MASK) == STMT_IF || (nodeKind & STMT_MASK) == STMT_SELECT;
 }
 
-static void PushContext(const struct StackNode *node)
+static void PushContext(struct Process *proc, const struct StackNode *node)
 {
-	struct Process *proc = Proc();
-	if(StkFull(proc->controlFlowStack))
-		CauseError(ER_STACK_OVERFLOW);
-	else {
+	if(!StkFull(proc->controlFlowStack)) {
 		proc->currentContext = node->kind;
-		if(node->kind == SELECT_ENTERED) {
-			struct StackNode newNode = *node;
-			/* Need to explicitly duplicate it because could be a string - */
-			CopyScalar(&newNode.extension.selectValue, &node->extension.selectValue);
-			StkPush(proc->controlFlowStack, &newNode);
-		}
-		else
-			StkPush(proc->controlFlowStack, node);
+		StkPush(proc->controlFlowStack, node);
 	}
+	else
+		CauseError(ER_STACK_OVERFLOW);
 }
 
-static void Ret(void)
+static void Ret(struct Process *proc)
 {
-	Proc()->currentPosition = PeekTop()->retAddr;
+	proc->currentPosition = PeekTop(proc)->retAddr;
 }
 
 void ClearControlFlowStack(void)
@@ -232,13 +207,14 @@ struct HashTable *CurrentStaticContext(const struct Process *proc)
 
 Error CheckForUnbalancedBlocks(bool inSubprogram)
 {
+	struct Process *proc = Proc();
 	const char *position = NULL;
 	int offset;
 	Error errorFound = SUCCESS;
 	bool aborted = FALSE;
 
-	for(offset = 0; offset < ControlFlowStackHeight() && !aborted && errorFound == SUCCESS; offset++) {
-		const struct StackNode *sn = Peek(offset);
+	for(offset = 0; offset < ControlFlowStackHeight(proc) && !aborted && errorFound == SUCCESS; offset++) {
+		const struct StackNode *sn = Peek(proc, offset);
 		enum ControlFlow kind = sn->kind;
 
 		position = sn->retAddr;
@@ -262,56 +238,59 @@ Error CheckForUnbalancedBlocks(bool inSubprogram)
 	}
 
 	if(errorFound != SUCCESS && position != NULL)
-		Proc()->currentStatementStart = position;
+		proc->currentStatementStart = position;
 	
 	return errorFound;
 }
 
 void PushActivationRecord(const struct Statement *statement)
 {
+	struct Process *proc = Proc();
 	struct StackNode returnAddress;
 	
 	assert(IsSubprogram(statement));
 	
 	returnAddress.kind = CALL_POSITION;
-	returnAddress.retAddr = Proc()->currentPosition; /* Start of next stmt. */
+	returnAddress.retAddr = proc->currentPosition; /* Start of next stmt. */
 	returnAddress.extension.subprogram = statement;
-	PushContext(&returnAddress);
+	PushContext(proc, &returnAddress);
 }
 
 void DiscardCurrentControlFlow(void)
 {
+	struct Process *proc = Proc();
 	enum ControlFlow top;
-	while((top = CurrentContext()) != CALL_POSITION && top != NO_CONTROL)
-		RemoveTop();
+	while((top = CurrentContext(proc)) != CALL_POSITION && top != NO_CONTROL)
+		RemoveTop(proc);
 }
 
 void ReturnFromSubprogram(void)
 {
-	if(CurrentContext() == CALL_POSITION) {
-		Ret();
-		RemoveTop();
+	struct Process *proc = Proc();
+	if(CurrentContext(proc) == CALL_POSITION) {
+		Ret(proc);
+		RemoveTop(proc);
 	}
 }
 
-static const char *RetrieveUntakenBranchDestination(const char *origin)
+static const char *RetrieveUntakenBranchDestination(struct Process *proc, const char *origin)
 {
-	return origin != NULL && Proc()->untakenBranchCache != NULL ? RetrieveFromCache(Proc()->untakenBranchCache, origin) : NULL;
+	return origin != NULL && proc->untakenBranchCache != NULL ? RetrieveFromCache(proc->untakenBranchCache, origin) : NULL;
 }
 
-static void CacheUntakenBranchDestination(const char *origin, const char *destination)
+static void CacheUntakenBranchDestination(struct Process *proc, const char *origin, const char *destination)
 {
 	CreateUntakenBranchCache();
-	if(origin != NULL && destination != NULL && Proc()->untakenBranchCache != NULL)
+	if(origin != NULL && destination != NULL && proc->untakenBranchCache != NULL)
 		/* && RetrieveUntakenBranchDestination(origin) != destination */
-		SetInCache(Proc()->untakenBranchCache, origin, (void *)destination);
+		SetInCache(proc->untakenBranchCache, origin, (void *)destination);
 }
 
 #ifdef DEBUG
 
 void PrintUntakenBranchCacheInfo(FILE *f, const char *origin)
 {
-	const char *dest = RetrieveUntakenBranchDestination(origin);
+	const char *dest = RetrieveUntakenBranchDestination(Proc(), origin);
 
 	if(dest != NULL) {
 		const char *thisModule;
@@ -324,20 +303,24 @@ void PrintUntakenBranchCacheInfo(FILE *f, const char *origin)
 
 #endif
 
-static bool IndicatesLoop(int offset) { return (Peek(offset)->kind & (STMT_FOR | STMT_REPEAT | STMT_WHILE)) != 0; }
+static bool IndicatesLoop(const struct Process *proc, int offset)
+{
+	return (Peek(proc, offset)->kind & (STMT_FOR | STMT_REPEAT | STMT_WHILE)) != 0;
+}
 
 /* For statement caching. Anything in a loop, and any subprogram called by another subprogram,
 is considered a piece of code that may be executed many times. This discriminates against loops
 fashioned using GOTO - so be it. */
 bool InPotentiallyHotPath(void)
 {
+	struct Process *proc = Proc();
 	int offset;
 	
-	if(Proc()->callNestLevel > SCOPE_MAIN + 1 || InStaticContext(Proc()))
+	if(proc->callNestLevel > SCOPE_MAIN + 1 || InStaticContext(proc))
 		return TRUE;
 	
-	for(offset = 0; offset < ControlFlowStackHeight(); offset++)
-		if(IndicatesLoop(offset))
+	for(offset = 0; offset < ControlFlowStackHeight(proc); offset++)
+		if(IndicatesLoop(proc, offset))
 			return TRUE;
 		
 	return FALSE;
@@ -378,32 +361,35 @@ bool GuaranteedLive()
 
 void GoTo_(BObject *arg, unsigned count)
 {
-	while(InSelectionStatement())
-		RemoveTop();
-	Proc()->currentPosition = arg[0].value.labelPos;
+	struct Process *proc = Proc();
+	while(InSelectionStatement(proc))
+		RemoveTop(proc);
+	proc->currentPosition = arg[0].value.labelPos;
 }
 
 void GoSub_(BObject *arg, unsigned count)
 {
+	struct Process *proc = Proc();
 	struct StackNode gosubSN;
 
 	gosubSN.kind = GOSUB_POSITION;
-	gosubSN.retAddr = Proc()->currentPosition;
-	PushContext(&gosubSN);
-	Proc()->currentPosition = arg[0].value.labelPos;
+	gosubSN.retAddr = proc->currentPosition;
+	PushContext(proc, &gosubSN);
+	proc->currentPosition = arg[0].value.labelPos;
 }
 
 void Return_(BObject *arg, unsigned count)	
 {
+	struct Process *proc = Proc();
 	enum ControlFlow kind;
 
-	while((kind = CurrentContext()) != GOSUB_POSITION
+	while((kind = CurrentContext(proc)) != GOSUB_POSITION
 		&& kind != NO_CONTROL && kind != CALL_POSITION)
-		RemoveTop();
+		RemoveTop(proc);
 	
 	if(kind == GOSUB_POSITION) {
-		Ret();
-		RemoveTop();
+		Ret(proc);
+		RemoveTop(proc);
 	}
 	else
 		CauseError(RETURNWITHOUTGOSUB);
@@ -476,8 +462,6 @@ void End_(BObject *arg, unsigned count)
 	Proc()->mode = MODE_INTERACTIVE;
 }
 
-/*extern void ReleaseResources(struct Options *);*/
-
 void System_(BObject *arg, unsigned count)
 {
 	int rc = GetBoolean(&arg[0].value.scalar) ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -492,7 +476,6 @@ void System_(BObject *arg, unsigned count)
 	
 	DisposeProcess();
 	DisposeHeap();
-	/*ReleaseResources(Opts());*/
 	PfFinish();
 	exit(rc);
 }
@@ -511,6 +494,7 @@ static enum ControlFlow ForLoopState(double start, double end, double step, enum
 
 void For_(BObject *arg, unsigned count)
 {
+	struct Process *proc = Proc();
 	void *counter;
 	union NumericalValue *startValue, *endValue, *stepSize;
 	struct StackNode node;
@@ -523,7 +507,7 @@ void For_(BObject *arg, unsigned count)
 	node.extension.forLoop.counter.sp = (short *)counter; /* Any pointer will do */
 	node.extension.forLoop.endValue = *endValue;
 	node.extension.forLoop.stepSize = *stepSize;
-	node.retAddr = Proc()->currentPosition;
+	node.retAddr = proc->currentPosition;
 
 	switch(NonPointer(VarData(&arg[0])->type)) {
 		case T_INT:
@@ -549,30 +533,29 @@ void For_(BObject *arg, unsigned count)
 	/* No untaken branch caching for FOR loops - they're much more efficient than WHILE loops,
 		and the cost of the untaken branch cache access is worth avoiding. */
 
-	PushContext(&node);
+	PushContext(proc, &node);
 }
 
 void Next_(BObject *arg, unsigned count)
 {
-	struct ForLoopControl *loopControl = PeekForLoopControl();
+	struct Process *proc = Proc();
+	struct ForLoopControl *loopControl = PeekForLoopControl(proc);
 	Error error = SUCCESS;
 	bool shouldFinish = FALSE;
 
-	switch(CurrentContext()) {
+	switch(CurrentContext(proc)) {
 		case FOR_INT: {
 			long newTotal = (long)*loopControl->counter.sp + loopControl->stepSize.s;
-			shouldFinish = ForLoopIsFinishedLong(newTotal, *loopControl->counter.sp,
-				loopControl->endValue.s, loopControl->stepSize.s);
+			shouldFinish = ForLoopIsFinishedLong(newTotal, *loopControl->counter.sp, loopControl->endValue.s, loopControl->stepSize.s);
 			*loopControl->counter.sp = (short)newTotal;
-			}
 			break;
+		}
 		case FOR_LONG: {
 			long newTotal = *loopControl->counter.lp + loopControl->stepSize.l;
-			shouldFinish = ForLoopIsFinishedLong(newTotal, *loopControl->counter.lp,
-				loopControl->endValue.l, loopControl->stepSize.l);
+			shouldFinish = ForLoopIsFinishedLong(newTotal, *loopControl->counter.lp, loopControl->endValue.l, loopControl->stepSize.l);
 			*loopControl->counter.lp = newTotal;
-			}
 			break;
+		}
 		case FOR_SINGLE:
 			*loopControl->counter.fp += loopControl->stepSize.f;
 			shouldFinish = ForLoopIsFinishedFP(*loopControl->counter.fp, loopControl->endValue.f, loopControl->stepSize.f);
@@ -592,19 +575,20 @@ void Next_(BObject *arg, unsigned count)
 	if(error != SUCCESS)
 		CauseError(error);
 	else if(shouldFinish)
-		RemoveTop();
+		RemoveTop(proc);
 	else
-		Ret();
+		Ret(proc);
 }
 
 void NextVar_(BObject *arg, unsigned count)
 {
-	struct ForLoopControl *loopControl = PeekForLoopControl();
+	struct Process *proc = Proc();
+	struct ForLoopControl *loopControl = PeekForLoopControl(proc);
 	Error error = SUCCESS;
 	unsigned i;
 	
 	for(i = 0; i != count && error == SUCCESS; i++)
-		if(!(CurrentContext() & STMT_FOR))
+		if(!(CurrentContext(proc) & STMT_FOR))
 			error = NEXTWITHOUTFOR;
 		else if(GetPointer(VarData(&arg[i])) != (void *)loopControl->counter.sp)
 			error = ER_BAD_NEXT_VARIABLE;
@@ -623,22 +607,24 @@ void IfGoTo_(BObject *arg, unsigned count)
 
 void If_(BObject *arg, unsigned count)
 {
+	struct Process *proc = Proc();
 	struct StackNode node;
 	const char *skip;
 	
 	node.kind = arg[0].value.scalar.value.boolean ? IF_BLOCK : IF_UNTAKEN;
-	node.retAddr = Proc()->currentStatementStart;
-	PushContext(&node);
+	node.retAddr = proc->currentStatementStart;
+	PushContext(proc, &node);
 	
-	if(node.kind == IF_UNTAKEN && (skip = RetrieveUntakenBranchDestination(node.retAddr)) != NULL)
-		Proc()->currentPosition = skip;
+	if(node.kind == IF_UNTAKEN && (skip = RetrieveUntakenBranchDestination(proc, node.retAddr)) != NULL)
+		proc->currentPosition = skip;
 }
 
 void ElseIf_(BObject *arg, unsigned count)
 {
-	if(CurrentContext() == IF_UNTAKEN) {
-		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
-		RemoveTop();
+	struct Process *proc = Proc();
+	if(CurrentContext(proc) == IF_UNTAKEN) {
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentStatementStart);
+		RemoveTop(proc);
 		If_(arg, count);
 	}
 	else
@@ -647,15 +633,16 @@ void ElseIf_(BObject *arg, unsigned count)
 
 void Else_(BObject *arg, unsigned count)
 {
-	if(CurrentContext() == IF_UNTAKEN) {
+	struct Process *proc = Proc();
+	if(CurrentContext(proc) == IF_UNTAKEN) {
 		struct StackNode node;
 		
-		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
-		RemoveTop();
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentStatementStart);
+		RemoveTop(proc);
 		
 		node.kind = ELSE_BLOCK;
-		node.retAddr = Proc()->currentStatementStart;
-		PushContext(&node);
+		node.retAddr = proc->currentStatementStart;
+		PushContext(proc, &node);
 	}
 	else
 		CauseError(ELSEIFWITHOUTIF);
@@ -663,13 +650,14 @@ void Else_(BObject *arg, unsigned count)
 
 void EndIf_(BObject *arg, unsigned count)
 {
-	enum ControlFlow node = CurrentContext();
+	struct Process *proc = Proc();
+	enum ControlFlow node = CurrentContext(proc);
 	
 	if(node == IF_UNTAKEN || node == ELSE_BLOCK)
-		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentStatementStart);
 	
 	if((node & STMT_MASK) & (STMT_IF | STMT_ELSE))
-		RemoveTop();
+		RemoveTop(proc);
 	else
 		CauseError(ENDIFWITHOUTIF);
 }
@@ -792,20 +780,22 @@ void Executed_(Scalar *result, const BObject *arg, unsigned count)
 
 void Repeat_(BObject *arg, unsigned count)
 {
+	struct Process *proc = Proc();
 	struct StackNode node;
 
 	node.kind = REPEAT_BLOCK;
-	node.retAddr = Proc()->currentPosition;
-	PushContext(&node);
+	node.retAddr = proc->currentPosition;
+	PushContext(proc, &node);
 }
 
 void Until_(BObject *arg, unsigned count)
 {
-	if(CurrentContext() == REPEAT_BLOCK) {
+	struct Process *proc = Proc();
+	if(CurrentContext(proc) == REPEAT_BLOCK) {
 		if(arg[0].value.scalar.value.boolean)
-			RemoveTop();
+			RemoveTop(proc);
 		else
-			Ret();
+			Ret(proc);
 	}
 	else
 		CauseError(UNTILWITHOUTREPEAT);
@@ -813,8 +803,9 @@ void Until_(BObject *arg, unsigned count)
 
 void Forever_(BObject *arg, unsigned count)
 {
-	if(CurrentContext() == REPEAT_BLOCK)
-		Ret();
+	struct Process *proc = Proc();
+	if(CurrentContext(proc) == REPEAT_BLOCK)
+		Ret(proc);
 	else
 		CauseError(UNTILWITHOUTREPEAT);
 }
@@ -825,21 +816,24 @@ void Select_(BObject *arg, unsigned count)
 
 	node.kind = SELECT_ENTERED;
 	node.retAddr = NULL;
-	node.extension.selectValue = arg[0].value.scalar;
-	PushContext(&node);
+	/* Need to explicitly duplicate it because could be a string - */
+	CopyScalar(&node.extension.selectValue, &arg[0].value.scalar);
+	
+	PushContext(Proc(), &node);
 }
 
 void Case_(BObject *arg, unsigned count)
 {
-	enum ControlFlow context = CurrentContext();
+	struct Process *proc = Proc();
+	enum ControlFlow context = CurrentContext(proc);
 	
 	if(context == SELECT_ENTERED) {
-		const Scalar *selectVal = PeekSelectValue();
+		const Scalar *selectVal = PeekSelectValue(proc);
 		const char *skip;
 		unsigned i;
 		bool matchedOne = FALSE;
 
-		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentStatementStart);
 
 		for(i = 0; i != count && !matchedOne; i++) {
 			Error ignored;
@@ -849,13 +843,13 @@ void Case_(BObject *arg, unsigned count)
 		if(matchedOne) {
 			struct StackNode node;
 			
-			RemoveTop();
+			RemoveTop(proc);
 			node.kind = CASE_BLOCK;
-			node.retAddr = Proc()->currentStatementStart;
-			PushContext(&node);
+			node.retAddr = proc->currentStatementStart;
+			PushContext(proc, &node);
 		}
-		else if((skip = RetrieveUntakenBranchDestination(Proc()->currentStatementStart)) != NULL)
-			Proc()->currentPosition = skip;
+		else if((skip = RetrieveUntakenBranchDestination(proc, proc->currentStatementStart)) != NULL)
+			proc->currentPosition = skip;
 	}
 	else if(context == DEFAULT_BLOCK)
 		CauseError(OTHERWISENOTLASTCLAUSE);
@@ -865,27 +859,28 @@ void Case_(BObject *arg, unsigned count)
 
 void Otherwise_(BObject *arg, unsigned count)
 {
-	enum ControlFlow context = CurrentContext();
+	struct Process *proc = Proc();
+	enum ControlFlow context = CurrentContext(proc);
 	struct StackNode node;
 
-	node.retAddr = Proc()->currentStatementStart;
+	node.retAddr = proc->currentStatementStart;
 	
 	if(context == SELECT_ENTERED) {
-		CacheUntakenBranchDestination(PeekTop()->retAddr, node.retAddr);
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, node.retAddr);
 		
-		RemoveTop();
+		RemoveTop(proc);
 		node.kind = DEFAULT_BLOCK;
-		PushContext(&node);
+		PushContext(proc, &node);
 	}
 	else if(context == CASE_BLOCK) {
 		const char *skip;
 		
-		RemoveTop();
+		RemoveTop(proc);
 		node.kind = CASE_TAKEN_SKIP_REST;
-		PushContext(&node);
+		PushContext(proc, &node);
 		
-		if((skip = RetrieveUntakenBranchDestination(node.retAddr)) != NULL)
-			Proc()->currentPosition = skip;
+		if((skip = RetrieveUntakenBranchDestination(proc, node.retAddr)) != NULL)
+			proc->currentPosition = skip;
 	}
 	else if(context == DEFAULT_BLOCK)
 		CauseError(TWOOTHERWISECLAUSES);
@@ -895,12 +890,13 @@ void Otherwise_(BObject *arg, unsigned count)
 
 void EndSelect_(BObject *arg, unsigned count)
 {
-	enum ControlFlow context = CurrentContext();
+	struct Process *proc = Proc();
+	enum ControlFlow context = CurrentContext(proc);
 	
 	if((context & STMT_MASK) & STMT_SELECT) {
-		RemoveTop();
+		RemoveTop(proc);
 		if(context & UNTAKEN_BRANCH)
-			CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
+			CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentStatementStart);
 	}
 	else
 		CauseError(ENDSELECTWITHOUTSELECT);
@@ -908,39 +904,41 @@ void EndSelect_(BObject *arg, unsigned count)
 
 void While_(BObject *arg, unsigned count)	
 {
+	struct Process *proc = Proc();
 	struct StackNode node;
 	const char *endOfLoop;
 
 	node.kind = arg[0].value.scalar.value.boolean ? WHILE_BLOCK : WHILE_UNTAKEN;
-	node.retAddr = Proc()->currentStatementStart;
+	node.retAddr = proc->currentStatementStart;
 		/* Doesn't use currentPosition like FOR does, so the whole WHILE statement is rerun
 			each time around the loop. */
 				
 	endOfLoop = !arg[0].value.scalar.value.boolean
-		? RetrieveUntakenBranchDestination(Proc()->currentStatementStart) : NULL;
+		? RetrieveUntakenBranchDestination(proc, proc->currentStatementStart) : NULL;
 
 	if(endOfLoop != NULL)
 		/* Unlike untaken branch caching for IF and SELECT, which have more complicated block
 			structure, just jump over the entire block, avoiding pushing anything on the stack - */
-		Proc()->currentPosition = endOfLoop;
+		proc->currentPosition = endOfLoop;
 	else
-		PushContext(&node);
+		PushContext(proc, &node);
 }
 
 void WEnd_(BObject *arg, unsigned count)	
 {
-	enum ControlFlow kindPresent = CurrentContext();
+	struct Process *proc = Proc();
+	enum ControlFlow kindPresent = CurrentContext(proc);
 
 	if(kindPresent == WHILE_BLOCK) {
 		/* Not very efficient, but simple: jump back and re-execute the whole WHILE statement,
 			instead of just re-evaluating the condition. */
-		Ret();
-		RemoveTop();
+		Ret(proc);
+		RemoveTop(proc);
 	}
 	else if(kindPresent == WHILE_UNTAKEN) {
 		/* This allows the whole block to be jumped over if the condition is false. */
-		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentPosition);
-		RemoveTop();
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentPosition);
+		RemoveTop(proc);
 	}
 	else
 		CauseError(WENDWITHOUTWHILE);
@@ -1020,9 +1018,9 @@ static void PrintNodeInfo(int offset)
 	enum ControlFlow nodeKind;
 	bool isPlaceKeeper, failedTest, madeJump;
 
-	assert(offset < ControlFlowStackHeight());
+	assert(offset < ControlFlowStackHeight(Proc()));
 
-	currentNode = Peek(offset);
+	currentNode = Peek(Proc(), offset);
 	nodeKind = currentNode->kind;
 
 	/* Categorise: */
@@ -1133,7 +1131,7 @@ static void PrintNodeInfo(int offset)
 
 void PrintStackTrace(int maxDepth)
 {
-	int stackHeight = ControlFlowStackHeight(), offset;
+	int stackHeight = ControlFlowStackHeight(Proc()), offset;
 
 	if(maxDepth > stackHeight)
 		maxDepth = stackHeight;
@@ -1215,7 +1213,7 @@ static bool PrintObjectSignature(unsigned binIndex, const QString *key, const vo
 {
 	const BObject *obj = val;
 
-	if (obj->category == FUNCTION || obj->category == STATEMENT) {
+	if(obj->category == FUNCTION || obj->category == STATEMENT) {
 		const struct Parameter *param
 			= obj->category == FUNCTION ? obj->value.function->parameter : obj->value.statement->formal;
 		int nParams = obj->category == FUNCTION ? obj->value.function->numArgs : obj->value.statement->formalCount;
@@ -1224,49 +1222,48 @@ static bool PrintObjectSignature(unsigned binIndex, const QString *key, const vo
 
 		QsWrite(key, stdout);
 
-		if (obj->category == FUNCTION && (obj->value.function->type & T_STRING))
+		if(obj->category == FUNCTION && (obj->value.function->type & T_STRING))
 			putc('$', stdout);
 
-		if (obj->category == FUNCTION && nParams != 0)
+		if(obj->category == FUNCTION && nParams != 0)
 			putc('(', stdout);
 
-		for (n = 0; n < nParams; n++) {
+		for(n = 0; n < nParams; n++) {
 			const struct Parameter *pn = &param[n];
 			unsigned short repeat, repend = pn->maxCount == MAX_TOKENS ? 1 : pn->maxCount;
 
-			for (repeat = 1; repeat <= repend; repeat++) {
-				if (n > 0 || obj->category == STATEMENT)
+			for(repeat = 1; repeat <= repend; repeat++) {
+				if(n > 0 || obj->category == STATEMENT)
 					putc(' ', stdout);
 
-				if (pn->defaultValue != NULL)
+				if(pn->defaultValue != NULL)
 					putc('[', stdout);
 
-				if (pn->kind == LABEL)
+				if(pn->kind == LABEL)
 					fputs("label", stdout);
 				else
 					putc((pn->kind & VARIABLE_IS_ARRAY) ? toupper(pLetter) : pLetter, stdout);
 
-				if (((pn->kind & IS_VARIABLE) || (pn->kind == LITERAL))
-					&& !Contextual(pn->type))
+				if(((pn->kind & IS_VARIABLE) || (pn->kind == LITERAL)) && !Contextual(pn->type))
 					putc(SpecifierFromType(TypeUsuallyProducedBy(pn->type)), stdout);
 
-				if (pn->kind & VARIABLE_IS_ARRAY)
+				if(pn->kind & VARIABLE_IS_ARRAY)
 					fputs("()", stdout);
 
 				++pLetter;
 
-				if (pn->defaultValue != NULL)
+				if(pn->defaultValue != NULL)
 					putc(']', stdout);
 
-				if (pn->maxCount == MAX_TOKENS)
+				if(pn->maxCount == MAX_TOKENS)
 					fputs(" ...", stdout);
 
-				if (n + 1 < nParams || repeat + 1 < repend)
+				if(n + 1 < nParams || repeat + 1 < repend)
 					putc(',', stdout);
 			}
 		}
 
-		if (obj->category == FUNCTION && nParams != 0)
+		if(obj->category == FUNCTION && nParams != 0)
 			putc(')', stdout);
 
 		putc('\n', stdout);
@@ -1329,51 +1326,52 @@ nested control structures. */
 /* SkippingWhenExecuting returns TRUE if in a non-taken branch of a control flow
 statement. This is a generic test based on the control flow stack state - 
 for specific statements, more complicated tests are provided below. */
-INLINE bool SkippingWhenExecuting(void)
+INLINE bool SkippingWhenExecuting(const struct Process *proc)
 {
-	enum ControlFlow nodeKind = CurrentContext();
+	enum ControlFlow nodeKind = CurrentContext(proc);
 	return (nodeKind & UNTAKEN_BRANCH) || nodeKind == SELECT_ENTERED;
 }
 
-INLINE bool Skipping(bool syntaxCheckingMode)
+INLINE bool Skipping(const struct Process *proc, bool syntaxCheck)
 {
-	return SkippingWhenExecuting() || syntaxCheckingMode;
+	return SkippingWhenExecuting(proc) || syntaxCheck;
 }
 
-static bool PushPlacekeeper(enum ControlFlow kind)
+static bool PushPlacekeeper(struct Process *proc, enum ControlFlow kind)
 {
 	struct StackNode placeKeeper;
 	placeKeeper.kind = kind;
-	placeKeeper.retAddr = Proc()->currentStatementStart; /* For error reporting and untaken branch caching. */
-	PushContext(&placeKeeper);
+	placeKeeper.retAddr = proc->currentStatementStart; /* For error reporting and untaken branch caching. */
+	PushContext(proc, &placeKeeper);
 	return TRUE;
 }
 
-static bool PopMatchingPlacekeeper(enum ControlFlow kind)
+static bool PopMatchingPlacekeeper(struct Process *proc, enum ControlFlow kind)
 {
-	bool matched = CurrentContext() == kind;
+	bool matched = CurrentContext(proc) == kind;
 	if(matched)
-		RemoveTop();
+		RemoveTop(proc);
 	return matched;
 }
 
 static bool HandleComplexInactiveBehaviour(
+	struct Process *proc,
 	enum ControlFlow tryThisBranch, /* clause might fire */
 	enum ControlFlow errorCase, /* indicates bad syntax */
 	enum ControlFlow skipThis, /* has already fired ... */
 	enum ControlFlow placekeeper) /* ... so push this */
 {
-	enum ControlFlow kind = CurrentContext();
+	enum ControlFlow kind = CurrentContext(proc);
 	if(kind == skipThis) {
 		const char *skip;
 		
-		CacheUntakenBranchDestination(PeekTop()->retAddr, Proc()->currentStatementStart);
+		CacheUntakenBranchDestination(proc, PeekTop(proc)->retAddr, proc->currentStatementStart);
 		
-		if((skip = RetrieveUntakenBranchDestination(Proc()->currentStatementStart)) != NULL)
-			Proc()->currentPosition = skip;
+		if((skip = RetrieveUntakenBranchDestination(proc, proc->currentStatementStart)) != NULL)
+			proc->currentPosition = skip;
 
-		RemoveTop();
-		PushPlacekeeper(placekeeper);
+		RemoveTop(proc);
+		PushPlacekeeper(proc, placekeeper);
 		
 		return TRUE;
 	}
@@ -1381,52 +1379,64 @@ static bool HandleComplexInactiveBehaviour(
 		return kind != tryThisBranch && kind != errorCase;
 }
 
-bool DefaultInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode); }
+bool DefaultInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck); }
 
-bool EmptyInactive(bool syntaxCheckingMode) { return TRUE; }
+bool EmptyInactive(struct Process *p, bool syntaxCheck)
+	{ return TRUE; }
 
-bool DataInactive(bool syntaxCheckingMode) { return FALSE; }
+bool DataInactive(struct Process *p, bool syntaxCheck)
+	{ return FALSE; }
 
-bool IfInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PushPlacekeeper(NESTED_UNTAKEN_IF); }
+bool IfInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_IF); }
 
-bool ForInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PushPlacekeeper(NESTED_UNTAKEN_FOR); }
+bool ForInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_FOR); }
 
-bool WhileInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PushPlacekeeper(NESTED_UNTAKEN_WHILE); }
+bool WhileInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_WHILE); }
 
-bool RepeatInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PushPlacekeeper(NESTED_UNTAKEN_REPEAT); }
+bool RepeatInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_REPEAT); }
 
-bool SelectInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PushPlacekeeper(NESTED_UNTAKEN_SELECT); }
+bool SelectInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_SELECT); }
 
-bool EndIfInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PopMatchingPlacekeeper(NESTED_UNTAKEN_IF); }
+bool EndIfInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_IF); }
 
-bool WEndInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PopMatchingPlacekeeper(NESTED_UNTAKEN_WHILE); }
+bool WEndInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_WHILE); }
 
-bool NextInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PopMatchingPlacekeeper(NESTED_UNTAKEN_FOR); }
+bool NextInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_FOR); }
 
-bool UntilInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PopMatchingPlacekeeper(NESTED_UNTAKEN_REPEAT); }
+bool UntilInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_REPEAT); }
 
-bool EndSelectInactive(bool syntaxCheckingMode) { return Skipping(syntaxCheckingMode) && PopMatchingPlacekeeper(NESTED_UNTAKEN_SELECT); }
+bool EndSelectInactive(struct Process *p, bool syntaxCheck)
+	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_SELECT); }
 
-bool ElseInactive(bool syntaxCheckingMode)
+bool ElseInactive(struct Process *p, bool syntaxCheck)
 {
-	enum ControlFlow nodeKind = CurrentContext();
+	enum ControlFlow nodeKind = CurrentContext(p);
 	return nodeKind == NESTED_UNTAKEN_IF
-		|| HandleComplexInactiveBehaviour(IF_UNTAKEN, ELSE_BLOCK, IF_BLOCK, IF_TAKEN_SKIP_ELSE);
+		|| HandleComplexInactiveBehaviour(p, IF_UNTAKEN, ELSE_BLOCK, IF_BLOCK, IF_TAKEN_SKIP_ELSE);
 }
 
-bool CaseInactive(bool syntaxCheckingMode)
+bool CaseInactive(struct Process *p, bool syntaxCheck)
 {
-	enum ControlFlow nodeKind = CurrentContext();
+	enum ControlFlow nodeKind = CurrentContext(p);
 	return nodeKind == NESTED_UNTAKEN_SELECT
-		|| HandleComplexInactiveBehaviour(SELECT_ENTERED, DEFAULT_BLOCK, CASE_BLOCK, CASE_TAKEN_SKIP_REST);
+		|| HandleComplexInactiveBehaviour(p, SELECT_ENTERED, DEFAULT_BLOCK, CASE_BLOCK, CASE_TAKEN_SKIP_REST);
 }
 
 /* Since subs don't nest, always execute END SUB - */
-bool EndSubInactive(bool syntaxCheckingMode) { return FALSE; }
+bool EndSubInactive(struct Process *p, bool syntaxCheck)
+	{ return FALSE; }
 
 /* Used for statements which are restricted to use within a subprogram: EXIT SUB, LOCAL, etc.
 If not in a subprogram, the statement's ordinary method will then be called, and cause an error. */
-bool SubprogramOnlyInactive(bool syntaxCheckingMode)
-{
-	return Proc()->callNestLevel > SCOPE_MAIN && Skipping(syntaxCheckingMode);
-}
+bool SubprogramOnlyInactive(struct Process *p, bool syntaxCheck)
+	{ return p->callNestLevel > SCOPE_MAIN && Skipping(p, syntaxCheck); }
