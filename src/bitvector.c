@@ -51,19 +51,33 @@ long FindContiguousOnes(Bits *v, long vectorLength, long start, long desiredLeng
 		Bits word = BV_MapWord(v, i);
 
 		if(word == ALL_SET) {
-			if(contiguous == 0)
+			if((contiguous += BV_BITS_PER_WORD) == BV_BITS_PER_WORD)
 				beginning = i;
-			contiguous += BV_BITS_PER_WORD;
 		}
-		else if((word & TOP_SET) || contiguous + BV_BITS_PER_WORD - 1 >= desiredLength) {
+		else if(word != NONE_SET && ((word & TOP_SET) || contiguous + BV_BITS_PER_WORD - 1 >= desiredLength)) {
 			long j;
 			
+/*#if (TOP_SET >> 1) > TOP_SET
+#define ASR_FOR_UNSIGNED TRUE
+#else
+#define ASR_FOR_UNSIGNED FALSE
+#endif*/
+
+			/* This loop kept as small as possible, to fit in cache on older processors. */
 			for(j = 0;
-			  j < BV_BITS_PER_WORD && contiguous < desiredLength && word != NONE_SET;
+/*#if ASR_FOR_UNSIGNED
+				j < BV_BITS_PER_WORD &&
+#endif*/
+			  word != NONE_SET;
 			  j++, word >>= 1) {
-				contiguous = word & 1 ? contiguous + 1 : 0;
-				if(contiguous == 1)
-					beginning = i + j;
+				  if(word & 1) {
+					  if(++contiguous == 1)
+						  beginning = i + j;
+					  if(contiguous >= desiredLength)
+						  break;
+				  }
+				  else
+					  contiguous = 0;
 			}
 			
 			if(j < BV_BITS_PER_WORD && contiguous < desiredLength)
