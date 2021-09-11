@@ -103,8 +103,6 @@ typedef short QsInternalLength;
 
 #endif /* !QSTRING_LONG_STRINGS */
 
-#define QSTRING_CACHE_HASH 0
-
 /*** Data structure and functions ***/
 
 /* QStrings can be statically initialised - the data and length must both be supplied.
@@ -113,19 +111,12 @@ Apart from at initialisation, the structure members should not be accessed direc
 typedef struct QString_struct {
 	QsChar *data;
 	QsInternalLength length;
-#if QSTRING_CACHE_HASH
-	unsigned short hash;
-#endif
 } QString;
 
 /* Constructors - initialise a string in various ways: */
 
 /* -- as a 0-length, empty string: */
-#if QSTRING_CACHE_HASH
-#define QS_NULL {NULL, 0, 0}
-#else
 #define QS_NULL {NULL, 0} /* For static initialisation. */
-#endif
 extern QString *QsInitNull(QString *);
 
 /* -- from C characters or strings (character arrays): */

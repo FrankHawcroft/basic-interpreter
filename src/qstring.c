@@ -63,6 +63,12 @@ Unlike SHORT_STRING_LENGTH, this can be an arbitrary value up to QS_MAX_LENGTH /
 
 #define MEDIUM_STRING_LENGTH 24
 
+/* Similar to the above - the string will grow by 1.5 times its allocated length
+	if above MEDIUM_STRING_LENGTH but below this limit. This is currently based on
+	an 'expected line length'. */
+	
+#define SCALE_BY_3_OVER_2_LENGTH 50
+
 /* Maximum reference count value. */
 	
 #define MAX_REF_COUNT USHRT_MAX
@@ -139,16 +145,10 @@ with a trivial, i.e. O(1), comparison. */
 
 /* Conversely, TRUE if the two strings are definitely not equivalent. */
 
-#if FAST_HASH || QSTRING_CACHE_HASH
+#if FAST_HASH
 #define QsTriviallyUnequal(s1, s2) (QsGetLength(s1) != QsGetLength(s2) || (QsGetLength(s1) > 40 && QsHash(s1) != QsHash(s2)))
 #else
 #define QsTriviallyUnequal(s1, s2) (QsGetLength(s1) != QsGetLength(s2))
-#endif
-
-#if QSTRING_CACHE_HASH
-#define StoreHash(s, data, len) ((s)->hash = (unsigned short)HashFor((data), (len)))
-#else
-#define StoreHash(s, data, len)
 #endif
 
 /*** QsInitIntern ***/
@@ -160,9 +160,6 @@ INLINE void QsInitIntern(QString *s, struct QStrData *qsd, size_t len)
 
 	s->data = (QsChar *)qsd;
 	s->length = -(QsInternalLength)len;
-#if QSTRING_CACHE_HASH
-	s->hash = 0;
-#endif
 }
 
 /*** QsAccess ***/
@@ -207,7 +204,6 @@ QString *QsInitStatic(QString *s, const QsChar *ptr, size_t len)
 	
 	s->data = (QsChar *)ptr;
 	s->length = (QsInternalLength)len;
-	StoreHash(s, ptr, len);
 
 	return s;
 }
@@ -293,8 +289,6 @@ bool QsJoin(QString *result, const QString *prefix, const QString *suffix)
 	if(suffixLength > 0)
 		CMemCpy(QsBuffer(result) + prefixLength, QsGetData(suffix), suffixLength);
 
-	StoreHash(result, QsGetData(result), QsGetLength(result));
-
 	return TRUE;
 }
 
@@ -326,8 +320,6 @@ QString *QsToUpperCase(QString *ucase, const QString *s)
 			*up++ = (QsChar)CToUpper(*sp++);
 	}
 
-	StoreHash(ucase, QsGetData(ucase), QsGetLength(ucase));
-
 	return ucase;
 }
 
@@ -344,8 +336,6 @@ QString *QsAppendChar(QString *s, QsChar ch)
 	newLength = QsGetLength(s) + 1;
 	QsCopyForWrite(s, newLength);
 	*(QsBuffer(s) + newLength - 1) = ch;
-
-	StoreHash(s, QsGetData(s), QsGetLength(s));
 	
 	return s;
 }
@@ -361,8 +351,6 @@ QString *QsSetCharAt(QString *s, size_t index, QsChar ch)
 	
 	QsCopyForWrite(s, QsGetLength(s));
 	*(QsBuffer(s) + index) = ch;
-	
-	StoreHash(s, QsGetData(s), QsGetLength(s));
 
 	return s;
 }
@@ -376,8 +364,6 @@ QString *QsCopyChar(QString *s, QsChar ch)
 	QsInitNull(s);
 	QsCopyForWrite(s, 1);
 	*(QsBuffer(s)) = ch;
-
-	StoreHash(s, QsGetData(s), QsGetLength(s));
 
 	return s;
 }
@@ -394,8 +380,6 @@ QString *QsCopyData(QString *s, const QsChar *data, size_t length)
 	QsCopyForWrite(s, length);
 	if(length > 0)
 		CMemCpy(QsBuffer(s), data, length);
-
-	StoreHash(s, QsGetData(s), QsGetLength(s));
 
 	return s;
 }
@@ -421,8 +405,6 @@ QString *QsRepeat(QString *s, size_t count, QsChar ch)
 	QsCopyForWrite(s, count);
 	if(count > 0)
 		CMemSet(QsBuffer(s), ch, count);
-
-	StoreHash(s, QsGetData(s), QsGetLength(s));
 
 	return s;
 }
@@ -585,7 +567,6 @@ QString *QsGetSubstring(QString *result, const QString *s, size_t start, size_t 
 		/* 'Static' data, so can just point at the same data. */
 		result->data = count == 0 ? NULL : s->data + start;
 		result->length = (QsInternalLength)count;
-		StoreHash(result, QsGetData(result), QsGetLength(result));
 	}
 	else if(start == 0 && count == length)
 		/* The whole string -- becomes just a ref count increase. */
@@ -596,7 +577,6 @@ QString *QsGetSubstring(QString *result, const QString *s, size_t start, size_t 
 		QsCopyForWrite(result, count);
 		if(count > 0)
 			CMemCpy(QsBuffer(result), QsGetData(s) + start, count);
-		StoreHash(result, QsGetData(result), QsGetLength(result));
 	}
 	
 	return result;
@@ -785,69 +765,37 @@ The algorithm used is 'djb2' by Dan Bernstein, as given at http://www.cse.yorku.
 #define Combine(h, s, n) ((((h) << 5) + (h)) ^ CToUpper((s)[n]))
 #endif
 
-static unsigned HashFor(const QsChar *c, size_t keyLength)
-{
-	unsigned hash = 5381;
-	
-#if FAST_HASH
-	/* Because most BASIC symbols are short, only 1-3 characters long,
-	hashing on at most four characters from the string tends to produce
-	reasonable results. */
-	
-	hash = keyLength == 0 ? hash : Combine(hash, c, 0);
-	hash = keyLength <= 1 ? hash : Combine(hash, c, keyLength - 1);
-	hash = keyLength <= 2 ? hash : Combine(hash, c, keyLength - 2);
-	hash = keyLength <= 3 ? hash : Combine(hash, c, keyLength >> 1);
-#else
-	/* A full hash function that uses every character in the string. */
-	
-	size_t i;
-	
-	for(i = 0; i < keyLength; i++)
-		hash = Combine(hash, c, i);
-#endif /* FAST_HASH */
-
-#ifdef DEBUG
-	++m_Hashes;
-#endif
-
-	return hash;
-}
-
 unsigned QsHash(const QString *key)
 {
-	unsigned hash = 5381; /* = QsIsNull(key) ? 0 : CToUpper(QsGetFirst(key)); */
-
-#if QSTRING_CACHE_HASH
-	hash = key->hash != 0 ? key->hash : HashFor(QsGetData(key), QsGetLength(key));
-#else
+	unsigned hash = 5381;
 	const QsChar *c = QsGetData(key);
 	size_t keyLength = QsGetLength(key);
-	
-#ifdef DEBUG
-	++m_Hashes;
-#endif
 
 #if FAST_HASH
 	/* Because most BASIC symbols are short, only 1-3 characters long,
 	hashing on at most four characters from the string tends to produce
 	reasonable results. */
 	
-	hash = keyLength == 0 ? hash : Combine(hash, c, 0);
-	hash = keyLength <= 1 ? hash : Combine(hash, c, keyLength - 1);
-	hash = keyLength <= 2 ? hash : Combine(hash, c, keyLength - 2);
-	hash = keyLength <= 3 ? hash : Combine(hash, c, keyLength >> 1);
+	switch(keyLength) {
+		case 0: break;
+		case 1: hash = Combine(hash, c, 0); break;
+		case 2: hash = Combine(Combine(hash, c, 0), c, 1); break;
+		case 3: hash = Combine(Combine(Combine(hash, c, 0), c, 1), c, 2); break;
+		default: hash = Combine(Combine(Combine(Combine(hash, c, 0), c, keyLength >> 1), c, keyLength - 2), c, keyLength - 1); break;
+	}
 #else
-	/* A full hash function that uses every character in the string. */
-	size_t i;
+	{
+		/* A full hash function that uses every character in the string. */
+		size_t i;
 	
-	for(i = 0; i < keyLength; i++)
-		hash = Combine(hash, c, i);
+		for(i = 0; i < keyLength; i++)
+			hash = Combine(hash, c, i);
+	}
 #endif /* !FAST_HASH */
 
-	/*return hash;
-	hash = HashFor(QsGetData(key), QsGetLength(key));*/
-#endif /* ! QSTRING_CACHE_HASH */
+#ifdef DEBUG
+	++m_Hashes;
+#endif
 
 	return hash;
 }
@@ -931,9 +879,13 @@ static struct QStrData *QsAllocate(size_t length)
 	assert(length <= QS_MAX_LENGTH);
 	assert(length > SHORT_STRING_LENGTH);
 	
-	if(length <= MEDIUM_STRING_LENGTH && length < QS_MAX_LENGTH / 2)
+	if(length <= MEDIUM_STRING_LENGTH)
 		length *= 2;
-
+	else if(length <= SCALE_BY_3_OVER_2_LENGTH)
+		length = (length * 3) / 2;
+	else
+		length += (length % sizeof(PfAlignmentType));
+	
 	qsd = (struct QStrData *)New((length - 1) * sizeof(QsChar) + sizeof(struct QStrData));
 		/* - 1 for 'data' member (1st char) */
 	qsd->refCount = 1;
