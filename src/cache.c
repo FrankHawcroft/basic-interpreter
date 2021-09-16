@@ -16,17 +16,17 @@
 #include "cache.h"
 #include "platform.h"
 
-/* Choose whether to use a simple closed array for the cache rather than a hash table with open chaining.
+/* Choose whether to use a simple fixed size array for the cache rather than a hash table with open chaining.
 	On older platforms like the Amiga, using the hash table structure - which means converting
 keys (pointers) to strings - incurs quite a substantial performance overhead: about 15% of the
 interpreter's time is spent retrieving things from the statement and untaken branch caches.
 	The advantage of using the full hash table structure is that it handles hash collisions, so that
-thrashing is never a problem unless the cache reaches its capacity. The direct mapped structure has
+thrashing is never a problem unless the cache reaches its capacity. The direct mapped approach has
 quicker access, but collisions simply result in eviction of the previous entry, so thrashing is more likely. */
 
-#define DIRECT_MAPPED TRUE
+#define USE_SIMPLE_ARRAY TRUE
 
-#if DIRECT_MAPPED
+#if USE_SIMPLE_ARRAY
 struct CacheEntry {
 	const void *key;
 	void *value;
@@ -34,7 +34,7 @@ struct CacheEntry {
 #endif
 
 struct Cache {
-#if DIRECT_MAPPED
+#if USE_SIMPLE_ARRAY
 	struct CacheEntry *table;
 #else
 	struct HashTable *table;
@@ -47,6 +47,7 @@ struct Cache {
 #ifdef DEBUG
 	unsigned long hits;
 	unsigned long misses;
+	unsigned long collisions;
 #endif
 };
 
@@ -58,7 +59,15 @@ static unsigned PseudoRandom(unsigned max)
 	return (unsigned)(nextRand / 65536) % max;
 }
 
-#if !DIRECT_MAPPED
+#define Combine(h, x) ((((h) << 5) + (h)) ^ (x))
+
+INLINE unsigned short QuickHash(const void *key)
+{
+	unsigned short n = (unsigned short)((intptr_t)key & USHRT_MAX);
+	return Combine(Combine(5381, n & UCHAR_MAX), n >> CHAR_BIT);
+}
+
+#if !USE_SIMPLE_ARRAY
 static struct HashTable *CreateTable(unsigned tableSize, void (*disposeValue)(void *))
 {
 	return HtCreate(tableSize, disposeValue, &QsEqual);
@@ -75,10 +84,10 @@ struct Cache *CreateCache(unsigned capacity, unsigned tableSize, void (*disposeV
 	/* As a gesture at getting a reasonable modulus for hashes, ensure that at least there'll
 	be an odd number of bins. */
 	if(tableSize == 0)
-		tableSize = 2 * capacity;
+		tableSize = 5 * capacity;
 	tableSize = tableSize + (tableSize % 2 == 0);
 	
-#if DIRECT_MAPPED
+#if USE_SIMPLE_ARRAY
 	newCache->table = New(sizeof(struct CacheEntry) * tableSize);
 	{
 		unsigned n;
@@ -95,13 +104,13 @@ struct Cache *CreateCache(unsigned capacity, unsigned tableSize, void (*disposeV
 	newCache->numEntries = 0;
 	newCache->maxEntries = capacity;
 #ifdef DEBUG
-	newCache->hits = newCache->misses = 0;
+	newCache->hits = newCache->misses = newCache->collisions = 0;
 #endif
 
 	return newCache;
 }
 
-#if DIRECT_MAPPED
+#if USE_SIMPLE_ARRAY
 
 void DisposeCache(struct Cache *cache)
 {
@@ -122,12 +131,8 @@ void ClearCache(struct Cache *cache)
 	cache->numEntries = 0;
 }
 
-#define Combine(h, x) ((((h) << 5) + (h)) ^ (x))
-
 static struct CacheEntry *EntryForKey(struct Cache *cache, const void *key)
 {
-	/*const unsigned stride = 8;
-	unsigned hash = ((intptr_t)key / stride) % cache->tableSize;*/
 	unsigned short n = (unsigned short)((intptr_t)key & USHRT_MAX);
 	unsigned short hash = Combine(Combine(5381, n & UCHAR_MAX), n >> CHAR_BIT);
 	return &cache->table[hash % cache->tableSize];
@@ -137,10 +142,14 @@ void SetInCache(struct Cache *cache, const void *key, void *value)
 {
 	struct CacheEntry *candidate = EntryForKey(cache, key);
 	
-	if(candidate->key != NULL) /* evict, on LRU principle */
+	if(candidate->key != NULL) { /* evict, on LRU principle */ 
+#ifdef DEBUG
+		cache->collisions += candidate->key != key;
+#endif
 		cache->disposeValue(candidate->value);
-	else if(cache->numEntries == cache->maxEntries) { /* drop another randomly */
-		unsigned n;
+	}
+	else if(cache->numEntries == cache->maxEntries) { /* considered 'full', so drop another randomly */
+		unsigned n = cache->numEntries - 1;
 		do
 			n = PseudoRandom(cache->tableSize);
 		while(cache->table[n].key == NULL);
@@ -148,7 +157,7 @@ void SetInCache(struct Cache *cache, const void *key, void *value)
 		cache->disposeValue(cache->table[n].value);
 		cache->table[n].key = cache->table[n].value = NULL;
 	}
-	else /* no conflict */
+	else /* no conflict, and limit on entries not reached */
 		++cache->numEntries;
 	
 	candidate->key = key;
@@ -165,7 +174,7 @@ void *RetrieveFromCache(struct Cache *cache, const void *key)
 	return candidate->key == key ? candidate->value : NULL;
 }
 
-#else /* !DIRECT_MAPPED */
+#else /* !USE_SIMPLE_ARRAY */
 
 void ClearCache(struct Cache *cache)
 {
@@ -195,7 +204,7 @@ static void CreateKey(QString *actualKey, const void *rawKey)
 		cache is used only to cache things in the program buffer, which for
 		BASIC programs will almost always be less than 64K in size. */
 	
-	unsigned short intKey = (unsigned long)rawKey & USHRT_MAX;
+	unsigned short intKey = (unsigned short)((intptr_t)key & USHRT_MAX);
 	QsCopyData(actualKey, (const QsChar *)&intKey, sizeof(intKey) / sizeof(QsChar));
 	
 	/* Better quality key creation, but entails a memory allocation - */
@@ -251,9 +260,7 @@ void SetInCache(struct Cache *cache, const void *key, void *value)
 	CreateKey(&formattedKey, key);
 	existing = HtLookUp(cache->table, &formattedKey);
 	
-	if(existing == value) /* already in cache */
-		return;
-	else if(existing != NULL) {
+	if(existing != NULL) {
 		HtDelete(cache->table, &formattedKey);
 		--cache->numEntries;
 	}
@@ -289,7 +296,7 @@ void *RetrieveFromCache(struct Cache *cache, const void *key)
 	return cachedValue;
 }
 
-#endif /* !DIRECT_MAPPED */
+#endif /* !USE_SIMPLE_ARRAY */
 
 #ifdef DEBUG
 
@@ -328,7 +335,7 @@ void RunCacheTests(void)
 
 void PrintCacheInfo(const struct Cache *c)
 {
-	if(c != NULL)
+	if(c != NULL) {
 		fprintf(stderr,
 			"Num entries = %u, max entries = %u, hits = %lu, misses = %lu, hit ratio = %f%%\n",
 			c->numEntries,
@@ -336,6 +343,10 @@ void PrintCacheInfo(const struct Cache *c)
 			c->hits,
 			c->misses,
 			c->hits == 0 && c->misses == 0 ? 0.0 : (c->hits / ((double)c->hits + c->misses)) * 100.0);
+#if USE_SIMPLE_ARRAY
+		fprintf(stderr, "Collisions = %lu\n", c->collisions);
+#endif
+	}
 	else
 		fprintf(stderr, "Cache not created.\n");
 }
@@ -344,7 +355,7 @@ void DumpCache(const struct Cache *cache)
 {
 	if(cache != NULL) {
 		fprintf(stderr, "-- Dumping cache %p\n", (void *)cache);
-#if DIRECT_MAPPED
+#if USE_SIMPLE_ARRAY
 		{
 			unsigned n;
 			for(n = 0; n != cache->tableSize; n++)

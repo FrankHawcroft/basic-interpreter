@@ -30,9 +30,11 @@ echo ++++++ invoke startup self-testing only (empty program) >> $logfile
 echo ++++++ simple_exprs.amiga (one-liners) >> $logfile
 execute simple_exprs.amiga
 
+;delete gmon.out
+
 ; More involved tests - 'c_' (for 'correctness') prefix -
 
-list c_#?.bas lformat "echo +++++ %s >> $logfile*N/src/nba --buf 30k %n >> $logfile" > t:runthem
+list c_#?.bas lformat "echo +++++ %s >> $logfile*N/src/nba --buf 30k %n >> $logfile" > t:runthem ; *Nrename gmon.out gmon_%m.out
 execute t:runthem
 delete t:runthem quiet
 

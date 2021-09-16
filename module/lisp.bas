@@ -111,7 +111,7 @@ DEFINT a-z '' TODO shouldn't do this in a library ... add explicit types where n
 ''
 
 I_Lisp_Interactive% = 0
-I_Lisp_ErrorCode% = 222	' A 'unique' error code
+I_Lisp_ErrorCode% = 222 ' A 'unique' error code
 
 ' TO DO: make use of these constants:
 

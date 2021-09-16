@@ -1098,14 +1098,14 @@ void CallByName_(Scalar *result, const BObject *arg, unsigned count)
 	}
 
 	defn = LookUpCheckingType(&name.value.string, Proc()->callNestLevel);
-	DisposeScalar(&name);
-	
 	if(defn == NULL || defn->category != FUNCTION) {
 		SetError(result, UNDEFINEDVARORFUNC);
 		SetAdditionalErrorMessage("Not found: %.*s", QsGetData(&name.value.string), QsGetLength(&name.value.string));
+		DisposeScalar(&name);
 		return;
 	}
-
+	DisposeScalar(&name);
+	
 	/* Sneakily convert the parameters in-place - hence a nasty const-removing cast - */
 	if(count > 1) {
 		Error error = ConformForApplication(defn, (BObject *)arg + 1, count - 1);

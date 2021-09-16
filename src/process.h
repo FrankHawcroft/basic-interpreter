@@ -97,6 +97,7 @@ struct Process {
 	
 	/* Caches - */
 	struct Cache *statementCache;
+	struct Cache *emptyStmtCache;
 	struct Cache *untakenBranchCache;
 	
 	/* OPTION BASE - */

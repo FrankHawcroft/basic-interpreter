@@ -735,9 +735,10 @@ In: *position -- the start of the statement.
 		occurred.
 
 Out: *position -- updated. If no lexical error is found, *position will 
-		be at the start of the next stmt, or one character beyond the buffer-
-		terminating NUL if this was the last stmt of the program. If an error 
-		occurred, will be at a location determined by skipOnError (see above).
+		be at the start of the next stmt, or at the buffer-terminating NUL if
+		this was the (lexically) last stmt of the program.
+		If an error occurred, will be at a location determined by skipOnError
+		(as above).
 	*tokSeq -- contains the scanned tokens - only those prior to where any
 		error was detected will be valid. 
 		

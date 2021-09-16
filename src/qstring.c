@@ -770,28 +770,31 @@ unsigned QsHash(const QString *key)
 	unsigned hash = 5381;
 	const QsChar *c = QsGetData(key);
 	size_t keyLength = QsGetLength(key);
-
+	
 #if FAST_HASH
 	/* Because most BASIC symbols are short, only 1-3 characters long,
 	hashing on at most four characters from the string tends to produce
 	reasonable results. */
 	
-	switch(keyLength) {
-		case 0: break;
-		case 1: hash = Combine(hash, c, 0); break;
-		case 2: hash = Combine(Combine(hash, c, 0), c, 1); break;
-		case 3: hash = Combine(Combine(Combine(hash, c, 0), c, 1), c, 2); break;
-		default: hash = Combine(Combine(Combine(Combine(hash, c, 0), c, keyLength >> 1), c, keyLength - 2), c, keyLength - 1); break;
+	if(keyLength != 0) {
+		hash = Combine(hash, c, 0);
+		if(keyLength > 1) {
+			hash = Combine(hash, c, keyLength - 1);
+			if(keyLength > 2) {
+				hash = Combine(hash, c, keyLength - 2);
+				if(keyLength > 3)
+					hash = Combine(hash, c, keyLength >> 1);
+			}
+		}
 	}
 #else
-	{
-		/* A full hash function that uses every character in the string. */
-		size_t i;
+	/* A full hash function that uses every character in the string. */
 	
-		for(i = 0; i < keyLength; i++)
-			hash = Combine(hash, c, i);
-	}
-#endif /* !FAST_HASH */
+	size_t i;
+	
+	for(i = 0; i < keyLength; i++)
+		hash = Combine(hash, c, i);
+#endif /* FAST_HASH */
 
 #ifdef DEBUG
 	++m_Hashes;
