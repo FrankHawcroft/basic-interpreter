@@ -83,8 +83,12 @@ Unlike SHORT_STRING_LENGTH, this can be an arbitrary value up to QS_MAX_LENGTH /
 
 /* Define this symbol true if your platform has a very fast memcmp implementation, to use
 	it by preference when testing strings for equality. */
-	
+
+#ifdef AMIGA
+#define FAST_MEMCMP FALSE
+#else
 #define FAST_MEMCMP TRUE
+#endif
 
 /*** QStrData ***/
 
@@ -621,21 +625,23 @@ bool QsEqual(const QString *s1, const QString *s2)
 
 bool QsEqNoCase(const QString *s1, const QString *s2)
 {
-	size_t l1 = QsGetLength(s1);
+	size_t len1 = QsGetLength(s1);
 #ifdef DEBUG
 	++m_Comparisons;
 #endif
-	if(l1 != QsGetLength(s2))
+	if(len1 != QsGetLength(s2))
 		return FALSE;
-#if FAST_MEMCMP
-	else if(CMemCmp(QsGetData(s1), QsGetData(s2), l1) == 0)
+	else if(len1 == 0)
 		return TRUE;
-#endif
 	else {
 		const QsChar *c1 = QsGetData(s1), *c2 = QsGetData(s2);
-		for( ; l1 != 0 && CToUpper(*c1) == CToUpper(*c2); l1--, c1++, c2++)
+#if FAST_MEMCMP
+		if(CMemCmp(c1, c2, len1) == 0)
+			return TRUE;
+#endif
+		for( ; len1 != 0 && CToUpper(*c1) == CToUpper(*c2); len1--, c1++, c2++)
 			;
-		return l1 == 0;
+		return len1 == 0;
 	}
 }
 

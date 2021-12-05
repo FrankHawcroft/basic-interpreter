@@ -28,9 +28,9 @@ static struct HashTable **AllocEnvTable(short count)
 /* Initialises the symbol tables ready for use. */
 static void InitSymbolTable(void)
 {
-	Proc()->envCount = Opts()->lowMemory ? -SCOPE_NONEXISTENT : 10;
+	Proc()->envCount = Opts()->lowMemory ? -SCOPE_NONEXISTENT : 25;
 	Proc()->environment = AllocEnvTable(Proc()->envCount);
-	Proc()->retainedWarmEnvs = Opts()->lowMemory ? 1 : 10;
+	Proc()->retainedWarmEnvs = Opts()->lowMemory ? 1 : 25;
 #ifdef DEBUG
 	Proc()->maxNestLevel = SCOPE_NONEXISTENT;
 	Proc()->definitions = Proc()->hashTableSearches = Proc()->lookUps = 0;
@@ -201,8 +201,8 @@ INLINE unsigned NumBins(bool lowMem, short callNestLevel)
 	if(callNestLevel == SCOPE_BUILTIN) return lowMem ? 103 : 809;
 	else if(callNestLevel == SCOPE_GLOBAL) return lowMem ? 53 : 577; 
 	else if(callNestLevel == SCOPE_MAIN) return lowMem ? 23 : 53;
-	else if(!lowMem && callNestLevel <= 5) return 13;
-	else return 5;
+	else if(!lowMem && callNestLevel <= 5) return 17;
+	else return 7;
 }
 
 static Error DefineQuickly(struct Definition *defn, short callNestLevel)

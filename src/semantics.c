@@ -132,7 +132,7 @@ SimpleType TypeFromSpecifier(char c)
 
 bool IsTypeSpecifier(char c)
 {
-	return !TypeIsInternal(TypeFromSpecifier(c));
+	return !isalnum(c) && !TypeIsInternal(TypeFromSpecifier(c));
 }
 
 char SpecifierFromType(SimpleType t) { return GetTypeCharacteristicsByCode(t)->specifier; }

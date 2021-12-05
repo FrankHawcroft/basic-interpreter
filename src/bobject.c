@@ -28,8 +28,7 @@ void InitObject(BObject *obj, enum SymbolType kind)
 
 bool IsEmpty(const BObject *obj)
 {
-	return obj == NULL 
-		|| (obj->category == LITERAL && (GetSimpleType(obj) == T_EMPTY || GetSimpleType(obj) == T_MISSING));
+	return obj == NULL  || (obj->category == LITERAL && GetSimpleType(obj) <= T_MISSING);
 }
 
 /* Duplicate an object. Literal values are cloned, but for other types, a simple structure copy is sufficient. */

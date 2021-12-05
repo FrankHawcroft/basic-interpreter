@@ -170,7 +170,7 @@ static struct Parameter m_ArgsForPSet[2] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE}};
 
 static struct Parameter m_ArgForRandomize[1] = {
-	{LITERAL, TR_INT_TO_LONG, NULL, NO_NAME, 1, FALSE}};
+	{LITERAL, TR_NUM_TO_LONG, NULL, NO_NAME, 1, FALSE}};
 
 static struct Parameter m_ArgForRead[1] = {
 	{SCALAR_VAR, TR_ANY, NULL, NO_NAME, UNLIMITED, FALSE}};

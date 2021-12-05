@@ -52,34 +52,60 @@ INLINE void PushObject(struct Stack *stack, const BObject *newTop)
 	}
 }
 
-static void Apply(const BObject *obj, BObject *param, unsigned count, BObject *result, struct Stack *stk)
+static void Apply(const BObject *functor, struct Stack *stk, unsigned priorHeight)
 {
-	Error error = ConformForApplication(obj, param, count);
+	BObject *param;
+	unsigned count;
+	Error error;
+	BObject result;
+	
+	assert(StkHeight(stk) > (int)priorHeight); /* TODO height same means infinite recursion. Detect? */
+			
+	count = StkHeight(stk) - priorHeight;
+	param = PeekExprStk(stk, count - 1);
+	
+	error = ConformForApplication(functor, param, count);
 	
 	if(error != SUCCESS)
-		SetObjectToError(result, error);
-	else if(obj->category == OPERATOR) {
-		assert(count == OperandCount(obj->value.opRef));
-		result->category = LITERAL;
-		EvalOperation(&result->value.scalar, obj->value.opRef,
+		SetObjectToError(&result, error);
+	else if(functor->category == OPERATOR) {
+		assert(count == OperandCount(functor->value.opRef));
+		result.category = LITERAL;
+		EvalOperation(&result.value.scalar, functor->value.opRef,
 			&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
 	}
-	else if(obj->category == FUNCTION)
-		CallFunction(result, obj->value.function, param, count, stk);
-	else if(IsVariable(obj)) {
-		if((error = IndexArray(&result->value.variable, VarPtr(obj), param, count)) == SUCCESS)
-			result->category = (result->value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF; /* vvv */
+	else if(functor->category == FUNCTION)
+		CallFunction(&result, functor->value.function, param, count, stk);
+	else if(IsVariable(functor)) {
+		if((error = IndexArray(&result.value.variable, VarPtr(functor), param, count)) == SUCCESS)
+			result.category = (result.value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF;
 		else
-			SetObjectToError(result, error);
+			SetObjectToError(&result, error);
 	}
 	else
-		SetObjectToError(result, ARRAYEXPECTED);	
+		SetObjectToError(&result, ARRAYEXPECTED);
+	
+	CutExprStk(stk, count);
+	PushObject(stk, &result);
+	/* Strictly, the applied object should be disposed of, but not doing it saves time for all
+		valid objects (arrays, functions, operators). If a string literal was appplied, it would
+		need to be disposed of, but this is caught by syntax checking, and the risk of a memory
+		leak (if syntax checking is bypassed or buggy) isn't worth the overhead on every
+		legitimate application. */
+	/*RemoveObject(functor, FALSE);*/
+	
+	/*fprintf(stderr, "[Eval-->: ");
+	DumpObject(&result);
+	fprintf(stderr, "]\n");*/
 }
 
 static void EvalParameterlessFunction(BObject *f, struct Stack *stk)
 {
-	/* Evaluate in-place, using the supplied function object to store the result - */
+	/* Unfortunately, need to check the arg count at eval time because an expr might
+		be precompiled before all the functions it uses are defined (in a STATIC function,
+		for instance). */
 	if(f->value.function->numArgs == 0)
+		/* Evaluate in-place, reusing the supplied function object to store the result. */
 		CallFunction(f, f->value.function, NULL, 0, stk);
 	else
 		SetObjectToError(f, BADARGCOUNT);
@@ -111,38 +137,19 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			/* A general 'apply' expression - function, operator, or subscripted array variable. */
 
 			const QString *post;
-			BObject result;
-			unsigned preHeight = StkHeight(exprStack), count;
+			unsigned priorHeight = StkHeight(exprStack);
 			
+			post = Eval(ct + 2, intern, tokIndex + 2, exprStack);	
+			assert(post > ct + 2);	
 			intern(tokIndex + 1, ct + 1, &obj);
-			post = Eval(ct + 2, intern, tokIndex + 2, exprStack);
-			
-			assert(post > ct + 2);
-			
+			Apply(&obj, exprStack, priorHeight);
 			tokIndex += post - ct;
 			ct = post;
-
-			assert(StkHeight(exprStack) > (int)preHeight); /* TODO height same means infinite recursion. Detect */
-
-			count = StkHeight(exprStack) - preHeight;
-			Apply(&obj, PeekExprStk(exprStack, count - 1), count, &result, exprStack);
-			/* Strictly, the applied object should be disposed of, but not doing it saves time for all
-				valid objects (arrays, functions, operators). If a string literal was appplied, it would
-				need to be disposed of, but this is caught by syntax checking, and the risk of a memory
-				leak (if syntax checking is bypassed or buggy) isn't worth the overhead on every
-				legitimate application. */
-			/*RemoveObject(&obj, FALSE);*/
-			CutExprStk(exprStack, count);
-			PushObject(exprStack, &result);
-			
-			/*fprintf(stderr, "[Eval-->: ");
-			DumpObject(&result);
-			fprintf(stderr, "]\n");*/
 		}
 		else if(!StkFull(exprStack)) {
 			/* If not an 'apply' (f a b c ...) form, it's an unsubscripted variable, a literal, a label,
-				or a parameterless function. Special-cased to intern directly to the TOS, to avoid copying
-				the object to a temporary location. */
+				or a parameterless function. Special-cased to intern directly to the TOS, to avoid an
+				extra object copy. */
 			
 			intern(tokIndex, ct, (BObject *)exprStack->top);
 			
@@ -158,6 +165,7 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			fprintf(stderr, "]\n");*/
 		}
 		else {
+			/* If stack's full, intern to a temporary location, then push. Slower, but the stack can grow itself. */
 			intern(tokIndex, ct, &obj);
 			if(obj.category == FUNCTION)
 				EvalParameterlessFunction(&obj, exprStack);
@@ -178,39 +186,37 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack)
 	for(cobj = exprSeq; cobj->category != PUNCTUATION || !cobj->value.punctuation->terminatesExpressionSequence; cobj++) {
 		BObject result;
 		
-		if(cobj->category == PUNCTUATION && cobj->value.punctuation->introducesNestedExpressionSequence) {
-			/* A general 'apply' expression - function, operator, or subscripted array variable. */
-
-			const BObject *post;
-			unsigned preHeight = StkHeight(exprStack), count;
+		switch(cobj->category) {
+			case PUNCTUATION: {
+				/* Function, operator, or subscripted array variable. */
+				const BObject *post;
+				unsigned priorHeight = StkHeight(exprStack);
 			
-			post = EvalPreconverted(cobj + 2, exprStack);
+				/* Only nested Lisp-like expressions are expected here at eval time; apart from expression terminators,
+					punctuation should have been stripped out in the transformation to prefix. */
+				assert(cobj->value.punctuation->introducesNestedExpressionSequence);
 			
-			assert(post > cobj + 2);
-			assert(StkHeight(exprStack) > (int)preHeight);
-
-			count = StkHeight(exprStack) - preHeight;
-			Apply(cobj + 1, PeekExprStk(exprStack, count - 1), count, &result, exprStack);
-			
-			cobj = post;
-			CutExprStk(exprStack, count);
-			PushObject(exprStack, &result);
-		}
-		else if(!StkFull(exprStack)) {
-			CopyObject((BObject *)exprStack->top, cobj);			
-			if(cobj->category == FUNCTION) {
-				result = *cobj;
-				EvalParameterlessFunction(&result, exprStack);
+				post = EvalPreconverted(cobj + 2, exprStack);		
+				assert(post > cobj + 2);
+				Apply(cobj + 1, exprStack, priorHeight);			
+				cobj = post;
+				break;
 			}
-			else
-				AdjustStackPointersFollowingDirectPush(exprStack);
-		}
-		else {	
-			CopyObject(&result, cobj);
-			if(cobj->category == FUNCTION)
-				EvalParameterlessFunction(&result, exprStack); /* eval in-place */
-			else
-				PushObject(exprStack, &result);
+			case FUNCTION:
+				/* Parameterless. Copy, to get a 'scratch' object, eval in place, and push the result. */
+				CopyObject(&result, cobj);
+				EvalParameterlessFunction(&result, exprStack);
+				break;
+			default:
+				if(!StkFull(exprStack)) {
+					CopyObject((BObject *)exprStack->top, cobj);			
+					AdjustStackPointersFollowingDirectPush(exprStack);
+				}
+				else {
+					CopyObject(&result, cobj);
+					PushObject(exprStack, &result);
+				}
+				break;
 		}
 	}
 	

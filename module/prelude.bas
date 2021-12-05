@@ -33,11 +33,11 @@ const pmaxstrlen% = 32767
 
 def MID2$(pmids$, pmidn%) static as mid(pmids, pmidn, pmaxstrlen)
 
-def LEFT$(plefs$, plefn%) static where plefn > 0 as mid(plefs, 1, plefn)
+def LEFT$(plefs$, plefn%) static where plefn as mid(plefs, 1, plefn)
 def LEFT$(plefs$, plefn%) static where plefn = 0 as ""
 
 def RIGHT$(prigs$, prign%) static where prign > len(prigs) as prigs
-def RIGHT$(prigs$, prign%) static where prign > 0 as mid(prigs, len(prigs) - prign + 1, prign)
+def RIGHT$(prigs$, prign%) static where prign as mid(prigs, len(prigs) - prign + 1, prign)
 def RIGHT$(prigs$, prign%) static where prign = 0 as ""
 
 def pstringiter$(n%, c@, acc$) static where n > 0 as pstringiter(n - 1, c, acc & c)
@@ -48,10 +48,9 @@ def SPACE$(pspan%) static as STRING(pspan, " ")
 
 def SPC$(pspcn%) static as SPACE(pspcn)
 
-def pxlititer$(s$, acc$, tfrom$, tto$) static where s = "" as acc
-def pxlititer$(s$, acc$, tfrom$, tto$) static where left(s, 1) in tfrom as pxlititer(MID2(s, 2), acc & mid(tto, instr(1, tfrom, left(s, 1)), 1), tfrom, tto)
-def pxlititer$(s$, acc$, tfrom$, tto$) static as pxlititer(mid2(s, 2), acc & left(s, 1), tfrom, tto)
-
+def pxlititer$(s$, acc$, tfrom$, tto$) static where mid(s, 1, 1) in tfrom as pxlititer(mid(s, 2, pmaxstrlen), acc & mid(tto, instr(1, tfrom, mid(s, 1, 1)), 1), tfrom, tto)
+def pxlititer$(s$, acc$, tfrom$, tto$) static where s <> "" as pxlititer(mid(s, 2, pmaxstrlen), acc & mid(s, 1, 1), tfrom, tto)
+def pxlititer$(s$, acc$, tfrom$, tto$) static as acc
 const pucase$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const plcase$ = "abcdefghijklmnopqrstuvwxyz"
 def UCASE$(pucas$) static as pxlititer(pucas, "", plcase, pucase)

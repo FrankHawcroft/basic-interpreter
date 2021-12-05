@@ -162,8 +162,8 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 {
 	ts->ops = GetOps(ts, callNestLevel) & ~(OP_CACHE | OP_OPTIMISE);
 	
-	/*if(Opts()->optimise && !StatementIsEmpty(ts->command) && GuaranteedLive())
-		ops &= ~OP_INACTIVE;*/
+	/*if(Opts()->optimise && !StatementIsEmpty(ts->command) && GuaranteedLive(Proc()))
+		ts->ops &= ~OP_INACTIVE;*/
 	
 	if(Opts()->optimise) {
 		if(SemanticallyPredictable(ts))
@@ -333,9 +333,8 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 		(*ts->command->method.macro)(ts->rest, ts->length);
 	}
 	
-	/* There's potential for a use-after-free bug if ts is accessed beyond this point - a CLEAR, TRON or TROFF statement will clear the statement cache, invalidating ts if it was retrieved from the cache ... fortunately,
-	we don't ever cache a statement more than once - if this is revisited and 'incremental optimisation' supported,
-	caution will be needed. */
+	/* There's potential for a use-after-free bug if ts is accessed beyond this point -
+	statements like CLEAR, TRON or TROFF, or the FRE function,  statement will clear the statement cache, invalidating ts if it was retrieved from the cache. */
 	
 	if(ops & OP_CACHE) {
 		ImproveIfAssignmentStatement(ts, vdef, initialCallNestLevel);

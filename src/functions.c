@@ -1161,6 +1161,10 @@ void ArgV_(Scalar *result, const BObject *arg, unsigned count)
 	}
 }
 
+/* Previously this used to clear the statement cache as a side effect,
+	but this is not safe, since the token sequence being executed
+	has usually been fetched from the cache, and (for speed) it isn't
+	copied, but merely a pointer to the cached structure. */ 
 void Fre_(Scalar *result, const BObject *arg, unsigned count)
 {
 	long amount;

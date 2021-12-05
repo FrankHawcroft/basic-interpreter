@@ -194,6 +194,11 @@ static bool NonMacroHasParenthesisedParameterList(const QString *stmt)
 	return IsArrayCreator(stmt) || QsEqNoCase(stmt, &g_CallKeyword);
 }
 
+static bool IsSimpleWord(const QString *token)
+{
+	return isalpha(QsGetFirst(token)) && isalpha(QsGetLast(token));
+}
+
 static bool IsTwoWordForm(const QString *stmt, const QString *following)
 {
 	static const QString *canBeSeparated[][2] = {
@@ -213,6 +218,11 @@ static bool IsTwoWordForm(const QString *stmt, const QString *following)
 		{ NULL, NULL }
 	};
 	int i;
+	
+	if(!IsSimpleWord(stmt) || !IsSimpleWord(following))
+		return FALSE;
+	
+	/*const QString *item = bsearch(stmt, canBeSeparated, 13, sizeof(canBeSeparated[0]), (int (*)(const void *, const void *))&QsCompare);*/
 	
 	for(i = 0; canBeSeparated[i][0] != NULL
 		&& !(QsEqNoCase(canBeSeparated[i][0], stmt) && QsEqNoCase(canBeSeparated[i][1], following)); i++)
@@ -417,9 +427,9 @@ static void StandardiseEqualsInAssignment(struct TokenSequence *ts)
 }
 
 /* DEF x[(...)] = <expr> --> DEF x[(...)] AS <expr> */
-static void TranslateOldStyleFunctionDefinition(struct TokenSequence *ts)
+static void TranslateOldStyleFunctionDefinition(struct TokenSequence *ts, bool functionDefinition)
 {
-	if(ts->length >= 5 && QsEqNoCase(&ts->statementName, &m_DefKeyword)) {
+	if(functionDefinition && ts->length >= 5) {
 		unsigned short i;
 		bool newStyle = FALSE;
 		
@@ -473,7 +483,7 @@ static void RemoveRedundantTrailer(struct TokenSequence *ts)
 */
 static void ConcatenateTwoWordForm(struct TokenSequence *ts)
 {
-	if(ts->length > 1 && isalpha(QsGetFirst(&ts->rest[0])) && IsTwoWordForm(&ts->statementName, &ts->rest[0])) {
+	if(ts->length > 1 && IsTwoWordForm(&ts->statementName, &ts->rest[0])) {
 		QsAppend(&ts->statementName, &ts->rest[0]);
 		DeleteToken(ts, 0);
 	}
@@ -575,8 +585,28 @@ static void StandardiseSeparator(QString *token, int nestLevel, bool considerKey
    MID(<expr1>, <expr2>) --> MID2(<expr1>, <expr2>)
    MID$(...) --> MID(...) etc.
 */
-static void RenameFunction(QString *token, unsigned short idx, unsigned short limit)
+static void RenameFunction(QString *token, bool functionDefinition, unsigned short idx, unsigned short limit)
 {
+	if(idx + 1 >= limit || (idx == 0 && functionDefinition)
+	|| QsGetFirst(token + 1) != '(' || !isalpha(QsGetFirst(token)))
+		return;
+	
+	if(QsGetLast(token) == '$') {
+		/* Traditional string function syntax - e.g. LEFT$(s$, 2)
+			Remove the '$' to avoid special-case checks later. */
+		const BObject *defn;
+		QString typeless;
+		
+		QsGetSubstring(&typeless, token, 0, QsGetLength(token) - 1);
+		defn = LookUp(&typeless, SCOPE_GLOBAL);
+		if(defn != NULL && defn->category == FUNCTION
+		&& (defn->value.function->type & (T_STRING | T_CHAR))) {
+			QsDispose(token);
+			QsCopy(token, &typeless);
+		}
+		QsDispose(&typeless);
+	}
+	
 	if(QsEqNoCase(token, &m_InputKeyword))
 		QsCopy(token, &m_FReadKeyword);
 	else if(QsEqNoCase(token, &m_WindowKeyword))
@@ -593,22 +623,6 @@ static void RenameFunction(QString *token, unsigned short idx, unsigned short li
 		
 		if(paramCount == 2)
 			QsCopy(token, QsEqNoCase(token, &m_InstrKeyword) ? &m_Instr2Keyword : &m_Mid2Keyword);
-	}
-	else if(QsGetLast(token) == '$' && 0 < idx && idx < limit && QsGetFirst(token + 1) == '(') {
-		/* TODO check if a function, built in - otherwise unreliable due to variable possibility */
-		/* Traditional string function syntax - e.g. LEFT$(s$, 2)
-			Remove the '$' to avoid special-case checks later. */
-		const BObject *defn;
-		QString typeless;
-		
-		QsGetSubstring(&typeless, token, 0, QsGetLength(token) - 1);
-		defn = LookUp(&typeless, SCOPE_GLOBAL);
-		if(defn != NULL && defn->category == FUNCTION
-		&& (defn->value.function->type & (T_STRING | T_CHAR))) {
-			QsDispose(token);
-			QsCopy(token, &typeless);
-		}
-		QsDispose(&typeless);
 	}
 }
 
@@ -682,6 +696,8 @@ static bool MacroInvocation(const BObject *cmd)
 
 void MakeSavoury(struct TokenSequence *ts)
 {
+	bool def = QsEqNoCase(&ts->statementName, &m_DefKeyword);
+	
 	/* Trying to finalise the statement name is a good thing to do first,
 		although it will need to be adjusted later on in some situations - */
 		
@@ -697,7 +713,7 @@ void MakeSavoury(struct TokenSequence *ts)
 		
 	TranslateOldStyleOpen(ts);
 	
-	TranslateOldStyleFunctionDefinition(ts);
+	TranslateOldStyleFunctionDefinition(ts, def);
 	
 	/* Must happen before RemoveRedundantTrailer - */
 	MakeShortIfStatementExplicit(ts);
@@ -734,20 +750,22 @@ void MakeSavoury(struct TokenSequence *ts)
 			ts->command = cmd->value.statement;
 		
 		for(i = 0; i != ts->length; i++) {
-			QString *tok = &ts->rest[i];
+			{
+				QString *tok = &ts->rest[i];
+				
+				RenameFunction(tok, def, i, ts->length);
+				
+				ResolveOverloadedOperator(tok, i == 0 ? &m_Comma : tok - 1);
+				
+				Nest(tok, &nestLevel);
+					/* Checking the sanity of the nest level is overkill in the context of this module. */
 			
-			RenameFunction(tok, i, ts->length);
-			
-			ResolveOverloadedOperator(tok, i == 0 ? &m_Comma : tok - 1);
-			
-			Nest(tok, &nestLevel);
-				/* Checking the sanity of the nest level is overkill in the context of this module. */
+				EnsureExistsIfBuiltIn(tok);
+				
+				StandardiseSeparator(tok, nestLevel, usesKeywordSeparators, macro);
+			}
 		
-			EnsureExistsIfBuiltIn(tok);
-			
-			StandardiseSeparator(tok, nestLevel, usesKeywordSeparators, macro);
-		
-			/* This may invalidate tok, so do it last - */
+			/* This may invalidate tokens, so do it last - */
 			InsertDummyFunctionInvocation(ts, i, sub);
 		}
 
