@@ -13,8 +13,9 @@
 INLINE void AdjustStackPointersFollowingDirectPush(struct Stack *stack)
 {
 	stack->top += stack->itemSize;
-	if(stack->top > stack->highest)
-		stack->highest = stack->top;
+	/* Don't maintain the high water mark, since it isn't actually needed for the expr eval stack. */
+	/*if(stack->top > stack->highest)
+		stack->highest = stack->top;*/
 	++stack->height;
 }
 
