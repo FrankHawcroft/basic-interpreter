@@ -11,8 +11,8 @@
 -- QString self-tests finished.
 -- Hash table self-tests running ...
 -- Hash table dump - num bins = 1087
- 356: key one => <00B53558>.
- 633: key three => <00B53588>.
+ 356: key one => <009D3558>.
+ 633: key three => <009D3588>.
 -- End of hash table dump
 -- Hash table self-tests finished.
 -- Cache self-tests running ...
@@ -64,13 +64,13 @@ Finished simple expression tests!
     0 + 1 [] [] const TRUE? = 1 <newline>.
     0 + 2 [] [] const TRUE? ; 1 |.
     0 + 3 [] [] const TRUE? 1 |.
-    0 + 4  <var(256) cat=56 @ 0: 00F4148C> <lit(4):  1>.
-    0 + 5  <var(256) cat=56 @ 0: 00F4148C> <lit(256): TRUE>.
+    0 + 4  <var(256) cat=56 @ 0: 012314BC> <lit(4):  1>.
+    0 + 5  <var(256) cat=56 @ 0: 012314BC> <lit(256): TRUE>.
    16 + 1 [] [] const FALSE? = not TRUE <newline>.
    16 + 2 [] [] const FALSE? ; not TRUE |.
    16 + 3 [] [] const FALSE? ( not TRUE ) |.
-   16 + 4  <var(256) cat=56 @ 0: 00F41E4C> <lit(256): FALSE>.
-   16 + 5  <var(256) cat=56 @ 0: 00F41E4C> <lit(256): FALSE>.
+   16 + 4  <var(256) cat=56 @ 0: 01231E7C> <lit(256): FALSE>.
+   16 + 5  <var(256) cat=56 @ 0: 01231E7C> <lit(256): FALSE>.
    40 + 1 [] [] [] <newline>.
    40 + 2 [] [] e~ |.
    41 + 1 [] [] def ABS# ( pabsx# ) static where pabsx < 0 as - pabsx <newline>.
@@ -94,13 +94,13 @@ Finished simple expression tests!
   296 + 1 [] [] const pmaxlng& = 0x7FFFFFFF <newline>.
   296 + 2 [] [] const pmaxlng& ; 0x7FFFFFFF |.
   296 + 3 [] [] const pmaxlng& 0x7FFFFFFF |.
-  296 + 4  <var(8) cat=56 @ 0: 00F4262C> <lit(8):  2147483647>.
-  296 + 5  <var(8) cat=56 @ 0: 00F4262C> <lit(8):  2147483647>.
+  296 + 4  <var(8) cat=56 @ 0: 0123265C> <lit(8):  2147483647>.
+  296 + 5  <var(8) cat=56 @ 0: 0123265C> <lit(8):  2147483647>.
   324 + 1 [] [] const pminlng& = 0x80000000 <newline>.
   324 + 2 [] [] const pminlng& ; 0x80000000 |.
   324 + 3 [] [] const pminlng& 0x80000000 |.
-  324 + 4  <var(8) cat=56 @ 0: 00F4268C> <lit(8): -2147483648>.
-  324 + 5  <var(8) cat=56 @ 0: 00F4268C> <lit(8): -2147483648>.
+  324 + 4  <var(8) cat=56 @ 0: 012326BC> <lit(8): -2147483648>.
+  324 + 5  <var(8) cat=56 @ 0: 012326BC> <lit(8): -2147483648>.
   352 + 1 [] [] [] <newline>.
   352 + 2 [] [] e~ |.
   353 + 1 [] [] def INT& ( pintx! ) static where pminlng < pintx and pintx < 0 as FIX ( pintx ) - 1 <newline>.
@@ -138,132 +138,130 @@ Finished simple expression tests!
   916 + 1 [] [] const pmaxstrlen% = 32767 <newline>.
   916 + 2 [] [] const pmaxstrlen% ; 32767 |.
   916 + 3 [] [] const pmaxstrlen% 32767 |.
-  916 + 4  <var(4) cat=56 @ 0: 00F436AC> <lit(4):  32767>.
-  916 + 5  <var(4) cat=56 @ 0: 00F436AC> <lit(4):  32767>.
+  916 + 4  <var(4) cat=56 @ 0: 012336DC> <lit(4):  32767>.
+  916 + 5  <var(4) cat=56 @ 0: 012336DC> <lit(4):  32767>.
   942 + 1 [] [] [] <newline>.
   942 + 2 [] [] e~ |.
   943 + 1 [] [] def MID2$ ( pmids$ , pmidn% ) static as mid ( pmids , pmidn , pmaxstrlen ) <newline>.
   943 + 2 [] [] def MID2$ ( pmids$ , pmidn% ) static as mid ( pmids , pmidn , pmaxstrlen ) |.
  1009 + 1 [] [] [] <newline>.
  1009 + 2 [] [] e~ |.
- 1010 + 1 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn > 0 as mid ( plefs , 1 , plefn ) <newline>.
- 1010 + 2 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn > 0 as mid ( plefs , 1 , plefn ) |.
- 1083 + 1 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn = 0 as "" <newline>.
- 1083 + 2 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn = 0 as "" |.
- 1138 + 1 [] [] [] <newline>.
- 1138 + 2 [] [] e~ |.
- 1139 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > len ( prigs ) as prigs <newline>.
- 1139 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > len ( prigs ) as prigs |.
- 1207 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > 0 as mid ( prigs , len ( prigs ) - prign + 1 , prign ) <newline>.
- 1207 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > 0 as mid ( prigs , len ( prigs ) - prign + 1 , prign ) |.
- 1302 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign = 0 as "" <newline>.
- 1302 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign = 0 as "" |.
- 1358 + 1 [] [] [] <newline>.
- 1358 + 2 [] [] e~ |.
- 1359 + 1 [] [] def pstringiter$ ( n% , c@ , acc$ ) static where n > 0 as pstringiter ( n - 1 , c , acc & c ) <newline>.
- 1359 + 2 [] [] def pstringiter$ ( n% , c@ , acc$ ) static where n > 0 as pstringiter ( n - 1 , c , acc & c ) |.
- 1443 + 1 [] [] def pstringiter$ ( n% , c@ , acc$ ) static as acc <newline>.
- 1443 + 2 [] [] def pstringiter$ ( n% , c@ , acc$ ) static as acc |.
- 1488 + 1 [] [] def STRING$ ( pstrn% , pstrc@ ) static where pstrn >= 0 as pstringiter ( pstrn , pstrc , "" ) <newline>.
- 1488 + 2 [] [] def STRING$ ( pstrn% , pstrc@ ) static where pstrn >= 0 as pstringiter ( pstrn , pstrc , "" ) |.
- 1573 + 1 [] [] [] <newline>.
- 1573 + 2 [] [] e~ |.
- 1574 + 1 [] [] def SPACE$ ( pspan% ) static as STRING ( pspan , " " ) <newline>.
- 1574 + 2 [] [] def SPACE$ ( pspan% ) static as STRING ( pspan , " " ) |.
- 1622 + 1 [] [] [] <newline>.
- 1622 + 2 [] [] e~ |.
- 1623 + 1 [] [] def SPC$ ( pspcn% ) static as SPACE ( pspcn ) <newline>.
- 1623 + 2 [] [] def SPC$ ( pspcn% ) static as SPACE ( pspcn ) |.
- 1663 + 1 [] [] [] <newline>.
- 1663 + 2 [] [] e~ |.
- 1664 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where s = "" as acc <newline>.
- 1664 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where s = "" as acc |.
- 1730 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where left ( s , 1 ) in tfrom as pxlititer ( MID2 ( s , 2 ) , acc & mid ( tto , instr ( 1 , tfrom , left ( s , 1 ) ) , 1 ) , tfrom , tto ) <newline>.
- 1730 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where left ( s , 1 ) in tfrom as pxlititer ( MID2 ( s , 2 ) , acc & mid ( tto , instr ( 1 , tfrom , left ( s , 1 ) ) , 1 ) , tfrom , tto ) |.
- 1887 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static as pxlititer ( mid2 ( s , 2 ) , acc & left ( s , 1 ) , tfrom , tto ) <newline>.
- 1887 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static as pxlititer ( mid2 ( s , 2 ) , acc & left ( s , 1 ) , tfrom , tto ) |.
- 1988 + 1 [] [] [] <newline>.
- 1988 + 2 [] [] e~ |.
- 1989 + 1 [] [] const pucase$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <newline>.
- 1989 + 2 [] [] const pucase$ ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
- 1989 + 3 [] [] const pucase$ "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
- 1989 + 4  <var(64) cat=56 @ 0: 00F4130C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
- 1989 + 5  <var(64) cat=56 @ 0: 00F4130C> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
- 2034 + 1 [] [] const plcase$ = "abcdefghijklmnopqrstuvwxyz" <newline>.
- 2034 + 2 [] [] const plcase$ ; "abcdefghijklmnopqrstuvwxyz" |.
- 2034 + 3 [] [] const plcase$ "abcdefghijklmnopqrstuvwxyz" |.
- 2034 + 4  <var(64) cat=56 @ 0: 00F4502C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
- 2034 + 5  <var(64) cat=56 @ 0: 00F4502C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
- 2079 + 1 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) <newline>.
- 2079 + 2 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) |.
- 2145 + 1 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) <newline>.
- 2145 + 2 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) |.
- 2212 + 1 [] [] [] <newline>.
- 2212 + 2 [] [] e~ |.
- 2213 + 1 [] [] sub LSET ( s$ , ( t$ ) ) static <newline>.
- 2213 + 2 [] [] sub LSET ( s$ , ( t$ ) ) static |.
- 2341 + 1 [] [] [] <newline>.
- 2341 + 2 [] [] e~ |.
- 2342 + 1 [] [] sub RSET ( s$ , ( t$ ) ) static <newline>.
- 2342 + 2 [] [] sub RSET ( s$ , ( t$ ) ) static |.
- 2466 + 1 [] [] [] <newline>.
- 2466 + 2 [] [] e~ |.
- 2467 + 1 [] [] sub LETMID ( s$ , ( st% ) , ( cnt% ) , ( t$ ) ) static <newline>.
- 2467 + 2 [] [] sub LETMID ( s$ , ( st% ) , ( cnt% ) , ( t$ ) ) static |.
- 2750 + 1 [] [] [] <newline>.
- 2750 + 2 [] [] e~ |.
- 2751 + 1 [] [] const plittleendian? = cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 <newline>.
- 2751 + 2 [] [] const plittleendian? ; cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 |.
- 2751 + 3 [] [] const plittleendian? ( < ( cvi ( & "x" ( mid ( mki 0 ) 1 1 ) ) ) 255 ) |.
- 2751 + 4  <var(256) cat=56 @ 0: 00F459BC> <lit(256): TRUE>.
- 2751 + 5  <var(256) cat=56 @ 0: 00F459BC> <lit(256): TRUE>.
- 2809 + 1 [] [] if plittleendian goto plechr <newline>.
- 2809 + 2 [] [] IFGOTO~ plittleendian ; plechr |.
- 2809 + 3 [] [] IFGOTO~ plittleendian plechr |.
- 2809 + 4  <var(256) cat=56 @ 0: 00F459BC> <label: file ..\module\prelude.bas, line 88>.
- 2809 + 5  <lit(256): TRUE> <label: file ..\module\prelude.bas, line 88>.
- 2983 + 1 [] plechr [] <newline>.
- 2983 + 2 [] plechr e~ |.
- 2991 + 1 [] [] def CHR@ ( pchrn% ) static where 0 <= pchrn and pchrn <= 255 as left ( mki ( pchrn ) , 1 ) <newline>.
- 2991 + 2 [] [] def CHR@ ( pchrn% ) static where 0 <= pchrn and pchrn <= 255 as left ( mki ( pchrn ) , 1 ) |.
- 3072 + 1 [] [] def ASC% ( pascc@ ) static as cvi ( pascc & chr ( 0 ) ) <newline>.
- 3072 + 2 [] [] def ASC% ( pascc@ ) static as cvi ( pascc & chr ( 0 ) ) |.
- 3119 + 1 [] pskiplechr [] <newline>.
- 3119 + 2 [] pskiplechr e~ |.
- 3131 + 1 [] [] [] <newline>.
- 3131 + 2 [] [] e~ |.
- 3132 + 1 [] [] const p2ndbit& = 0x40000000 <newline>.
- 3132 + 2 [] [] const p2ndbit& ; 0x40000000 |.
- 3132 + 3 [] [] const p2ndbit& 0x40000000 |.
- 3132 + 4  <var(8) cat=56 @ 0: 00F4601C> <lit(8):  1073741824>.
- 3132 + 5  <var(8) cat=56 @ 0: 00F4601C> <lit(8):  1073741824>.
- 3160 + 1 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) <newline>.
- 3160 + 2 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) |.
- 3210 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n <newline>.
- 3210 + 2 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n |.
- 3255 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c > 0 as plsr ( p2ndbit , c - 1 ) bitor plsr ( n bitand pmaxlng , c ) <newline>.
- 3255 + 2 [] [] def plsr& ( n& , c% ) where n < 0 and c > 0 as plsr ( p2ndbit , c - 1 ) bitor plsr ( n bitand pmaxlng , c ) |.
- 3351 + 1 [] [] const phdigit$ = "0123456789ABCDEF" <newline>.
- 3351 + 2 [] [] const phdigit$ ; "0123456789ABCDEF" |.
- 3351 + 3 [] [] const phdigit$ "0123456789ABCDEF" |.
- 3351 + 4  <var(64) cat=56 @ 0: 00F4628C> <lit(64): 0123456789ABCDEF>.
- 3351 + 5  <var(64) cat=56 @ 0: 00F4628C> <lit(64): 0123456789ABCDEF>.
- 3387 + 1 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) <newline>.
- 3387 + 2 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) |.
- 3460 + 1 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) <newline>.
- 3460 + 2 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) |.
- 3555 + 1 [] [] def HEX$ ( phexn& ) static as p2bstr ( phexn , 16 ) <newline>.
- 3555 + 2 [] [] def HEX$ ( phexn& ) static as p2bstr ( phexn , 16 ) |.
- 3600 + 1 [] [] def OCT$ ( poctn& ) static as p2bstr ( poctn , 8 ) <newline>.
- 3600 + 2 [] [] def OCT$ ( poctn& ) static as p2bstr ( poctn , 8 ) |.
- 3644 + 1 [] [] print 1 + 1 <nul>.
- 3644 + 2 [] [] print 1 + 1 ; "
+ 1010 + 1 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn as mid ( plefs , 1 , plefn ) <newline>.
+ 1010 + 2 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn as mid ( plefs , 1 , plefn ) |.
+ 1079 + 1 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn = 0 as "" <newline>.
+ 1079 + 2 [] [] def LEFT$ ( plefs$ , plefn% ) static where plefn = 0 as "" |.
+ 1134 + 1 [] [] [] <newline>.
+ 1134 + 2 [] [] e~ |.
+ 1135 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > len ( prigs ) as prigs <newline>.
+ 1135 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign > len ( prigs ) as prigs |.
+ 1203 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign as mid ( prigs , len ( prigs ) - prign + 1 , prign ) <newline>.
+ 1203 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign as mid ( prigs , len ( prigs ) - prign + 1 , prign ) |.
+ 1294 + 1 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign = 0 as "" <newline>.
+ 1294 + 2 [] [] def RIGHT$ ( prigs$ , prign% ) static where prign = 0 as "" |.
+ 1350 + 1 [] [] [] <newline>.
+ 1350 + 2 [] [] e~ |.
+ 1351 + 1 [] [] def pstringiter$ ( n% , c@ , acc$ ) static where n > 0 as pstringiter ( n - 1 , c , acc & c ) <newline>.
+ 1351 + 2 [] [] def pstringiter$ ( n% , c@ , acc$ ) static where n > 0 as pstringiter ( n - 1 , c , acc & c ) |.
+ 1435 + 1 [] [] def pstringiter$ ( n% , c@ , acc$ ) static as acc <newline>.
+ 1435 + 2 [] [] def pstringiter$ ( n% , c@ , acc$ ) static as acc |.
+ 1480 + 1 [] [] def STRING$ ( pstrn% , pstrc@ ) static where pstrn >= 0 as pstringiter ( pstrn , pstrc , "" ) <newline>.
+ 1480 + 2 [] [] def STRING$ ( pstrn% , pstrc@ ) static where pstrn >= 0 as pstringiter ( pstrn , pstrc , "" ) |.
+ 1565 + 1 [] [] [] <newline>.
+ 1565 + 2 [] [] e~ |.
+ 1566 + 1 [] [] def SPACE$ ( pspan% ) static as STRING ( pspan , " " ) <newline>.
+ 1566 + 2 [] [] def SPACE$ ( pspan% ) static as STRING ( pspan , " " ) |.
+ 1614 + 1 [] [] [] <newline>.
+ 1614 + 2 [] [] e~ |.
+ 1615 + 1 [] [] def SPC$ ( pspcn% ) static as SPACE ( pspcn ) <newline>.
+ 1615 + 2 [] [] def SPC$ ( pspcn% ) static as SPACE ( pspcn ) |.
+ 1655 + 1 [] [] [] <newline>.
+ 1655 + 2 [] [] e~ |.
+ 1656 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where mid ( s , 1 , 1 ) in tfrom as pxlititer ( mid ( s , 2 , pmaxstrlen ) , acc & mid ( tto , instr ( 1 , tfrom , mid ( s , 1 , 1 ) ) , 1 ) , tfrom , tto ) <newline>.
+ 1656 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where mid ( s , 1 , 1 ) in tfrom as pxlititer ( mid ( s , 2 , pmaxstrlen ) , acc & mid ( tto , instr ( 1 , tfrom , mid ( s , 1 , 1 ) ) , 1 ) , tfrom , tto ) |.
+ 1828 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where s <> "" as pxlititer ( mid ( s , 2 , pmaxstrlen ) , acc & mid ( s , 1 , 1 ) , tfrom , tto ) <newline>.
+ 1828 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static where s <> "" as pxlititer ( mid ( s , 2 , pmaxstrlen ) , acc & mid ( s , 1 , 1 ) , tfrom , tto ) |.
+ 1956 + 1 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static as acc <newline>.
+ 1956 + 2 [] [] def pxlititer$ ( s$ , acc$ , tfrom$ , tto$ ) static as acc |.
+ 2009 + 1 [] [] const pucase$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <newline>.
+ 2009 + 2 [] [] const pucase$ ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
+ 2009 + 3 [] [] const pucase$ "ABCDEFGHIJKLMNOPQRSTUVWXYZ" |.
+ 2009 + 4  <var(64) cat=56 @ 0: 01234EDC> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
+ 2009 + 5  <var(64) cat=56 @ 0: 01234EDC> <lit(64): ABCDEFGHIJKLMNOPQRSTUVWXYZ>.
+ 2054 + 1 [] [] const plcase$ = "abcdefghijklmnopqrstuvwxyz" <newline>.
+ 2054 + 2 [] [] const plcase$ ; "abcdefghijklmnopqrstuvwxyz" |.
+ 2054 + 3 [] [] const plcase$ "abcdefghijklmnopqrstuvwxyz" |.
+ 2054 + 4  <var(64) cat=56 @ 0: 0123517C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
+ 2054 + 5  <var(64) cat=56 @ 0: 0123517C> <lit(64): abcdefghijklmnopqrstuvwxyz>.
+ 2099 + 1 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) <newline>.
+ 2099 + 2 [] [] def UCASE$ ( pucas$ ) static as pxlititer ( pucas , "" , plcase , pucase ) |.
+ 2165 + 1 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) <newline>.
+ 2165 + 2 [] [] def LCASE$ ( plcas$ ) static as pxlititer ( plcas , "" , pucase , plcase ) |.
+ 2232 + 1 [] [] [] <newline>.
+ 2232 + 2 [] [] e~ |.
+ 2233 + 1 [] [] sub LSET ( s$ , ( t$ ) ) static <newline>.
+ 2233 + 2 [] [] sub LSET ( s$ , ( t$ ) ) static |.
+ 2361 + 1 [] [] [] <newline>.
+ 2361 + 2 [] [] e~ |.
+ 2362 + 1 [] [] sub RSET ( s$ , ( t$ ) ) static <newline>.
+ 2362 + 2 [] [] sub RSET ( s$ , ( t$ ) ) static |.
+ 2486 + 1 [] [] [] <newline>.
+ 2486 + 2 [] [] e~ |.
+ 2487 + 1 [] [] sub LETMID ( s$ , ( st% ) , ( cnt% ) , ( t$ ) ) static <newline>.
+ 2487 + 2 [] [] sub LETMID ( s$ , ( st% ) , ( cnt% ) , ( t$ ) ) static |.
+ 2770 + 1 [] [] [] <newline>.
+ 2770 + 2 [] [] e~ |.
+ 2771 + 1 [] [] const plittleendian? = cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 <newline>.
+ 2771 + 2 [] [] const plittleendian? ; cvi ( "x" & mid ( mki ( 0 ) , 1 , 1 ) ) < 255 |.
+ 2771 + 3 [] [] const plittleendian? ( < ( cvi ( & "x" ( mid ( mki 0 ) 1 1 ) ) ) 255 ) |.
+ 2771 + 4  <var(256) cat=56 @ 0: 01235B3C> <lit(256): TRUE>.
+ 2771 + 5  <var(256) cat=56 @ 0: 01235B3C> <lit(256): TRUE>.
+ 2829 + 1 [] [] if plittleendian goto plechr <newline>.
+ 2829 + 2 [] [] IFGOTO~ plittleendian ; plechr |.
+ 2829 + 3 [] [] IFGOTO~ plittleendian plechr |.
+ 2829 + 4  <var(256) cat=56 @ 0: 01235B3C> <label: file ..\module\prelude.bas, line 87>.
+ 2829 + 5  <lit(256): TRUE> <label: file ..\module\prelude.bas, line 87>.
+ 3003 + 1 [] plechr [] <newline>.
+ 3003 + 2 [] plechr e~ |.
+ 3011 + 1 [] [] def CHR@ ( pchrn% ) static where 0 <= pchrn and pchrn <= 255 as left ( mki ( pchrn ) , 1 ) <newline>.
+ 3011 + 2 [] [] def CHR@ ( pchrn% ) static where 0 <= pchrn and pchrn <= 255 as left ( mki ( pchrn ) , 1 ) |.
+ 3092 + 1 [] [] def ASC% ( pascc@ ) static as cvi ( pascc & chr ( 0 ) ) <newline>.
+ 3092 + 2 [] [] def ASC% ( pascc@ ) static as cvi ( pascc & chr ( 0 ) ) |.
+ 3139 + 1 [] pskiplechr [] <newline>.
+ 3139 + 2 [] pskiplechr e~ |.
+ 3151 + 1 [] [] [] <newline>.
+ 3151 + 2 [] [] e~ |.
+ 3152 + 1 [] [] const p2ndbit& = 0x40000000 <newline>.
+ 3152 + 2 [] [] const p2ndbit& ; 0x40000000 |.
+ 3152 + 3 [] [] const p2ndbit& 0x40000000 |.
+ 3152 + 4  <var(8) cat=56 @ 0: 0123619C> <lit(8):  1073741824>.
+ 3152 + 5  <var(8) cat=56 @ 0: 0123619C> <lit(8):  1073741824>.
+ 3180 + 1 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) <newline>.
+ 3180 + 2 [] [] def plsr& ( n& , c% ) where n >= 0 as n \ clng ( 2 ^ c ) |.
+ 3230 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n <newline>.
+ 3230 + 2 [] [] def plsr& ( n& , c% ) where n < 0 and c = 0 as n |.
+ 3275 + 1 [] [] def plsr& ( n& , c% ) where n < 0 and c > 0 as plsr ( p2ndbit , c - 1 ) bitor plsr ( n bitand pmaxlng , c ) <newline>.
+ 3275 + 2 [] [] def plsr& ( n& , c% ) where n < 0 and c > 0 as plsr ( p2ndbit , c - 1 ) bitor plsr ( n bitand pmaxlng , c ) |.
+ 3371 + 1 [] [] const phdigit$ = "0123456789ABCDEF" <newline>.
+ 3371 + 2 [] [] const phdigit$ ; "0123456789ABCDEF" |.
+ 3371 + 3 [] [] const phdigit$ "0123456789ABCDEF" |.
+ 3371 + 4  <var(64) cat=56 @ 0: 0123640C> <lit(64): 0123456789ABCDEF>.
+ 3371 + 5  <var(64) cat=56 @ 0: 0123640C> <lit(64): 0123456789ABCDEF>.
+ 3407 + 1 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) <newline>.
+ 3407 + 2 [] [] def p2bstr$ ( n& , b% ) where n bitand ( b - 1 ) = n as mid ( phdigit , n + 1 , 1 ) |.
+ 3480 + 1 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) <newline>.
+ 3480 + 2 [] [] def p2bstr$ ( n& , b% ) as p2bstr ( plsr ( n , cint ( log ( b ) / log ( 2 ) ) ) , b ) & p2bstr ( n bitand ( b - 1 ) , b ) |.
+ 3575 + 1 [] [] def HEX$ ( phexn& ) static as p2bstr ( phexn , 16 ) <newline>.
+ 3575 + 2 [] [] def HEX$ ( phexn& ) static as p2bstr ( phexn , 16 ) |.
+ 3620 + 1 [] [] def OCT$ ( poctn& ) static as p2bstr ( poctn , 8 ) <newline>.
+ 3620 + 2 [] [] def OCT$ ( poctn& ) static as p2bstr ( poctn , 8 ) |.
+ 3664 + 1 [] [] print 1 + 1 <nul>.
+ 3664 + 2 [] [] print 1 + 1 ; "
 " |.
- 3644 + 3 [] [] print ( + 1 1 ) "
+ 3664 + 3 [] [] print ( + 1 1 ) "
 " |.
- 3644 + 4  <lit(4):  2> <lit(64): 
+ 3664 + 4  <lit(4):  2> <lit(64): 
 >.
- 3644 + 5  <lit(4):  2> <lit(64): 
+ 3664 + 5  <lit(4):  2> <lit(64): 
 >.
  2
  1
@@ -359,8 +357,8 @@ DEFined function tests completed OK
 ***** "c_deftype.bas"  
 hi there!	also a string	 1	x
 ***** "c_events.bas"  
-Timer handler called:	 0	at timer = 	 48844
-Timer handler called:	 1	at timer = 	 48845
+Timer handler called:	 0	at timer = 	 71042
+Timer handler called:	 1	at timer = 	 71043
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred

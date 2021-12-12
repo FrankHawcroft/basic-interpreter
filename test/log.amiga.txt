@@ -137,7 +137,7 @@ CINT	: Passed!
 Numeric literal tests completed.
 +++++ c_mm.bas
 Platform is Amiga
- 65	 files processed OK!
+ 64	 files processed OK!
 +++++ c_lisp.bas
 ( 1  2  3 ( 1 .  2) ( 3 .  4))
 X
@@ -160,12 +160,13 @@ Random access I/O test completed.
 Forward GOTO arrived
 Forward GOSUB arrived
 +++++ c_events.bas
-Timer handler called:	 0	at timer = 	 76169
-Timer handler called:	 1	at timer = 	 76170
+Timer handler called:	 0	at timer = 	 46089
+Timer handler called:	 1	at timer = 	 46092
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred
 Break handler called:	 4
+Timer handler called:	 5	at timer = 	 46094
 Successful RESUME
 +++++ c_deftype.bas
 hi there!	also a string	 1	x
