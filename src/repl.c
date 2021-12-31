@@ -171,13 +171,13 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 		if(NoDynamicallyAllocatedMemory(ts))
 			ts->ops &= ~OP_CLEAR, ts->ops |= OP_CLEARQ;
 	}
-	
-	if(StatementIsEmpty(ts->command))
-		ts->ops &= ~OP_POLL; /* TODO option to only poll every n stmts? */
-	
-	if(ts->length <= 1 && (ts->command->formalCount == 0 || StatementIsEmpty(ts->command)))
-		ts->ops &= ~(OP_EVAL | OP_EVALQ | OP_CONFORM | OP_CLEAR | OP_CLEARQ);
 		
+	if(ts->length <= 1 && ts->command->formalCount == 0)
+		ts->ops &= ~(OP_EVAL | OP_EVALQ | OP_CONFORM | OP_CLEAR | OP_CLEARQ);
+
+	if(StatementIsEmpty(ts->command))
+		ts->ops = 0;
+
 	if(ts->preconverted != NULL)
 		ts->ops &= ~OP_EVAL, ts->ops |= OP_EVALQ;
 		
@@ -431,6 +431,7 @@ static void Immediate(void)
 
 extern bool ProgramSyntaxCheckPassed(void);
 extern void PrintStackTrace(int maxDepth);
+extern void CreateStatementCache(void);
 
 int Loop(void)
 {
@@ -446,6 +447,8 @@ int Loop(void)
 		proc->currentStatementStart = proc->currentPosition = FileBufferBase(proc->buffer);
 	}
 	
+	CreateStatementCache();
+
 	while(proc->mode == MODE_RUNNING) {
 		struct TokenSequence tokSeq;
 		struct Stack exprStack;
@@ -488,6 +491,10 @@ int Loop(void)
 		
 		DisposeTokenSequence(&tokSeq);
 		DisposeExprStk(&exprStack);
+#ifdef DEBUG
+		if(proc->opts->profileDest == NULL) /* need it to display cache info if profiling */
+#endif
+			ClearStatementCache();
 		
 		/* Handle any error which stopped execution: */
 		

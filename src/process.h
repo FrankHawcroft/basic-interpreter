@@ -98,6 +98,7 @@ struct Process {
 	/* Caches - */
 	struct Cache *statementCache;
 	struct Cache *emptyStmtCache;
+	struct TokenSequence empty;
 	struct Cache *untakenBranchCache;
 	
 	/* OPTION BASE - */

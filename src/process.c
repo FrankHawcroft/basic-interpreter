@@ -70,6 +70,9 @@ struct Process *Proc(void)
 
 Error CreateNewProcess(const struct Options *options)
 {
+	static const struct TokenSequence emptyProto
+		= {NULL, NULL, QS_NULL, QS_NULL, {(QsChar *)KW_EMPTY_STMT, 2}, NULL, 0, 0, 0, NULL, NULL};
+
 	int slot;
 	struct Process *p;
 	PfMutex mutex;
@@ -150,6 +153,7 @@ Error CreateNewProcess(const struct Options *options)
 	p->statementCache = NULL;
 	p->untakenBranchCache = NULL;
 	p->emptyStmtCache = NULL;
+	p->empty = emptyProto;
 
 	p->callNestLevel 
 		= p->functionCallNesting
@@ -247,28 +251,22 @@ const struct Options *Opts(void)
 	return Proc()->opts;
 }
 
-/* This static structure is recycled, but as used fairly safe because its lifespan in empty statement
-	execution is very short. 0x100 is a magic number, OP_MACRO in the Ops enum in repl.c */
-static struct TokenSequence m_Empty = { NULL, NULL, QS_NULL, QS_NULL, QS_NULL, NULL, 0, 0, 0x100, NULL, NULL };
-
 /* Because the location in the source code is used as the key when caching, the cache must
 	be cleared if there's the potential for memory to be reused to hold a different program;
 	e.g. for immediate mode code which is stored in a potentially temporarily allocated
 	buffer. */
 struct TokenSequence *GetFromCache(struct Process *proc, const char *position)
 {
-	struct TokenSequence *ts = NULL;
-	if(proc->statementCache != NULL) {
-		ts = RetrieveFromCache(proc->statementCache, position);
-		if(ts == NULL && proc->emptyStmtCache != NULL) {
-			const char *nextStmt = (const char *)RetrieveFromCache(proc->emptyStmtCache, position);
-			if(nextStmt != NULL) {
-				/* This reuse of a single static structure is quick, and saves memory, but will need to change
-					if empty statement cache entries are ever needed outside statement execution! */
-				m_Empty.start = position;
-				m_Empty.next = nextStmt;
-				ts = &m_Empty;
-			}
+	struct TokenSequence *ts = RetrieveFromCache(proc->statementCache, position);
+	if(ts == NULL) {
+		const char *nextStmt = (const char *)RetrieveFromCache(proc->emptyStmtCache, position);
+		if(nextStmt != NULL) {
+			/* This reuse of a single structure is quick, and saves memory in the empty stmt cache since
+			   only one pointer (the next stmt location) needs to be stored, but care must be taken
+			   with its lifetime during each statement execution round. */
+			proc->empty.start = position;
+			proc->empty.next = nextStmt;
+			ts = &proc->empty;
 		}
 	}
 	return ts;
@@ -284,40 +282,47 @@ static void NoDisposal(void *addr)
 {
 }
 
+void CreateStatementCache(void)
+{
+	const unsigned approxPreludeSize = 3500;
+	
+	struct Process *p = Proc();
+
+	/* If not operating in memory restricted mode (-l), create a generously sized cache -
+		aim is to avoid thrashing. */
+
+	/* mandel.bas - 900 chs, 27 cacheable stmts
+	   lisp.bas - 22924 chs, 487 cacheable stmts
+	   fractal_mountains.bas - 5513 chs, 145 cacheable stmts
+	   life.bas - 1794 chs, 38 cacheable stmts */
+	
+	unsigned expectedCacheableStatements = (FileBufferExtent(p->buffer) - FileBufferBase(p->buffer) - approxPreludeSize) / 40;
+	unsigned expectedEmptyStatements;
+	
+	if(expectedCacheableStatements < 11)
+		expectedCacheableStatements = 11;
+
+	GetStatement(&p->empty.statementName, &p->empty.command);
+	
+	expectedEmptyStatements = expectedCacheableStatements / 5;
+
+	if(p->opts->lowMemory)
+		expectedCacheableStatements = expectedEmptyStatements = 1;
+	
+	p->statementCache = CreateCache(expectedCacheableStatements, 0, &DisposeEntry);
+	p->emptyStmtCache = CreateCache(expectedEmptyStatements, 0, &NoDisposal);
+}
+
 void AttemptToCache(const struct TokenSequence *tokSeq)
 {
 	struct Process *p = Proc();
-	if(p->statementCache == NULL) {
-		/* Since not operating in memory restricted mode (-l), create a generously sized cache -
-			aim is to avoid thrashing. */
-
-		/* mandel.bas - 900 chs, 27 cacheable stmts
-		   lisp.bas - 22924 chs, 487 cacheable stmts
-		   fractal_mountains.bas - 5513 chs, 145 cacheable stmts
-		   life.bas - 1794 chs, 38 cacheable stmts */
-		const unsigned approxPreludeSize = 3500;
-		unsigned expectedCacheableStatements = (FileBufferExtent(p->buffer) - FileBufferBase(p->buffer) - approxPreludeSize) / 40;
-		QString emptyStmtName;
-		
-		if(expectedCacheableStatements < 11)
-			expectedCacheableStatements = 11;
-
-		QsInitStaticNTS(&emptyStmtName, KW_EMPTY_STMT);
-		GetStatement(&emptyStmtName, &m_Empty.command);
-
-		p->statementCache = CreateCache(expectedCacheableStatements, 0, &DisposeEntry);
-		p->emptyStmtCache = CreateCache(expectedCacheableStatements / 5, 0, &NoDisposal);
-	}
-
-	{
-		if(StatementIsEmpty(tokSeq->command))
-			SetInCache(p->emptyStmtCache, tokSeq->start, (void *)tokSeq->next);
-		else {
-			struct TokenSequence *cached = Duplicate(tokSeq);
-			/* Don't end the program due to failing to alloc a cache entry. */
-			if(cached != NULL)
-				SetInCache(p->statementCache, tokSeq->start, cached);
-		}
+	if(StatementIsEmpty(tokSeq->command))
+		SetInCache(p->emptyStmtCache, tokSeq->start, (void *)tokSeq->next);
+	else {
+		struct TokenSequence *cached = Duplicate(tokSeq);
+		/* Don't end the program due to failing to alloc a cache entry. */
+		if(cached != NULL)
+			SetInCache(p->statementCache, tokSeq->start, cached);
 	}
 }
 
