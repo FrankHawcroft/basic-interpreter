@@ -1,7 +1,13 @@
-def pucasealtiter$(s$, out$) static where left(s, 1) in plcase as pucasealtiter$(mid2(s, 2), out & chr(asc(left(s, 1)) - 32))
-def pucasealtiter$(s$, out$) static where s <> "" as pucasealtiter$(mid2(s, 2), out & left(s, 1))
-def pucasealtiter$(s$, out$) static as out
-def ucasealt$(uca$) static as pucasealtiter$(uca, "")
+'def pucasealtiter$(s$, out$) static where left(s, 1) in plcase as pucasealtiter$(mid2(s, 2), out & chr(asc(left(s, 1)) - 32))
+'def pucasealtiter$(s$, out$) static where s <> "" as pucasealtiter$(mid2(s, 2), out & left(s, 1))
+'def pucasealtiter$(s$, out$) static as out
+'def ucasealt$(uca$) static as pucasealtiter$(uca, "")
+
+const acode% = asc("a") | const zcode% = asc("z")
+def pucasealtiter$(fc%, s$, out$) static where acode <= fc and fc <= zcode as pucasealtiter$(asc(mid(s, 1, 1)), mid(s, 2, pmaxstrlen), out & chr(fc - 32))
+def pucasealtiter$(fc%, s$, out$) static where fc as pucasealtiter$(asc(mid(s, 1, 1)), mid(s, 2, pmaxstrlen), out & chr(fc))
+def pucasealtiter$(fc%, s$, out$) static as out
+def ucasealt$(uca$) static as pucasealtiter$(asc(mid(uca, 1, 1)), mid(uca, 2, pmaxstrlen), "")
 
 'def pxlititertuned$(first$, rest$, acct$, tfromt$, ttot$) static where first in tfromt as pxlititertuned(mid(rest, 1, 1), mid(rest, 2, pmaxstrlen), acct & mid(ttot, instr(1, tfromt, first), 1), tfromt, ttot)
 'def pxlititertuned$(first$, rest$, acct$, tfromt$, ttot$) static where first <> "" as pxlititertuned(mid(rest, 1, 1), mid(rest, 2, pmaxstrlen), acct & first, tfromt, ttot)
@@ -28,7 +34,7 @@ for i = 1 to 1000
 	teststr$ = randomstr(random(101))
 	u1$ = UCASEtuned(teststr)
 	u2$ = ucasealt(teststr)
-	print teststr, "->", u1
-	print teststr, "->", u2
+	'print teststr, "->", u1
+	'print teststr, "->", u2
 	if u1 <> u2 then error 255
 next

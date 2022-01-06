@@ -1,19 +1,19 @@
 const TRUE? = 1
 const FALSE? = not TRUE
 
-def ABS#(pabsx#) static where pabsx < 0 as -pabsx
+def ABS#(pabsx#) static where pabsx < 0# as -pabsx
 def ABS#(pabsx#) static as pabsx
 
-def SGN%(psgnx#) static where psgnx = 0 as 0
-def SGN%(psgnx#) static where psgnx > 0 as 1
-def SGN%(psgnx#) static where psgnx < 0 as -1
+def SGN%(psgnx#) static where psgnx = 0# as 0
+def SGN%(psgnx#) static where psgnx > 0# as 1
+def SGN%(psgnx#) static where psgnx < 0# as -1
 
 def FIX&(pfixx#) static as pfixx
 
 const pmaxlng& = 0x7FFFFFFF
 const pminlng& = 0x80000000
 
-def INT&(pintx!) static where pminlng < pintx and pintx < 0 as FIX(pintx) - 1
+def INT&(pintx!) static where pminlng < pintx and pintx < 0! as FIX(pintx) - 1
 def INT&(pintx!) static where pintx <= pmaxlng as FIX(pintx)
 
 def CDBL#(pcdbx#) static as pcdbx
@@ -33,12 +33,10 @@ const pmaxstrlen% = 32767
 
 def MID2$(pmids$, pmidn%) static as mid(pmids, pmidn, pmaxstrlen)
 
-def LEFT$(plefs$, plefn%) static where plefn as mid(plefs, 1, plefn)
-def LEFT$(plefs$, plefn%) static where plefn = 0 as ""
+def LEFT$(plefs$, plefn%) static as mid(plefs, 1, plefn)
 
 def RIGHT$(prigs$, prign%) static where prign > len(prigs) as prigs
-def RIGHT$(prigs$, prign%) static where prign as mid(prigs, len(prigs) - prign + 1, prign)
-def RIGHT$(prigs$, prign%) static where prign = 0 as ""
+def RIGHT$(prigs$, prign%) static where prign >= 0 as mid(prigs, len(prigs) - prign + 1, prign)
 
 def pstringiter$(n%, c@, acc$) static where n > 0 as pstringiter(n - 1, c, acc & c)
 def pstringiter$(n%, c@, acc$) static as acc
@@ -49,7 +47,7 @@ def SPACE$(pspan%) static as STRING(pspan, " ")
 def SPC$(pspcn%) static as SPACE(pspcn)
 
 def pxlititer$(s$, acc$, tfrom$, tto$) static where mid(s, 1, 1) in tfrom as pxlititer(mid(s, 2, pmaxstrlen), acc & mid(tto, instr(1, tfrom, mid(s, 1, 1)), 1), tfrom, tto)
-def pxlititer$(s$, acc$, tfrom$, tto$) static where s <> "" as pxlititer(mid(s, 2, pmaxstrlen), acc & mid(s, 1, 1), tfrom, tto)
+def pxlititer$(s$, acc$, tfrom$, tto$) static where s as pxlititer(mid(s, 2, pmaxstrlen), acc & mid(s, 1, 1), tfrom, tto)
 def pxlititer$(s$, acc$, tfrom$, tto$) static as acc
 const pucase$ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const plcase$ = "abcdefghijklmnopqrstuvwxyz"

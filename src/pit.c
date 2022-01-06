@@ -230,7 +230,7 @@ static bool IsDeterministic(const QString *t, bool inFunction, unsigned depth, s
 			const struct Piece *piece;
 			
 			if(f->staticFunction)
-				return FALSE; /* TODO figure it out ... */
+				return TRUE; /* TODO figure it out ... */
 			
 			HtAdd(fcns, t, (void *)&exists); /* cast away const */
 			
@@ -287,8 +287,13 @@ static void MakeQuotedToken(const Scalar *v, QString *t)
 
 		convBuffer[0] = NUL;
 
-		if(v->type == T_CHAR)
-			sprintf(convBuffer, "\"%c\"", GetCharacter(v));
+		if(v->type == T_CHAR) {
+			/* TODO also, there's the quote problem */
+			if(GetCharacter(v) != 0)
+				sprintf(convBuffer, "\"%c\"", GetCharacter(v));
+			else
+				strcpy(convBuffer, "\"\"");
+		}
 		else if(v->type == T_BOOL)
 			sprintf(convBuffer, "%d", (int)GetBoolean(v));
 		else if(v->type == T_INT) {
