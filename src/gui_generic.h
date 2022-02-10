@@ -68,6 +68,8 @@ static int GetPixelPaletteColourNative(PfWindowHandle win, const BasicPoint *p) 
 
 static void SetPixelNative(PfWindowHandle win, const BasicPoint *p, short penOrDefault) { }
 
+static void MoveRegionNative(PfWindowHandle win, const BasicRectangle *region, short dx, short dy) { }
+
 static void DrawLineNative(PfWindowHandle win, const BasicPoint *p1, const BasicPoint *p2) { }
 
 static bool AddVertexToPolygonNative(PfWindowHandle win, const BasicPoint *p) { return FALSE; }
@@ -75,6 +77,10 @@ static bool AddVertexToPolygonNative(PfWindowHandle win, const BasicPoint *p) { 
 static bool FillPolygonNative(PfWindowHandle win) { return FALSE; }
 
 static bool FloodFillNative(PfWindowHandle win, const BasicPoint *p, short penOrDefault) { return FALSE; }
+
+static void SetWindowLinePatternNative(PfWindowHandle win, short pattern) { }
+
+static void SetWindowAreaPatternNative(PfWindowHandle win, short *pattern, size_t nWords) { }
 
 static void DrawEllipseNative(PfWindowHandle win, const BasicRectangle *bounds) { }
 

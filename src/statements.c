@@ -151,6 +151,10 @@ static struct Parameter m_ArgsForPalette[2] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE},
 	{LITERAL, TR_NUM_TO_SINGLE, NULL, NO_NAME, 3, FALSE}};
 
+static struct Parameter m_ArgsForPattern[2] = {
+	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE},
+	{ARRAY, TR_INT_ONLY, NULL, NO_NAME, 1, FALSE}};
+
 static struct Parameter m_ArgsForPokeAndPokeW[2] = {
 	{LITERAL, TR_INT_TO_LONG, NULL, NO_NAME, 1, FALSE},
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE}};
@@ -188,7 +192,10 @@ static struct Parameter m_ArgsForScreenGetAndPut[] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 4, FALSE},
 	{ARRAY, TR_NUMERIC, NULL, NO_NAME, 1, FALSE}
 };
-	
+
+static struct Parameter m_ArgForScroll[1] = {
+	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 6, FALSE}};
+
 static struct Parameter m_ArgForSelect[1] = {
 	{LITERAL, TR_ANY, NULL, NO_NAME, 1, FALSE}};
 
@@ -335,6 +342,7 @@ static const struct BuiltInStatement m_StmtDefinitions[] = {
 	{"OTHERWISE", Otherwise_, DefaultConvert, CaseInactive, NULL, 0},
 	{"PAINT", Paint_, DefaultConvert, DefaultInactive, m_ArgForPaint, 1},
 	{"PALETTE", Palette_, DefaultConvert, DefaultInactive, m_ArgsForPalette, 2},
+	{"PATTERN", Pattern_, DefaultConvert, DefaultInactive, m_ArgsForPattern, 2},
 	{"POKE", Poke_, DefaultConvert, DefaultInactive, m_ArgsForPokeAndPokeW, 2},
 	{"POKEL", PokeL_, DefaultConvert, DefaultInactive, m_ArgsForPokeL, 2},
 	{"POKEW", PokeW_, DefaultConvert, DefaultInactive, m_ArgsForPokeAndPokeW, 2},
@@ -354,6 +362,7 @@ static const struct BuiltInStatement m_StmtDefinitions[] = {
 	{"SCREENCLOSE", ScreenClose_, DefaultConvert, DefaultInactive, m_ArgForScreenClose, 1},
 	{"SCREENGET", ScreenGet_, DefaultConvert, DefaultInactive, m_ArgsForScreenGetAndPut, 2},
 	{"SCREENPUT", ScreenPut_, DefaultConvert, DefaultInactive, m_ArgsForScreenGetAndPut, 2},
+	{"SCROLL", Scroll_, DefaultConvert, DefaultInactive, m_ArgForScroll, 1},
 	{"SELECT", Select_, DefaultConvert, SelectInactive, m_ArgForSelect, 1},
 	{"SHARED", Shared_, EmptyConvert, SubprogramOnlyInactive, NULL, TOKENISED_ARGUMENTS},
 	{"SLEEP", Sleep_, DefaultConvert, DefaultInactive, NULL, 0},
@@ -458,6 +467,7 @@ static void DefineBuiltInStatement(const struct BuiltInStatement *command)
 		m_ArgsForMenu[1].defaultValue = g_NulChar;
 		m_ArgsForMenu[2].defaultValue = g_ZeroLongInt;
 		m_ArgsForOpen[3].defaultValue = g_ZeroLongInt;
+		m_ArgsForPattern[0].defaultValue = g_NegOneInt;
 		m_ArgForPrint[0].defaultValue = g_NullString;
 		m_ArgsForPSet[1].defaultValue = g_NegOneInt;
 		m_ArgForRandomize[0].defaultValue = g_ZeroLongInt;

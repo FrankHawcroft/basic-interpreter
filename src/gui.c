@@ -512,6 +512,36 @@ void ScreenPut_(BObject *arg, unsigned count)
 	OperateOnRectangularRegion(arg, &WritePt);
 }
 
+void Scroll_(BObject *arg, unsigned count)
+{
+	BasicRectangle region;
+	PfWindowHandle win = OutputWindow();
+	short dx, dy;
+	
+	if(!FeatureAvailable(Scroll_)) {
+		CauseError(NOTIMPLEMENTED);
+		return;
+	}
+	
+#if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
+	if(win == NULL_WINDOW_HANDLE) {
+		CauseError(ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+#else
+	InitGfx();
+#endif
+	
+	region.topLeft.x = arg[0].value.scalar.value.number.s;
+	region.topLeft.y = arg[1].value.scalar.value.number.s;
+	region.bottomRight.x = arg[2].value.scalar.value.number.s;
+	region.bottomRight.y = arg[3].value.scalar.value.number.s;
+	dx = arg[4].value.scalar.value.number.s;
+	dy = arg[5].value.scalar.value.number.s;
+	
+	MoveRegionNative(win, &region, dx, dy);
+}
+
 /* TODO colour, boxes and optionally filling them, STEP, patterns, etc. */
 void Line_(BObject *arg, unsigned count)
 {
@@ -632,6 +662,31 @@ void Paint_(BObject *arg, unsigned count)
 	
 	if(!FloodFillNative(win, &p, penID))
 		CauseError(NOMEMORY); /* assume this rather than some more obscure gfx problem */
+}
+
+void Pattern_(BObject *arg, unsigned count)
+{
+	short linePattern = arg[0].value.scalar.value.number.s;
+	short *areaPattern = VarData(&arg[1])->value.pointer.sp;
+	int areaWords = VarPtr(&arg[1])->dim.few[0] * (VarPtr(&arg[1])->dim.few[1] <= 0 ? 1 : VarPtr(&arg[1])->dim.few[1]);
+	PfWindowHandle win = OutputWindow();
+
+	if(!FeatureAvailable(Pattern_)) {
+		CauseError(NOTIMPLEMENTED);
+		return;
+	}
+	
+#if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
+	if(win == NULL_WINDOW_HANDLE) {
+		CauseError(ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+#else
+	InitGfx();
+#endif
+	
+	SetWindowLinePatternNative(win, linePattern);
+	SetWindowAreaPatternNative(win, areaPattern, areaWords);
 }
 
 void Circle_(BObject *arg, unsigned count)
