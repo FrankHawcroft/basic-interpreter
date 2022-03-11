@@ -76,6 +76,7 @@ extern void Merge_(BObject *, unsigned);
 extern void Name_(BObject *, unsigned);
 extern void Next_(BObject *, unsigned);
 extern void NextVar_(BObject *, unsigned);
+
 extern void On_(const QString *, unsigned);
 extern void OnGoSub_(BObject *, unsigned);
 extern void OnGoTo_(BObject *, unsigned);
@@ -152,7 +153,7 @@ extern void ArgC_(Scalar *, const BObject *, unsigned);
 extern void ArgV_(Scalar *, const BObject *, unsigned);
 extern void Atn_(Scalar *, const BObject *, unsigned);
 extern void CallByName_(Scalar *, const BObject *, unsigned);
-extern void Collision_(Scalar *, const BObject *, unsigned); /* TODO */
+extern void Collision_(Scalar *, const BObject *, unsigned);
 extern void Cos_(Scalar *, const BObject *, unsigned);
 extern void Cvb_(Scalar *, const BObject *, unsigned);
 extern void Cvd_(Scalar *, const BObject *, unsigned);
@@ -183,7 +184,11 @@ extern void Mkd_(Scalar *, const BObject *, unsigned);
 extern void Mki_(Scalar *, const BObject *, unsigned);
 extern void Mkl_(Scalar *, const BObject *, unsigned);
 extern void Mks_(Scalar *, const BObject *, unsigned);
-extern void Mouse_(Scalar *, const BObject *, unsigned); /* TODO */
+extern void Mouse_(Scalar *, const BObject *, unsigned);
+extern void ObjectVX_(Scalar *, const BObject *, unsigned);
+extern void ObjectVY_(Scalar *, const BObject *, unsigned);
+extern void ObjectX_(Scalar *, const BObject *, unsigned);
+extern void ObjectY_(Scalar *, const BObject *, unsigned);
 extern void Peek_(Scalar *, const BObject *, unsigned);
 extern void PeekL_(Scalar *, const BObject *, unsigned);
 extern void PeekW_(Scalar *, const BObject *, unsigned);

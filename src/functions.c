@@ -885,6 +885,7 @@ static const enum TypeRule m_ArgForAtn[1] = { TR_SINGLE_TO_DOUBLE };	/* Atn(x) *
 static const enum TypeRule m_ArgForCDbl[1] = { TR_SINGLE_TO_DOUBLE };	/* CDbl(x) */
 static const enum TypeRule m_ArgForCInt[1] = { TR_SINGLE_TO_DOUBLE };	/* CInt(x) */
 static const enum TypeRule m_ArgForCLng[1] = { TR_SINGLE_TO_DOUBLE };	/* CLng(x) */
+static const enum TypeRule m_ArgForCollision[1] = { TR_NUM_TO_INT };	/* Collision(id) */
 static const enum TypeRule m_ArgForCos[1] = { TR_SINGLE_TO_DOUBLE };	/* Cos(x) */
 static const enum TypeRule m_ArgForCSng[1] = { TR_SINGLE_TO_DOUBLE };	/* CSng(x) */
 static const enum TypeRule m_ArgForCvb[1] = { TR_STRING_ONLY };		/* Cvb(s) */
@@ -908,6 +909,7 @@ static const enum TypeRule m_ArgForMkd[1] = { TR_SINGLE_TO_DOUBLE };	/* Mkb(b) *
 static const enum TypeRule m_ArgForMki[1] = { TR_NUM_TO_INT };		/* Mki(i) */
 static const enum TypeRule m_ArgForMkl[1] = { TR_NUM_TO_LONG };		/* Mkl(i) */
 static const enum TypeRule m_ArgForMks[1] = { TR_NUM_TO_SINGLE };		/* Mks(i) */
+static const enum TypeRule m_ArgForObjectFcns[1] = { TR_NUM_TO_INT }; /* ObjectX(id), ObjectY(id), ObjectVX(id), ObjectVY(id) */
 static const enum TypeRule m_ArgForPeek[1] = { TR_INT_TO_LONG };		/* Peek(addr), PeekL(addr), PeekW(addr) */
 static const enum TypeRule m_ArgsForPoint[2] = { TR_NUM_TO_INT, TR_NUM_TO_INT }; /* Point(x, y) */
 static const enum TypeRule m_ArgForRandom[1] = { TR_NUM_TO_LONG };	/* Random(m) */
@@ -945,6 +947,7 @@ static const struct BuiltInFunction m_FuncDefinitions[] = {
 	{"ARGV", ArgV_, TR_STRING_ONLY, m_ArgForArgV, 1},
 	{"ATN", Atn_, TR_DOUBLE_ONLY, m_ArgForAtn, 1},
 	{"CALLBYNAME", CallByName_, TR_ANY, NULL, FN_VAR_ARGS},
+	{"COLLISION", Collision_, TR_INT_ONLY, m_ArgForCollision, 1},
 	{"COS", Cos_, TR_DOUBLE_ONLY, m_ArgForCos, 1},
 	{"CVB", Cvb_, TR_BOOL_ONLY, m_ArgForCvb, 1},
 	{"CVD", Cvd_, TR_DOUBLE_ONLY, m_ArgForCvd, 1},
@@ -975,6 +978,10 @@ static const struct BuiltInFunction m_FuncDefinitions[] = {
 	{"MKI", Mki_, TR_STRING_ONLY, m_ArgForMki, 1},
 	{"MKL", Mkl_, TR_STRING_ONLY, m_ArgForMkl, 1},
 	{"MKS", Mks_, TR_STRING_ONLY, m_ArgForMks, 1},
+	{"OBJECTVX", ObjectVX_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
+	{"OBJECTVY", ObjectVY_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
+	{"OBJECTX", ObjectX_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
+	{"OBJECTY", ObjectY_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
 	{"PEEK", Peek_, TR_INT_ONLY, m_ArgForPeek, 1},
 	{"PEEKL", PeekL_, TR_LONG_ONLY, m_ArgForPeek, 1},
 	{"PEEKW", PeekW_, TR_INT_ONLY, m_ArgForPeek, 1},

@@ -28,15 +28,42 @@ typedef struct BasicRectangle_struct {
 #include "gui_amiga.h"
 #include "gui_generic.h"
 
+struct AnimatedObject {
+	PfWindowHandle window;
+	BasicPoint position;
+	short vx, vy; /* Velocity in pixels/s. */
+	short ax, ay; /* Acceleration in pixels/s/s. */
+	bool visible, moving;
+	struct PfSystemTimeStamp lastMovedAt;
+	BasicRectangle bounds;
+	BasicRectangle clipRegion;
+	short priority;
+	unsigned short collisionMask;
+	PfAnimatedObjectHandle image;
+};
+
+#define MAX_COLLISIONS 16 /* In AmigaBASIC, this seems to be a self-imposed limit, rather than from the system. */
+
+struct Collision {
+	unsigned char windowId;
+	unsigned char object1Id;
+	signed char object2OrBorderId; /* -1 = Top border, -2 = Left border, -3 = Bottom border and -4 = Right border */
+};
+
 struct UserInterface {
 	PfScreenHandle screen[MAX_SCREENS];
 	PfWindowHandle window[MAX_WINDOWS];
-	unsigned int openWindowCount;
+	unsigned short openWindowCount;
 	PfWindowHandle outputWindow;
+	struct AnimatedObject *animObj;
+	unsigned short animObjCount; /* Not all necessarily displayed or populated! */
+	unsigned short maxAnimObj; /* Size of the animObj array. */
+	/* Event logging - */
 	PfKeypress keyData;
 	PfPointer pointer;
 	PfMenuSelection menuChoice;
-	bool keyWasPressed, pointerOperated, menuSelected;
+	struct Collision collision[MAX_COLLISIONS];
+	bool keyWasPressed, pointerOperated, menuSelected, objectsCollided;
 };
 
 static struct UserInterface *Gui(void)
@@ -61,7 +88,10 @@ static void InitUI(void)
 		gui->openWindowCount = 0;
 		gui->outputWindow = NULL_WINDOW_HANDLE;
 		
-		gui->keyWasPressed = gui->pointerOperated = gui->menuSelected = FALSE;
+		gui->animObj = NULL;
+		gui->animObjCount = gui->maxAnimObj = 0;
+		
+		gui->keyWasPressed = gui->pointerOperated = gui->menuSelected = gui->objectsCollided = FALSE;
 	}
 }
 
@@ -86,11 +116,19 @@ static bool WindowExists(const PfWindowHandle w)
 	return i < MAX_WINDOWS;
 }
 
+static void RemoveAnimatedObject(int id);
+
 static void RemoveWindow(int id)
 {
 	if(Gui()->window[id] != NULL_WINDOW_HANDLE) {
+		int i;
+		
 		if(OutputWindow() == Gui()->window[id])
 			Gui()->outputWindow = NULL_WINDOW_HANDLE;
+		
+		for(i = 0; i < Gui()->animObjCount; i++)
+			if(Gui()->animObj[i].window == Gui()->window[id])
+				RemoveAnimatedObject(i);
 		
 		RemoveWindowNative(Gui()->window[id], Gui()->openWindowCount == 1);
 		
@@ -111,6 +149,9 @@ void CleanUpUI(void)
 {
 	if(Gui() != NULL) {
 		int id;
+
+		for(id = 0; id < Gui()->animObjCount; id++)
+			RemoveAnimatedObject(id);
 		
 		for(id = 0; id < MAX_WINDOWS; id++)
 			RemoveWindow(id);
@@ -1243,4 +1284,174 @@ void Mouse_(Scalar *result, const BObject *arg, unsigned count)
 	
 	/*InitScalar(result, T_INT, FALSE);*/
 	SetFromLong(result, GetPointerStateNative(&Gui()->pointer, wanted), T_INT);
+}
+
+static void AllocateAnimatedObjects(void)
+{
+	if(Gui()->animObj == NULL) {
+		Gui()->maxAnimObj = MAX_OBJECTS;
+		Gui()->animObj = New(sizeof(struct AnimatedObject) * Gui()->maxAnimObj);
+		memset(Gui()->animObj, 0, sizeof(struct AnimatedObject) * Gui()->maxAnimObj);
+		Gui()->animObjCount = 0;
+	}
+}
+
+static void AlterObject(int what, const BObject *objectId, const BObject *val, unsigned nVal)
+{
+	short id = objectId->value.scalar.value.number.s;
+	struct AnimatedObject *obj;
+	unsigned n;
+	
+	if(!FunctionAvailable(Collision_)) {
+		CauseError(NOTIMPLEMENTED);
+		return;
+	}
+	
+	if(Gui() == NULL) {
+		CauseError(ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+	
+	if(id >= MAX_OBJECTS) {
+		CauseError(OUTSIDEDOMAIN);
+		return;
+	}
+	
+	AllocateAnimatedObjects();
+	
+	obj = &Gui()->animObj[id];
+	
+	if(what == 1) /* OBJECT.AX */
+		obj->ax = val[0].value.scalar.value.number.s;
+	else if(what == 2) /* OBJECT.AY */
+		obj->ay = val[0].value.scalar.value.number.s;
+	else if(what == 3) { /* OBJECT.CLIP */
+		obj->clipRegion.topLeft.x = val[0].value.scalar.value.number.s;
+		obj->clipRegion.topLeft.y = val[1].value.scalar.value.number.s;
+		obj->clipRegion.bottomRight.x = val[2].value.scalar.value.number.s;
+		obj->clipRegion.bottomRight.y = val[3].value.scalar.value.number.s;
+	}
+	else if(what == 4) { /* OBJECT.CLOSE */
+		RemoveAnimatedObject(id);
+		for(n = 0; n < nVal; n++)
+			RemoveAnimatedObject(val[n].value.scalar.value.number.s);
+	}
+	else if(what == 5) { /* OBJECT.HIT */ /* TODO two masks */
+		obj->collisionMask = val[0].value.scalar.value.number.s;
+	}
+	else if(what == 6) { /* OBJECT.OFF */
+		obj->visible = obj->moving = FALSE;
+		for(n = 0; n < nVal; n++)
+			Gui()->animObj[val[n].value.scalar.value.number.s].visible
+				= Gui()->animObj[val[n].value.scalar.value.number.s].moving = FALSE;
+	}
+	else if(what == 7) { /* OBJECT.ON */
+		obj->visible = obj->moving = TRUE;
+		for(n = 0; n < nVal; n++)
+			Gui()->animObj[val[n].value.scalar.value.number.s].visible
+				= Gui()->animObj[val[n].value.scalar.value.number.s].moving = TRUE;
+	}
+	else if(what == 8) /* OBJECT.PLANES */ /* TODO */
+		obj->ax = obj->ax;
+	else if(what == 9) /* OBJECT.PRIORITY */
+		obj->priority = val[0].value.scalar.value.number.s;
+	else if(what == 10) /* OBJECT.SHAPE */ /* TODO */
+		obj->ax = obj->ax;
+	else if(what == 11) { /* OBJECT.START */
+		obj->moving = TRUE;
+		for(n = 0; n < nVal; n++)
+			Gui()->animObj[val[n].value.scalar.value.number.s].moving = TRUE;
+	}
+	else if(what == 12) { /* OBJECT.STOP */
+		obj->moving = FALSE;
+		for(n = 0; n < nVal; n++)
+			Gui()->animObj[val[n].value.scalar.value.number.s].moving = FALSE;
+	}
+	else if(what == 13) /* OBJECT.VX */
+		obj->vx = val[0].value.scalar.value.number.s;
+	else if(what == 14) /* OBJECT.VY */
+		obj->vy = val[0].value.scalar.value.number.s;
+	else if(what == 15) /* OBJECT.X */
+		obj->position.x = val[0].value.scalar.value.number.s;
+	else if(what == 16) /* OBJECT.Y */
+		obj->position.y = val[0].value.scalar.value.number.s;
+		
+	if(id >= Gui()->animObjCount)
+		Gui()->animObjCount = id;
+}
+
+void Collision_(Scalar *result, const BObject *arg, unsigned count)
+{
+	short wanted = arg[0].value.scalar.value.number.s, i;
+
+	if(!FunctionAvailable(Collision_)) {
+		SetError(result, NOTIMPLEMENTED);
+		return;
+	}
+	
+	if(Gui() == NULL) {
+		SetError(result, ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+	
+	for(i = 0; i < MAX_COLLISIONS; i++) {
+		if(wanted == -1 && Gui()->collision[i].object1Id >= 1)
+			SetFromLong(result, Gui()->collision[i].windowId, T_INT);
+		else if(wanted == 0 && Gui()->collision[i].object1Id >= 1)
+			SetFromLong(result, Gui()->collision[i].object1Id, T_INT);
+		else if(Gui()->collision[i].object1Id == wanted) {
+			SetFromLong(result, Gui()->collision[i].object2OrBorderId, T_INT);
+			Gui()->collision[i].object1Id = -1; /* Only discard collision if checking a specific object. */
+		}
+	}
+}
+
+static void GetObjectProperty(Scalar *result, const BObject *objectId, int wanted)
+{
+	short id = objectId->value.scalar.value.number.s, val;
+	
+	if(!FunctionAvailable(Collision_)) {
+		SetError(result, NOTIMPLEMENTED);
+		return;
+	}
+	
+	if(Gui() == NULL) {
+		SetError(result, ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+	
+	AllocateAnimatedObjects();
+	
+	if(id >= Gui()->animObjCount)
+		val = -1;
+	else if(wanted == 1)
+		val = Gui()->animObj[id].position.x;
+	else if(wanted == 2)
+		val = Gui()->animObj[id].position.y;
+	else if(wanted == 3)
+		val = Gui()->animObj[id].vx;
+	else if(wanted == 4)
+		val = Gui()->animObj[id].vy;
+	
+	SetFromLong(result, val, T_INT);
+}
+
+void ObjectX_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 1); }
+void ObjectY_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 2); }
+void ObjectVX_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 3); }
+void ObjectVY_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 4); }
+
+/* Do all the animation display updates, and return true if any collisions. */
+bool AnimatedObjectCollided(void)
+{
+	return FALSE; /* TODO */
+}
+
+static void RemoveAnimatedObject(int id)
+{
+	FreeAnimatedObjectNative(Gui()->animObj[id].image);
+	memset(&Gui()->animObj[id], 0, sizeof(Gui()->animObj[id]));
+	Gui()->animObj[id].window = NULL_WINDOW_HANDLE;
+	if(id + 1 == Gui()->animObjCount)
+		--Gui()->animObjCount;
 }

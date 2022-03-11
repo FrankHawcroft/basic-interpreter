@@ -20,6 +20,7 @@
 
 enum EventType {
 	EVT_TIMER,   /* A time interval elapsed. */
+	EVT_COLLISION, /* Animated object(s) collided. */
 	EVT_POINTER, /* Mouse or other pointing device was used. */
 	EVT_INKEY,   /* Key pressed (in a GUI rather than a console). */
 	EVT_MENU,    /* Menu selected. */
@@ -34,7 +35,8 @@ enum EventType {
 struct Event {
 	/* Miscellaneous value giving more information about the event.
 		For ERROR: the error number.
-		For POINTER: kind of action, and location. */
+		For POINTER: kind of action, and location. 
+		For COLLISION: encoded collision information - id(s) of object(s), window, border. */
 	long lngInfo;
 	
 	/* For ERROR: name of closest label appearing before where error occurred at the same call nest level. 
@@ -146,6 +148,7 @@ static void PollTimer(struct Trap *t)
 extern bool KeyWasPressed(void);
 extern bool PointerWasOperated(void);
 extern bool MenuWasSelected(void);
+extern bool AnimatedObjectCollided(void);
 	/* TODO should have a registration system where polling functions are added
 		outside the events module itself */
 
@@ -173,6 +176,17 @@ static void PollMenu(struct Trap *t)
 		struct Event e;
 		InitEvent(&e);
 		EnqueueOnCQ(&Proc()->q[t - Proc()->trap], &e, TRUE); /* TODO store menu info ... */
+	}
+}
+
+static void PollCollision(struct Trap *t)
+{
+	/* Akin to break handling for the Amiga but more so - AnimatedObjectCollided is a hook
+		to update the display, so must be called regardless of the trap status. */
+	if(AnimatedObjectCollided() && t->status >= SUSPENDED) {
+		struct Event e;
+		InitEvent(&e);
+		EnqueueOnCQ(&Proc()->q[t - Proc()->trap], &e, TRUE); /* TODO store collision info ... */
 	}
 }
 
@@ -347,6 +361,7 @@ void InitEventTraps(void)
 	Proc()->activeEvent = New(sizeof(struct Event) * NUM_EVENT_TYPES);
 	
 	InitTrap(&Proc()->trap[EVT_TIMER], "TIMER", DISABLED, 10);
+	InitTrap(&Proc()->trap[EVT_COLLISION], "COLLISION", DISABLED, 12);
 	InitTrap(&Proc()->trap[EVT_POINTER], "MOUSE", DISABLED, 15);
 	InitTrap(&Proc()->trap[EVT_INKEY], "INKEY", DISABLED, 20);
 	InitTrap(&Proc()->trap[EVT_MENU], "MENU", DISABLED, 25);
@@ -355,6 +370,8 @@ void InitEventTraps(void)
 			
 	Proc()->trap[EVT_TIMER].poll = PollTimer;
 	Proc()->trap[EVT_TIMER].transition = TransitionTimer;
+	
+	Proc()->trap[EVT_COLLISION].poll = PollCollision;
 	
 	Proc()->trap[EVT_POINTER].poll = PollPointer;
 	
@@ -369,6 +386,7 @@ void InitEventTraps(void)
 	Proc()->trap[EVT_ERROR].track = ErrorTracker;
 	
 	CreateCQ(&Proc()->q[EVT_TIMER], sizeof(struct Event), 10, DisposeEvent);
+	CreateCQ(&Proc()->q[EVT_COLLISION], sizeof(struct Event), 16, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_POINTER], sizeof(struct Event), 10, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_INKEY], sizeof(struct Event), 20, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_MENU], sizeof(struct Event), 4, DisposeEvent);
