@@ -17,11 +17,13 @@
 #include <exec/libraries.h>
 #include <graphics/gfxbase.h>
 #include <graphics/gfxmacros.h>
+#include <graphics/gels.h>
 
 extern struct GfxBase *GfxBase;
 
 typedef struct Window *PfWindowHandle;
 typedef struct Screen *PfScreenHandle;
+typedef struct VSprite *PfAnimatedObjectHandle;
 
 #define NULL_SCREEN_HANDLE NULL
 #define NULL_WINDOW_HANDLE NULL
@@ -50,6 +52,7 @@ static struct MsgPort *m_Port = NULL; /* Shared IDCMP. */
 
 #define MAX_WINDOWS 20
 #define MAX_SCREENS 4
+#define MAX_OBJECTS 20 /* should be 'limited by available memory' */
 
 #define MULTIPLE_VIRTUAL_SCREENS_SUPPORTED TRUE
 #define DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED FALSE
@@ -1329,6 +1332,11 @@ static int GetMenuItemStateNative(PfWindowHandle win, char *menuName, char *item
 	
 	return state;
 }
+
+static void FreeAnimatedObjectNative(PfAnimatedObjectHandle mob)
+{
+	/* TODO */
+};
 
 static bool WindowExists(const PfWindowHandle w);
 static PfWindowHandle OutputWindow(void);
