@@ -86,13 +86,19 @@ struct StackNode {
 
 #define DEFAULT_STACK_SIZE (50 + 1) /* 50 per AmigaBASIC; + 1 for sentinel */
 
+extern void DefaultOutOfMemoryHandler(size_t);
+
 void CreateControlFlowStack(unsigned short height)
 {
 	assert(Proc()->controlFlowStack == NULL);
 	
+	if(height == 0)
+		height = DEFAULT_STACK_SIZE;
+	
 	Proc()->controlFlowStack = New(sizeof(struct Stack));
 	StkInit(Proc()->controlFlowStack);
-	StkCreate(Proc()->controlFlowStack, sizeof(struct StackNode), height == 0 ? DEFAULT_STACK_SIZE : height);
+	if(StkCreate(Proc()->controlFlowStack, sizeof(struct StackNode), height) == NULL)
+		DefaultOutOfMemoryHandler(height * sizeof(struct StackNode));
 	
 	{
 		struct StackNode sentinel;

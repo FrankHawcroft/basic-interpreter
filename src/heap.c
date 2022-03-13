@@ -82,7 +82,7 @@ void SetOutOfMemoryHandler(OutOfMemoryHandler handler)
 	m_OutOfMemoryHandler = handler;
 }
 
-static void DefaultOutOfMemoryHandler(size_t sizeRequested)
+void DefaultOutOfMemoryHandler(size_t sizeRequested)
 {
 	fprintf(stderr, "[Heap] error: out of memory - failed to allocate " SIZE_FMT " bytes - exiting.\n", sizeRequested);
 	DisposeHeap();
@@ -235,7 +235,6 @@ static struct HeapRegion *m_FirstRegion = NULL;
 static PfMutex m_RegionListLock;
 static bool m_FixedSizeHeap;
 
-static void DefaultOutOfMemoryHandler(size_t);
 static struct HeapRegion *AddRegion(size_t);
 static void DisposeRegion(struct HeapRegion *);
 static void RemoveRegion(struct HeapRegion *);

@@ -26,7 +26,7 @@ extern void StkInit(struct Stack *stk);
 extern struct Stack *StkCreate(struct Stack *stk, size_t itemSize, unsigned maxHeight);
 
  /* Only increasing the size is allowed. Returns TRUE if successful; FALSE if memory can't be allocated. */
-extern struct Stack *StkResize(struct Stack *stk, unsigned newLimit);
+extern bool StkResize(struct Stack *stk, unsigned newLimit);
 
 extern void StkPush(struct Stack *stk, const void *item);
 extern void StkPop(struct Stack *stk, void *item);

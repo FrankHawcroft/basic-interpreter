@@ -243,10 +243,13 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack,
 	return exprSeq;
 }
 
+extern void DefaultOutOfMemoryHandler(size_t);
+
 void CreateExprStk(struct Stack *stack, unsigned maxHeight)
 {
 	StkInit(stack);
-	StkCreate(stack, sizeof(BObject), maxHeight);
+	if(StkCreate(stack, sizeof(BObject), maxHeight) == NULL)
+		DefaultOutOfMemoryHandler(maxHeight * sizeof(BObject));
 }
 
 static void ShallowDispose(BObject *obj) { RemoveObject(obj, FALSE); }
