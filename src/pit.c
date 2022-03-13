@@ -236,10 +236,10 @@ static bool IsDeterministic(const QString *t, bool inFunction, unsigned depth, s
 			
 			for(piece = f->def; piece != NULL; piece = piece->next) {
 				const QString *scan;
-				for(scan = piece->condition.s; scan != NULL && scan < piece->condition.s + piece->condExprLength; scan++)
+				for(scan = piece->condition.body.s; scan != NULL && scan < piece->condition.body.s + piece->condition.length; scan++)
 					if(HtLookUp(fcns, scan) == NULL && !IsDeterministic(scan, TRUE, depth + 1, fcns))
 						return FALSE;
-				for(scan = piece->value.s; scan != NULL && scan < piece->value.s + piece->valExprLength; scan++)
+				for(scan = piece->value.body.s; scan != NULL && scan < piece->value.body.s + piece->value.length; scan++)
 					if(HtLookUp(fcns, scan) == NULL && !IsDeterministic(scan, TRUE, depth + 1, fcns))
 						return FALSE;
 			}

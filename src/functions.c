@@ -78,16 +78,16 @@ static void DisposeStringVector(QString *v, short length)
 	}
 }
 
-static void DisposeExpr(union CompiledExpr *expr, short length, bool converted)
+static void DisposeExpr(struct CompiledExpr *expr, bool converted)
 {
-	if(expr->s != NULL) {
+	if(expr->body.s != NULL && expr->length > 0) {
 		if(!converted)
-			DisposeStringVector((QString *)expr->s, length);
+			DisposeStringVector((QString *)expr->body.s, expr->length);
 		else {
 			short n;
-			for(n = 0; n < length; n++)
-				RemoveObject((BObject *)&expr->obj[n], FALSE);
-			Dispose((BObject *)expr->obj);
+			for(n = 0; n < expr->length; n++)
+				RemoveObject((BObject *)&expr->body.obj[n], FALSE);
+			Dispose((BObject *)expr->body.obj);
 		}
 	}
 }
@@ -100,8 +100,8 @@ void DisposeFunction(struct Function *f)
 		struct Piece *piece, *savedNext;
 		for(piece = f->def; piece != NULL; piece = savedNext) {
 			savedNext = piece->next;
-			DisposeExpr(&piece->condition, piece->condExprLength, f->staticFunction && piece->compiled);
-			DisposeExpr(&piece->value, piece->valExprLength, f->staticFunction && piece->compiled);
+			DisposeExpr(&piece->condition, f->staticFunction && piece->compiled);
+			DisposeExpr(&piece->value, f->staticFunction && piece->compiled);
 			Dispose(piece);
 		}
 	}
@@ -149,22 +149,22 @@ static void PrintFunctionInfo(const struct Function *f)
 		puts("pieces:");
 		for(piece = f->def; piece != NULL; piece = piece->next) {
 			printf("  guard cond: ");
-			if(piece->condition.s == NULL)
+			if(piece->condition.body.s == NULL)
 				printf("<default>");
 			else if(f->staticFunction) {
-				for(i = 0; i < piece->condExprLength; i++)
-					DumpObject(&piece->condition.obj[i]);
+				for(i = 0; i < piece->condition.length; i++)
+					DumpObject(&piece->condition.body.obj[i]);
 			}
 			else
-				PrintFnExprTokens(piece->condition.s, piece->condExprLength);
+				PrintFnExprTokens(piece->condition.body.s, piece->condition.length);
 			putchar('\n');
 			printf("  value: ");
 			if(f->staticFunction) {
-				for(i = 0; i < piece->valExprLength; i++)
-					DumpObject(&piece->value.obj[i]);
+				for(i = 0; i < piece->value.length; i++)
+					DumpObject(&piece->value.body.obj[i]);
 			}
 			else
-				PrintFnExprTokens(piece->value.s, piece->valExprLength);
+				PrintFnExprTokens(piece->value.body.s, piece->value.length);
 			putchar('\n');
 		}
 	}
@@ -252,37 +252,37 @@ static Error Compile(struct Piece *piece, bool convert)
 {
 	QString *condExpr, *valExpr = NULL;
 	Error error = SUCCESS;
-	short previousCondExprLength = piece->condExprLength, previousValExprLength = piece->valExprLength;
+	short previousCondExprLength = piece->condition.length, previousValExprLength = piece->value.length;
 	
 	if(piece->compiled)
 		return SUCCESS;
 	
-	condExpr = AsPrefix(piece->condition.s, &piece->condExprLength, piece->defStart, &error);
+	condExpr = AsPrefix(piece->condition.body.s, &piece->condition.length, piece->defStart, &error);
 	
 	if(error == SUCCESS)
-		valExpr = AsPrefix(piece->value.s, &piece->valExprLength, piece->defStart, &error);
+		valExpr = AsPrefix(piece->value.body.s, &piece->value.length, piece->defStart, &error);
 	
 	if(error == SUCCESS) {
-		DisposeStringVector((QString *)piece->condition.s, previousCondExprLength);
-		DisposeStringVector((QString *)piece->value.s, previousValExprLength);
+		DisposeStringVector((QString *)piece->condition.body.s, previousCondExprLength);
+		DisposeStringVector((QString *)piece->value.body.s, previousValExprLength);
 		
 		if(convert) {
 			short n;
 			
-			piece->condition.obj = piece->condExprLength > 0 ? New(sizeof(BObject) * piece->condExprLength) : NULL;
-			piece->value.obj = New(sizeof(BObject) * piece->valExprLength);
+			piece->condition.body.obj = piece->condition.length > 0 ? New(sizeof(BObject) * piece->condition.length) : NULL;
+			piece->value.body.obj = New(sizeof(BObject) * piece->value.length);
 			
-			for(n = 0; n < piece->condExprLength; n++)
-				StaticFunctionExpressionConvert(n, &condExpr[n], (BObject *)&piece->condition.obj[n]);	
-			for(n = 0; n < piece->valExprLength; n++)
-				StaticFunctionExpressionConvert(n, &valExpr[n], (BObject *)&piece->value.obj[n]);
+			for(n = 0; n < piece->condition.length; n++)
+				StaticFunctionExpressionConvert(n, &condExpr[n], (BObject *)&piece->condition.body.obj[n]);	
+			for(n = 0; n < piece->value.length; n++)
+				StaticFunctionExpressionConvert(n, &valExpr[n], (BObject *)&piece->value.body.obj[n]);
 			
-			DisposeStringVector(condExpr, piece->condExprLength);
-			DisposeStringVector(valExpr, piece->valExprLength);
+			DisposeStringVector(condExpr, piece->condition.length);
+			DisposeStringVector(valExpr, piece->value.length);
 		}
 		else {
-			piece->condition.s = condExpr;
-			piece->value.s = valExpr;
+			piece->condition.body.s = condExpr;
+			piece->value.body.s = valExpr;
 		}
 		
 		piece->compiled = TRUE;
@@ -302,12 +302,12 @@ static void TailCall(
 	int preHeight = StkHeight(stk), argCount;
 	BObject *arg;
 	
-	/* Just evaluate actual parameters, assuming the form(func <expr1> <expr2> ...) */
+	/* Just evaluate actual parameters, assuming the form (func <expr1> <expr2> ...) */
 	
 	if(function->staticFunction)
-		EvalPreconverted(&piece->value.obj[2], stk);
+		EvalPreconverted(&piece->value.body.obj[2], stk, piece->value.length);
 	else
-		Eval(&piece->value.s[2], &FunctionExpressionConvert, 0, stk);
+		Eval(&piece->value.body.s[2], &FunctionExpressionConvert, 0, stk);
 
 	argCount = StkHeight(stk) - preHeight;
 	arg = PeekExprStk(stk, argCount - 1);
@@ -342,12 +342,12 @@ static void DeleteVar(void *v)
 	Dispose(v);
 }
 
-static BObject *EvalFunctionExpr(const union CompiledExpr *expr, bool preconverted, struct Stack *stk)
+static BObject *EvalFunctionExpr(const struct CompiledExpr *expr, bool preconverted, struct Stack *stk)
 {
 	if(preconverted)
-		EvalPreconverted(expr->obj, stk);
+		EvalPreconverted(expr->body.obj, stk, expr->length);
 	else
-		Eval(expr->s, &FunctionExpressionConvert, 0, stk);
+		Eval(expr->body.s, &FunctionExpressionConvert, 0, stk);
 	return PeekExprStk(stk, 0);
 }
 
@@ -474,7 +474,7 @@ static void CallProgramaticallyDefinedFunction(
 	{
 		bool fired = FALSE;
 		for(piece = function->def;
-		  !IndicatesError(result) && piece != NULL && piece->condition.s != NULL && !fired;
+		  !IndicatesError(result) && piece != NULL && piece->condition.body.s != NULL && !fired;
 		  piece = fired ? piece : piece->next) {
 			EvalFunctionExpr(&piece->condition, function->staticFunction, workingStack);
 			PopObject(workingStack, result);
@@ -552,7 +552,7 @@ static void CallPrecompiledProgramaticallyDefinedFunction(
 	{
 		bool fired = FALSE;
 		for(piece = function->def;
-		  piece != NULL && piece->condition.s != NULL && !fired && error == SUCCESS;
+		  piece != NULL && piece->condition.body.s != NULL && !fired && error == SUCCESS;
 		  piece = fired ? piece : piece->next) {
 			/* Rather than popping each time, accumulate results on the stack, then cut it back. */
 			BObject *obj = EvalFunctionExpr(&piece->condition, function->staticFunction, workingStack);
@@ -590,17 +590,17 @@ static void CallPrecompiledProgramaticallyDefinedFunction(
 }
 
 /* TODO doesn't cope with redundant parentheses around the invocation */
-static bool DetermineIfTailCall(const QString *name, const QString *body, short limit)
+static bool DetermineIfTailCall(const QString *name, const struct CompiledExpr *valExpr)
 {
 	int nesting = 0;
 	short i;
 	
-	if(!QsEqNoCase(name, &body[0]))
+	if(!QsEqNoCase(name, &valExpr->body.s[0]))
 		return FALSE;
 	
-	for(i = 1; i < limit; i++) {
-		Nest(&body[i], &nesting);
-		if(nesting == 0 && QsGetFirst(&body[i]) != ')')
+	for(i = 1; i < valExpr->length; i++) {
+		Nest(&valExpr->body.s[i], &nesting);
+		if(nesting == 0 && QsGetFirst(&valExpr->body.s[i]) != ')')
 			return FALSE;
 	}
 	
@@ -657,10 +657,10 @@ static bool Redefinition(const struct Function *f, enum TypeRule newType, const 
 		DEF a(x) where 1 as "bar"
 	isn't detected as a redefinition. */
 
-	if(newPiece->condition.s == NULL) {
+	if(newPiece->condition.body.s == NULL) {
 		const struct Piece *p;
 		for(p = f->def; p != NULL; p = p->next)
-			if(p->condition.s == NULL) {
+			if(p->condition.body.s == NULL) {
 				/*fprintf(stderr, "redef 3\n");*/
 				return TRUE;
 			}
@@ -725,6 +725,11 @@ void Def_(const QString *toks, unsigned nToks)
 			return;
 		}
 		
+		/*if(paramCount > MAX_FUNCTION_PARAMS) {
+			CauseError(LONGLINE);
+			return;
+		}*/
+		
 		scan = rparen + 1;
 	}
 	
@@ -767,18 +772,17 @@ void Def_(const QString *toks, unsigned nToks)
 	
 	piece->next = NULL;	/* Always added at end of list. */
 
-	piece->condition.s = CopyTokens(condExpr, condExprLength);
-	piece->value.s = CopyTokens(valueExpr, valExprLength);
-	
-	piece->condExprLength = condExprLength;
-	piece->valExprLength = valExprLength;
+	piece->condition.body.s = CopyTokens(condExpr, condExprLength);
+	piece->condition.length = condExprLength;
+	piece->value.body.s = CopyTokens(valueExpr, valExprLength);
+	piece->value.length = valExprLength;
 	
 	/* Record the location of the piece for error reporting, profiling, and debug dumping. */
 	piece->defStart = Proc()->currentStatementStart;
 	piece->defFinish = Proc()->currentPosition - 1;
 
 	piece->compiled = FALSE;
-	piece->tailCall = DetermineIfTailCall(&name, piece->value.s, piece->valExprLength);
+	piece->tailCall = DetermineIfTailCall(&name, &piece->value);
 
 	/* Calculate size of stack required to hold intermediate expression evaluation results. */
 	

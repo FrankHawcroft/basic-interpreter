@@ -25,6 +25,9 @@
 /* Maximum dimensionality of an array. */
 #define MAX_DIMENSIONS 4
 
+/* Maximum allowed DEF or built-in function parameters. */
+/*#define MAX_FUNCTION_PARAMS 20*/
+
 /*** SimpleType ***/
 
 /* The primitive data types usable by BASIC programs, plus some internal-use ones. */
@@ -305,9 +308,12 @@ struct Statement {
 
 /*** CompiledExpr ***/
 
-union CompiledExpr {
-	const QString *s;
-	const BObject *obj;
+struct CompiledExpr {
+	union {
+		const QString *s;
+		const BObject *obj;
+	} body;
+	short length;
 };
 
 /*** Piece ***/
@@ -316,9 +322,8 @@ union CompiledExpr {
 
 struct Piece {
 	struct Piece *next;
-	union CompiledExpr condition; /* If NULL, always execute this one. */
-	union CompiledExpr value; /* Terminated by an end-of-statement delimiter. */
-	short condExprLength, valExprLength;
+	struct CompiledExpr condition; /* If empty, always execute this one. */
+	struct CompiledExpr value; /* Terminated by an end-of-statement delimiter. */
 	
 	/* Location of the piece in code - this is used for error reporting when the piece is compiled,
 		for profiling, and when printing debug info about the function. */
@@ -702,7 +707,7 @@ extern struct Parameter *ParseNameList(const QString *first, int nTokens, short 
 /*** Expression evaluation -- eval.c ***/
 
 extern const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, struct Stack *exprStack);
-extern const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack);
+extern const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack, int stackSpaceRequired);
 	
 extern void CreateExprStk(struct Stack *, unsigned maxHeight);
 extern void ClearExprStk(struct Stack *);

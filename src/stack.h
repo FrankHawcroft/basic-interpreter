@@ -21,8 +21,13 @@ struct Stack {
 };
 
 extern void StkInit(struct Stack *stk);
-extern void StkCreate(struct Stack *stk, size_t itemSize, unsigned maxHeight);
-extern void StkResize(struct Stack *stk, unsigned newLimit); /* Only increasing the size is allowed. */
+
+/* Returns stk if successful; NULL if memory can't be allocated. */
+extern struct Stack *StkCreate(struct Stack *stk, size_t itemSize, unsigned maxHeight);
+
+ /* Only increasing the size is allowed. Returns TRUE if successful; FALSE if memory can't be allocated. */
+extern struct Stack *StkResize(struct Stack *stk, unsigned newLimit);
+
 extern void StkPush(struct Stack *stk, const void *item);
 extern void StkPop(struct Stack *stk, void *item);
 #define StkHeight(stk) ((stk)->height)
@@ -33,9 +38,12 @@ extern int StkLimit(const struct Stack *stk);
 extern void *StkPeek(const struct Stack *stk, int offset); /* where 0 corresponds to TOS */
 
 typedef void (*StackItemDisposer)(void *);
+ /* Use with StkDiscard and StkClear if items don't need to be individually deleted - i.e. they contain no
+	pointers to dynamically allocated memory or other resources which need to be closed/freed/released. */
+static void NoNeedToDisposeOfStackItems(void *item) { }
 
 /* Discard a number of items from the stack - the function passed is called on each item, top to bottom. */
-extern void StkDiscard(struct Stack *stk, unsigned count, StackItemDisposer dispose);
+extern void StkDiscard(struct Stack *stk, int count, StackItemDisposer dispose);
 
 /* Clear the stack, disposing of each item using the function supplied. */
 extern void StkClear(struct Stack *stk, StackItemDisposer dispose);

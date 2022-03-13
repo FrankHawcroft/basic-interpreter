@@ -257,7 +257,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 		if(ops & OP_EVAL)
 			Eval(ts->rest, ts->command->convert, 0, exprStack);
 		else if(ops & OP_EVALQ)
-			EvalPreconverted(ts->preconverted, exprStack);
+			EvalPreconverted(ts->preconverted, exprStack, ts->length - 1);
 
 #ifdef DEBUG
 		if(ops & OP_VERBOSE) {

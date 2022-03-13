@@ -35,7 +35,7 @@ void StkInit(struct Stack *stk)
 	stk->itemSize = stk->height = 0;
 }
 
-void StkCreate(struct Stack *stk, size_t itemSize, unsigned maxHeight)
+struct Stack *StkCreate(struct Stack *stk, size_t itemSize, unsigned maxHeight)
 {
 	assert(stk->base == NULL);
 	assert(itemSize != 0 && maxHeight != 0);
@@ -44,16 +44,21 @@ void StkCreate(struct Stack *stk, size_t itemSize, unsigned maxHeight)
 		separate. Seems reasonable - but means you need to bear control flow
 		and expression evaluation stack sizes in mind when using a fixed-size heap. */
 
-	stk->base = (PfGranularType *)New(itemSize * maxHeight);
+	stk->base = (PfGranularType *)TolerantNew(itemSize * maxHeight);
+	if(stk->base == NULL)
+		return NULL;
+	
 	stk->top = stk->highest = stk->base;
 	stk->itemSize = itemSize;
 	stk->height = 0;
 	stk->limit = StkOffset(stk, maxHeight);
 
 	assert(StkIsValid(stk));
+	
+	return stk;
 }
 
-void StkResize(struct Stack *stk, unsigned newLimit)
+bool StkResize(struct Stack *stk, unsigned newLimit)
 {
 	int height = StkHeight(stk), hwm = StkHighWaterMark(stk);
 	PfGranularType *oldStorage = stk->base;
@@ -61,7 +66,10 @@ void StkResize(struct Stack *stk, unsigned newLimit)
 	assert(newLimit >= (unsigned)StkLimit(stk));
 	
 	stk->base = NULL;
-	StkCreate(stk, stk->itemSize, newLimit);
+	if(StkCreate(stk, stk->itemSize, newLimit) == NULL) {
+		stk->base = oldStorage;
+		return FALSE;
+	}
 	stk->height = height;
 	if(height > 0)
 		memcpy(stk->base, oldStorage, stk->itemSize * (unsigned)height);
@@ -71,6 +79,8 @@ void StkResize(struct Stack *stk, unsigned newLimit)
 	assert(StkIsValid(stk));
 	
 	Dispose(oldStorage);
+	
+	return TRUE;
 }
 
 void StkPush(struct Stack *stk, const void *item)
@@ -129,23 +139,15 @@ void *StkPeek(const struct Stack *stk, int offset)
 	return stk->top - (offset + 1) * stk->itemSize;
 }
 
-void StkDiscard(struct Stack *stk, unsigned n, StackItemDisposer dispose)
+void StkDiscard(struct Stack *stk, int n, StackItemDisposer dispose)
 {
-	assert(n <= (unsigned)StkHeight(stk));
-
-	if(n == 0)
-		return;
+	assert(n >= 0);
+	assert(n <= StkHeight(stk));
 
 	stk->height -= n;
-
-	if(dispose != NULL) {
-		while(n-- != 0) {
-			stk->top -= stk->itemSize;
-			dispose(stk->top);
-		}
-	}
-	else
-		stk->top -= stk->itemSize * n;
+	
+	while(n-- > 0)
+		dispose(stk->top -= stk->itemSize);
 }
 
 void StkClear(struct Stack *stk, StackItemDisposer dispose)
@@ -194,7 +196,7 @@ void StkRunTests(void)
 	StkInit(&s);
 	
 	/* StkCreate, StkHeight */
-	StkCreate(&s, sizeof(char *), 10);
+	assert(StkCreate(&s, sizeof(char *), 10) != NULL);
 	assert(StkHeight(&s) == 0); /* empty has height 0 */
 
 	/* StkPush */
