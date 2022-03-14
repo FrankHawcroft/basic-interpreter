@@ -134,8 +134,7 @@ void ClearCache(struct Cache *cache)
 static struct CacheEntry *EntryForKey(struct Cache *cache, const void *key)
 {
 	unsigned short n = (unsigned short)((intptr_t)key & USHRT_MAX);
-	unsigned short hash = Combine(Combine(5381, n & UCHAR_MAX), n >> CHAR_BIT);
-	return &cache->table[hash % cache->tableSize];
+	return &cache->table[n % cache->tableSize];
 }
 
 void SetInCache(struct Cache *cache, const void *key, void *value)
