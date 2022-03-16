@@ -1172,8 +1172,6 @@ void XFree_(BObject *arg, unsigned count)
 	fprintf(stderr, "-- Statement cache --\n");
 	PrintCacheInfo(Proc()->statementCache);
 	/*DumpCache(Proc()->statementCache);*/
-	fprintf(stderr, "-- Empty statement cache --\n");
-	PrintCacheInfo(Proc()->emptyStmtCache);
 	fprintf(stderr, "-- Untaken branch cache --\n");
 	PrintCacheInfo(Proc()->untakenBranchCache);
 	/*DumpCache(Proc()->untakenBranchCache);*/

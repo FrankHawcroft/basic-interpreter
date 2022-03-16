@@ -76,7 +76,6 @@ extern void Merge_(BObject *, unsigned);
 extern void Name_(BObject *, unsigned);
 extern void Next_(BObject *, unsigned);
 extern void NextVar_(BObject *, unsigned);
-
 extern void On_(const QString *, unsigned);
 extern void OnGoSub_(BObject *, unsigned);
 extern void OnGoTo_(BObject *, unsigned);

@@ -40,7 +40,6 @@ struct Cache {
 	struct HashTable *table;
 #endif
 	unsigned tableSize; /* Number of bins. */
-	unsigned tableCapacity;
 	void (*disposeValue)(void *);
 	unsigned numEntries;
 	unsigned maxEntries;
@@ -57,14 +56,6 @@ static unsigned PseudoRandom(unsigned max)
 	static unsigned long nextRand = 1;
 	nextRand = 1103515245 * nextRand + 12345;
 	return (unsigned)(nextRand / 65536) % max;
-}
-
-#define Combine(h, x) ((((h) << 5) + (h)) ^ (x))
-
-INLINE unsigned short QuickHash(const void *key)
-{
-	unsigned short n = (unsigned short)((intptr_t)key & USHRT_MAX);
-	return Combine(Combine(5381, n & UCHAR_MAX), n >> CHAR_BIT);
 }
 
 #if !USE_SIMPLE_ARRAY
@@ -99,7 +90,6 @@ struct Cache *CreateCache(unsigned capacity, unsigned tableSize, void (*disposeV
 #endif
 
 	newCache->tableSize = tableSize;
-	newCache->tableCapacity = capacity;
 	newCache->disposeValue = disposeValue;
 	newCache->numEntries = 0;
 	newCache->maxEntries = capacity;

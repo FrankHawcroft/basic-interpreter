@@ -129,7 +129,7 @@ enum Ops {
 	OP_EVALQ = 0x20,
 	OP_CONFORM = 0x40,
 	OP_CONFORMQ = 0x80,
-	OP_MACRO = 0x100,
+	OP_MACRO = 0x100, /* If this value changes, the empty statement prototype used in the Process structure must also. */
 	OP_SUB = 0x200,
 	OP_EXEC = 0x400,
 	OP_CACHE = 0x800,
@@ -175,17 +175,16 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 	if(ts->length <= 1 && ts->command->formalCount == 0)
 		ts->ops &= ~(OP_EVAL | OP_EVALQ | OP_CONFORM | OP_CLEAR | OP_CLEARQ);
 
-	if(StatementIsEmpty(ts->command))
-		ts->ops = 0;
-
 	if(ts->preconverted != NULL)
 		ts->ops &= ~OP_EVAL, ts->ops |= OP_EVALQ;
 		
-	if((ts->ops & OP_CONFORM) && IsAssignmentStatement(ts->command)) /* TODO can be a bit broader */
+	if((ts->ops & OP_CONFORM) && HasSimpleParameters(ts->command))
 		ts->ops &= ~OP_CONFORM, ts->ops |= OP_CONFORMQ;
 		
 	/*if(ts->preconverted != NULL || !ShouldCachePreconvertedObjects(ts, callNestLevel))
 		ts->ops &= ~(OP_CACHE | OP_OPTIMISE);*/
+	if(StatementIsEmpty(ts->command))
+		ts->ops = OP_MACRO;
 }
 
 /* Prints the statement preceded by its line number. */

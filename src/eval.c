@@ -23,11 +23,13 @@ static bool ExtendStackIfNecessary(struct Stack *stack, int required)
 			if(StkHeight(stack) + required > newSize)
 				newSize = StkHeight(stack) + required;
 			ok = StkResize(stack, newSize);
+/*
 #ifdef DEBUG
 			fprintf(stderr, 
 				ok ? "[ExprStack: extended from size %u --> %u]\n" 
 				   : "[ExprStack: FAILED to extend from size %u --> %u]\n", limit, newSize);
 #endif
+*/
 		}
 		else
 			ok = FALSE;
@@ -76,18 +78,15 @@ INLINE void PushObject(struct Stack *stack, const BObject *newTop)
 		StkPush(stack, newTop);
 }
 
-static void Apply(const BObject *functor, struct Stack *stack, unsigned priorHeight)
+static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 {
 	BObject *param;
-	unsigned count;
 	Error error;
 	BObject result;
 	
-	assert(StkHeight(stack) > (int)priorHeight); /* TODO height same means infinite recursion. Detect? */
-			
-	count = StkHeight(stack) - priorHeight;
-	param = PeekExprStk(stack, count - 1);
+	assert(count != 0 && count <= StkHeight(stack)); /* TODO height same means infinite recursion. Detect? */
 	
+	param = PeekExprStk(stack, count - 1);
 	error = ConformForApplication(functor, param, count);
 	
 	if(error != SUCCESS)
@@ -114,7 +113,6 @@ static void Apply(const BObject *functor, struct Stack *stack, unsigned priorHei
 	/* Because one or more args have just been popped, no need to check stack space. */
 	*(BObject *)stack->top = result;
 	AdjustStackPointersFollowingDirectPush(stack);
-	/*PushObject(stack, &result);*/
 	
 	/* Strictly, the applied object should be disposed of, but not doing it saves time for all
 		valid objects (arrays, functions, operators). If a string literal was appplied, it would
@@ -173,7 +171,7 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			assert(post > ct + 2);	
 			intern(tokIndex + 1, ct + 1, &obj);
 			
-			Apply(&obj, exprStack, priorHeight);
+			Apply(&obj, exprStack, StkHeight(exprStack) - priorHeight);
 			tokIndex += post - ct;
 			ct = post;
 		}
@@ -227,7 +225,7 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack,
 		
 			post = EvalPreconverted(exprSeq + 2, exprStack, stackSpaceRequired - 3);		
 			assert(post > exprSeq + 2);
-			Apply(exprSeq + 1, exprStack, priorHeight);			
+			Apply(exprSeq + 1, exprStack, StkHeight(exprStack) - priorHeight);			
 			exprSeq = post;
 		}
 		else if(exprSeq->category != FUNCTION) {
