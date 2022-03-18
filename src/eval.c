@@ -46,6 +46,11 @@ static bool ExtendStackIfNecessary(struct Stack *stack, int required)
 	return ok;
 }
 
+/* To save copying to a temporary object, expression evaluation doesn't push objects on the stack
+	in the usual way, but instead copies directly to memory at the TOS pointer. This means the
+	eval functions have to check there's enough stack space first. Doing a direct memory copy
+	(structure assignment) also means care must be taken with long-lived reference-counted (string)
+	objects, to ensure only one reference is held. */
 INLINE void AdjustStackPointersFollowingDirectPush(struct Stack *stack)
 {
 	stack->top += stack->itemSize;
@@ -53,29 +58,6 @@ INLINE void AdjustStackPointersFollowingDirectPush(struct Stack *stack)
 	/*if(stack->top > stack->highest)
 		stack->highest = stack->top;*/
 	++stack->height;
-}
-
-/* Pushes the BObject onto the stack. The stack is extended if necessary.
-	The stack simply does a 'shallow' copy of the object structure, so newTop
-	should be considered discarded after this function has been called, and
-	should not be RemoveObject()d. 
-	If the stack can't be extended because it has reached the stack height
-	limit, the top object will be discarded and an overflow error pushed. 
-	
-	PopObject - defined as a macro in interpreter.h - is the complement of
-	PushObject - the unstacked BObject is memcpy()d back off the stack, and
-	the caller takes ownership of any memory allocated in it. */
-INLINE void PushObject(struct Stack *stack, const BObject *newTop)
-{
-	/* StkFull is quicker than calling StkSpaceRemaining (it's a macro, with no multiplication) */
-	if(!StkFull(stack)) {
-		/* Special-cased rather than calling StkPush, because
-			structure assignment is quicker than memcpy with Amiga-GCC. */
-		*(BObject *)stack->top = *newTop;
-		AdjustStackPointersFollowingDirectPush(stack);
-	}
-	else if(ExtendStackIfNecessary(stack, 1))
-		StkPush(stack, newTop);
 }
 
 static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
@@ -86,7 +68,7 @@ static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 	
 	assert(count != 0 && count <= StkHeight(stack)); /* TODO height same means infinite recursion. Detect? */
 	
-	param = PeekExprStk(stack, count - 1);
+	param = PeekExprStk(stack, (int)count - 1);
 	error = ConformForApplication(functor, param, count);
 	
 	if(error != SUCCESS)
@@ -129,14 +111,18 @@ static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 static void EvalParameterlessFunction(const struct Function *f, struct Stack *exprStack)
 {
 	BObject result;
-	/* Unfortunately, need to check the arg count at eval time because an expr might
-		be precompiled before all the functions it uses are defined (in a STATIC function,
-		for instance). */
+		
+	assert(!StkFull(exprStack));
+	
+	/* Unfortunately, need to check the arg count at eval time because an expr might be precompiled
+		before all the functions it uses are defined (in a STATIC function, for instance). */
 	if(f->numArgs == 0)
 		CallFunction(&result, f, NULL, 0, exprStack);
 	else
 		SetObjectToError(&result, BADARGCOUNT);
-	PushObject(exprStack, &result);
+	
+	*(BObject *)exprStack->top = result;
+	AdjustStackPointersFollowingDirectPush(exprStack);
 }
 
 /* Evaluate a sequence of expressions, pushing the results on the stack. */
@@ -157,27 +143,28 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 		fprintf(stderr, "%s]\n", firstCh != '|' && firstCh != ')' ? "..." : "");
 	}*/
 
-	for(ct = toks; (firstCh = QsGetFirst(ct)) != '|' && firstCh != ')'; ct++, tokIndex++) {
-		BObject obj;
-	
+	for(ct = toks; (firstCh = QsGetFirst(ct)) != '|' && firstCh != ')'; ct++, tokIndex++) {	
 		if(firstCh == '(') {
 			/* A general 'apply' expression - function, operator, or subscripted array variable,
 				which will be consistently in the Lisp-like prefix (f a b c ...) form. */
 
 			const QString *post;
 			unsigned priorHeight = StkHeight(exprStack);
+			BObject obj;
 			
 			post = Eval(ct + 2, intern, tokIndex + 2, exprStack);
 			assert(post > ct + 2);	
-			intern(tokIndex + 1, ct + 1, &obj);
-			
+			intern(tokIndex + 1, ct + 1, &obj);	
 			Apply(&obj, exprStack, StkHeight(exprStack) - priorHeight);
 			tokIndex += post - ct;
 			ct = post;
 		}
-		else if(!StkFull(exprStack)) {
+		else {
 			/* If not an 'apply' form it's an unsubscripted variable, a literal, a label, or a
 				parameterless function. Intern directly to the TOS, to avoid an extra object copy. */
+			
+			if(StkFull(exprStack) && !ExtendStackIfNecessary(exprStack, 1))
+				return ct + 1; /* TODO - wrong - need to search for the matching rparen or an EOS marker */
 			
 			intern(tokIndex, ct, (BObject *)exprStack->top);
 			
@@ -187,16 +174,8 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 				AdjustStackPointersFollowingDirectPush(exprStack);
 			
 			/*fprintf(stderr, "[Eval-->: ");
-			DumpObject(&obj);
+			DumpObject((BObject *)exprStack->top);
 			fprintf(stderr, "]\n");*/
-		}
-		else {
-			/* If stack's full, intern to a temporary location, then push. Slower, but the stack can grow itself. */
-			intern(tokIndex, ct, &obj);
-			if(obj.category == FUNCTION)
-				EvalParameterlessFunction(obj.value.function, exprStack);
-			else
-				PushObject(exprStack, &obj);
 		}
 	}
 	
@@ -230,7 +209,9 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack,
 		}
 		else if(exprSeq->category != FUNCTION) {
 			/* Variable, literal, or label. */
-			CopyObject((BObject *)exprStack->top, exprSeq);			
+			CopyObject((BObject *)exprStack->top, exprSeq);
+				/* CopyObject is needed rather than a direct structure assignment, because the pre-converted expression
+					sequence is long-lived. */
 			AdjustStackPointersFollowingDirectPush(exprStack);
 		}
 		else
