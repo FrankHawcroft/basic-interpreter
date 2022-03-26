@@ -444,6 +444,27 @@ Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, 
 	return error;
 }
 
+/* For applications in expressions, or command invocations _where the command has previously executed successfully
+	with a full Conform_, determines if the quicker version of actual to formal parameter conformance can be used.
+	I.e. there are
+	- no missing actuals (so no defaults need to be copied in to the actuals), and
+	- no formals which can match more than one actual. */
+bool AmenableToQuickConformance(const struct Parameter *formal, int nFormals, const BObject *actual, unsigned nActuals)
+{
+	unsigned an;
+	int fn;
+		
+	for(fn = 0; fn < nFormals; fn++)
+		if(formal[fn].maxCount > 1)
+			return FALSE;
+			
+	for(an = 0; an < nActuals; an++)
+		if(IsEmpty(&actual[an]))
+			return FALSE;
+
+	return TRUE;
+}
+
 Error ConformForApplication(const BObject *applied, BObject *actual, unsigned actualCount)
 {
 	int numFormals;
@@ -451,7 +472,7 @@ Error ConformForApplication(const BObject *applied, BObject *actual, unsigned ac
 	/* Error result here assumes usage in expr rather than command context - */
 	if(proto == NULL)
 		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
-	else if(numFormals == actualCount) /* assumes operator or function parameter conventions! */
+	else if(AmenableToQuickConformance(proto, numFormals, actual, actualCount))
 		return ConformQuickly(proto, actual, numFormals);
 	else
 		return Conform(proto, numFormals, actual, actualCount);

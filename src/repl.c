@@ -178,7 +178,7 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 	if(ts->preconverted != NULL)
 		ts->ops &= ~OP_EVAL, ts->ops |= OP_EVALQ;
 		
-	if((ts->ops & OP_CONFORM) && HasSimpleParameters(ts->command))
+	if((ts->ops & OP_CONFORM) && AmenableToQuickConformance(ts->command))
 		ts->ops &= ~OP_CONFORM, ts->ops |= OP_CONFORMQ;
 		
 	/*if(ts->preconverted != NULL || !ShouldCachePreconvertedObjects(ts, callNestLevel))

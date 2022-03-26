@@ -621,8 +621,6 @@ extern void Do(struct Process *proc, struct TokenSequence *tokSeq, struct Stack 
 extern bool EligibleForCaching(const struct TokenSequence *, short callNestLevelWhenExecuted);
 extern bool NoDynamicallyAllocatedMemory(const struct TokenSequence *);
 extern void StorePreconvertedObjects(struct TokenSequence *, short callNestLevelWhenExecuted);
-extern bool IsAssignmentStatement(const struct Statement *);
-extern bool HasSimpleParameters(const struct Statement *); /* Amenable to ConformQuickly */
 extern const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel);
 extern void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted);
 extern void Improve(struct TokenSequence *);
@@ -652,6 +650,7 @@ extern void FindLabelPreceding(/*out*/ QString *label, /*in*/ const char *limit)
 /*** Formal against actual parameter checking and transformation -- semantics.c ***/
 
 extern Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, unsigned actualCount);
+extern bool AmenableToQuickConformance(const struct Parameter *formal, int nFormals, const BObject *actual, unsigned nActuals);
 extern Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count);
 extern Error ConformForApplication(const BObject *applied, BObject *actual, unsigned actualCount);
 extern const struct Parameter *FormalForActual(const struct Parameter *formal, int formalCount, unsigned actual);

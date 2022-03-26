@@ -102,22 +102,9 @@ bool NoDynamicallyAllocatedMemory(const struct TokenSequence *ts)
 }
 
 /* Covers CONST as well because it's just Let_ with extra parameter checking in its converter. */
-bool IsAssignmentStatement(const struct Statement *command)
+static bool IsAssignmentStatement(const struct Statement *command)
 {
 	return !IsSubprogram(command) && !IsMacro(command) && command->method.builtIn == Let_;
-}
-
-/* I.e. has no defaults or repeated parameters, and is suitable for ConformQuickly - */
-bool HasSimpleParameters(const struct Statement *command)
-{
-	return !IsMacro(command) 
-	  && (IsSubprogram(command)
-	   || command->method.builtIn == Let_
-	   || command->method.builtIn == If_
-	   || command->method.builtIn == ElseIf_
-	   || command->method.builtIn == Select_
-	   || command->method.builtIn == While_
-	   || command->method.builtIn == Until_);
 }
 
 const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel)
