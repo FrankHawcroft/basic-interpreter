@@ -63,32 +63,32 @@ INLINE void AdjustStackPointersFollowingDirectPush(struct Stack *stack)
 static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 {
 	BObject *param;
-	Error error;
+	Error error = ARRAYEXPECTED;
 	BObject result;
 	
 	assert(count != 0 && count <= StkHeight(stack)); /* TODO height same means infinite recursion. Detect? */
 	
 	param = PeekExprStk(stack, (int)count - 1);
-	error = ConformForApplication(functor, param, count);
+	
+	if(functor->category == OPERATOR) {
+		assert(count == OperandCount(functor->value.opRef)); /* assume syntax checked */
+		result.category = LITERAL;
+		if((error = ConformQuickly(ParametersForOperator(functor->value.opRef), param, count)) == SUCCESS)
+			EvalOperation(&result.value.scalar, functor->value.opRef,
+				&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
+	}
+	else if(functor->category == FUNCTION) {
+		if((error = ConformForApplication(functor, param, count)) == SUCCESS)
+			CallFunction(&result, functor->value.function, param, count, stack);
+	}
+	else if(IsVariable(functor)) {
+		if((error = ConformForApplication(functor, param, count)) == SUCCESS
+		&& (error = IndexArray(&result.value.variable, VarPtr(functor), param, count)) == SUCCESS)
+			result.category = (result.value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF;
+	}
 	
 	if(error != SUCCESS)
 		SetObjectToError(&result, error);
-	else if(functor->category == OPERATOR) {
-		assert(count == OperandCount(functor->value.opRef)); /* assume syntax checked */
-		result.category = LITERAL;
-		EvalOperation(&result.value.scalar, functor->value.opRef,
-			&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
-	}
-	else if(functor->category == FUNCTION)
-		CallFunction(&result, functor->value.function, param, count, stack);
-	else if(IsVariable(functor)) {
-		if((error = IndexArray(&result.value.variable, VarPtr(functor), param, count)) == SUCCESS)
-			result.category = (result.value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF;
-		else
-			SetObjectToError(&result, error);
-	}
-	else
-		SetObjectToError(&result, ARRAYEXPECTED);
 	
 	CutExprStk(stack, count);
 	

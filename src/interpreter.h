@@ -650,10 +650,10 @@ extern void FindLabelPreceding(/*out*/ QString *label, /*in*/ const char *limit)
 /*** Formal against actual parameter checking and transformation -- semantics.c ***/
 
 extern Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, unsigned actualCount);
-extern bool AmenableToQuickConformance(const struct Parameter *formal, int nFormals, const BObject *actual, unsigned nActuals);
 extern Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count);
 extern Error ConformForApplication(const BObject *applied, BObject *actual, unsigned actualCount);
 extern const struct Parameter *FormalForActual(const struct Parameter *formal, int formalCount, unsigned actual);
+extern bool AmenableToQuickConformance(const struct TokenSequence *ts, bool fullCheck);
 extern bool SemanticallyPredictable(const struct TokenSequence *ts);
 extern SimpleType TypeOfToken(const QString *);
 

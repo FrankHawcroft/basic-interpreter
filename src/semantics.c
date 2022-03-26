@@ -310,11 +310,7 @@ const struct Parameter *GetPrototype(const BObject *applied, int *numFormals)
 	assert(applied != NULL);
 	assert(numFormals != NULL);
 
-	if(applied->category == OPERATOR) {
-		proto = ParametersForOperator(applied->value.opRef);
-		*numFormals = OperandCount(applied->value.opRef);
-	}
-	else if(applied->category == FUNCTION) {
+	if(applied->category == FUNCTION) {
 		proto = applied->value.function->parameter;
 		if((*numFormals = applied->value.function->numArgs) == FN_VAR_ARGS) {
 			proto = &m_AnyArgs;
@@ -333,6 +329,10 @@ const struct Parameter *GetPrototype(const BObject *applied, int *numFormals)
 			proto = &m_AnyArgs;
 			*numFormals = 1;
 		}
+	}
+	else if(applied->category == OPERATOR) {
+		proto = ParametersForOperator(applied->value.opRef);
+		*numFormals = OperandCount(applied->value.opRef);
 	}
 	else {
 		proto = NULL;
@@ -444,22 +444,25 @@ Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, 
 	return error;
 }
 
-/* For applications in expressions, or command invocations _where the command has previously executed successfully
-	with a full Conform_, determines if the quicker version of actual to formal parameter conformance can be used.
-	I.e. there are
+/* For command invocations _where the command has previously executed successfully with a full Conform_,
+	determines if the quicker version of actual to formal parameter conformance can be used. I.e.
 	- no missing actuals (so no defaults need to be copied in to the actuals), and
 	- no formals which can match more than one actual. */
-bool AmenableToQuickConformance(const struct Parameter *formal, int nFormals, const BObject *actual, unsigned nActuals)
+bool AmenableToQuickConformance(const struct TokenSequence *ts, bool fullCheck)
 {
-	unsigned an;
 	int fn;
+	unsigned short tn;
 		
-	for(fn = 0; fn < nFormals; fn++)
-		if(formal[fn].maxCount > 1)
+	for(fn = 0; fn < ts->command->formalCount; fn++)
+		if(ts->command->formal[fn].maxCount > 1
+		|| (!fullCheck && ts->command->formal[fn].defaultValue != NULL))
 			return FALSE;
-			
-	for(an = 0; an < nActuals; an++)
-		if(IsEmpty(&actual[an]))
+	
+	if(!fullCheck)
+		return TRUE;
+	
+	for(tn = 0; tn != ts->length; tn++)
+		if(QsEqual(&ts->rest[tn], &g_Missing))
 			return FALSE;
 
 	return TRUE;
@@ -472,7 +475,8 @@ Error ConformForApplication(const BObject *applied, BObject *actual, unsigned ac
 	/* Error result here assumes usage in expr rather than command context - */
 	if(proto == NULL)
 		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
-	else if(AmenableToQuickConformance(proto, numFormals, actual, actualCount))
+	else if((applied->category == FUNCTION && applied->value.function->numArgs != FN_VAR_ARGS)
+		 || (IsVariable(applied) && actualCount == 1))
 		return ConformQuickly(proto, actual, numFormals);
 	else
 		return Conform(proto, numFormals, actual, actualCount);
