@@ -660,15 +660,18 @@ static void AppendPlaceholders(struct TokenSequence *ts, int numActualParams, in
 /* Cheats ... semantic infection, but better than the alternative complicated ways of dealing with default values.*/
 static int MinActuals(const BObject *cmd)
 {
-	int n = 0;
+	int minActuals = 0;
 	
 	if(cmd != NULL && cmd->category == STATEMENT && cmd->value.statement->formalCount > 0) {
-		const struct Parameter *p;
-		for(p = cmd->value.statement->formal; p < &cmd->value.statement->formal[cmd->value.statement->formalCount]; p++)
-			n += p->defaultValue == NULL && p->maxCount < MAX_TOKENS ? p->maxCount : 1;
+		int fn;
+		for(fn = 0; fn < cmd->value.statement->formalCount; fn++) {
+			const struct Parameter *p = &cmd->value.statement->formal[fn];
+			minActuals += (p->defaultValue == NULL
+				&& p->maxCount < MAX_TOKENS) || fn + 1 < cmd->value.statement->formalCount ? p->maxCount : 1;
+		}
 	}
 	
-	return n;
+	return minActuals;
 }
 
 static bool MacroInvocation(const BObject *cmd)

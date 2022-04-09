@@ -258,6 +258,8 @@ void Window_(BObject *arg, unsigned count)
 		return;
 	}
 	
+	/* A negative screen ID means use the default system screen, and/or there's no concept of
+		multiple screens. */
 	wScreen = 0 <= screenID && screenID < MAX_SCREENS ? Gui()->screen[screenID] : NULL_SCREEN_HANDLE;
 	if(screenID != -1 && wScreen == NULL_SCREEN_HANDLE) {
 		CauseError(ER_BAD_SCREEN_ID);
@@ -269,7 +271,7 @@ void Window_(BObject *arg, unsigned count)
 	extent.bottomRight.x = x2;
 	extent.bottomRight.y = y2;
 	
-	if(extent.bottomRight.x <= extent.topLeft.x || extent.bottomRight.y <= extent.topLeft.y) {
+	if(extent.bottomRight.x < extent.topLeft.x || extent.bottomRight.y < extent.topLeft.y) {
 		CauseError(ER_BAD_SIZE);
 		return;
 	}

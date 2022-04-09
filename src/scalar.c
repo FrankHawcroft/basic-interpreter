@@ -701,7 +701,7 @@ It's acceptable for the input value to contain an error - this is left intact
 in the input, and also returned. */
 Error ChangeType(Scalar *value, enum TypeRule rule)
 {
-	Error result = BADARGTYPE;
+	Error result = SUCCESS;
 	SimpleType newType = T_MISSING;
 	
 	assert(value != NULL);
@@ -709,7 +709,8 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 	assert(!Contextual(rule));
 	
 	newType = TargetType(rule, value->type);
-	result = TypeIsInternal(newType) ? BADARGTYPE : SUCCESS;
+	if(TypeIsInternal(newType))
+		result = value->type == T_EMPTY || value->type == T_MISSING ? UNDEFINEDVARORFUNC : BADARGTYPE;
 	
 	if(result == SUCCESS && value->type != newType) {
 		/* TODO these conversions should respect TypeDiscipline options */

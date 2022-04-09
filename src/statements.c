@@ -179,9 +179,10 @@ static struct Parameter m_ArgForRandomize[1] = {
 static struct Parameter m_ArgForRead[1] = {
 	{SCALAR_VAR, TR_ANY, NULL, NO_NAME, UNLIMITED, FALSE}};
 
+static Scalar m_DefScreen2;
 static struct Parameter m_ArgsForScreen[] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE},
-	{LITERAL, TR_STRING_ONLY, NULL, NO_NAME, 1, FALSE},
+	{LITERAL, TR_STRING_ONLY, &m_DefScreen2, NO_NAME, 1, FALSE},
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 3, FALSE},
 	{LITERAL, TR_INT_TO_LONG, NULL, NO_NAME, 1, FALSE}};
 	
@@ -227,9 +228,10 @@ static struct Parameter m_ArgsForWave[] = {
 static struct Parameter m_ArgForWaveSin[] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE}};
 	
+static Scalar m_DefWindow2;
 static struct Parameter m_ArgsForWindow[] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE},
-	{LITERAL, TR_STRING_ONLY, NULL, NO_NAME, 1, FALSE},
+	{LITERAL, TR_STRING_ONLY, &m_DefWindow2, NO_NAME, 1, FALSE},
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 4, FALSE},
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE},
 	{LITERAL, TR_STRING_ONLY, NULL, NO_NAME, 1, FALSE},
@@ -471,9 +473,15 @@ static void DefineBuiltInStatement(const struct BuiltInStatement *command)
 		m_ArgForPrint[0].defaultValue = g_NullString;
 		m_ArgsForPSet[1].defaultValue = g_NegOneInt;
 		m_ArgForRandomize[0].defaultValue = g_ZeroLongInt;
+		m_ArgsForScreen[2].defaultValue = g_NegOneInt;
+		m_ArgsForScreen[3].defaultValue = g_NegOneLongInt;
 		m_ArgsForSound[3].defaultValue = g_NegOneInt;
 		m_ArgsForSound[4].defaultValue = g_ZeroInt;
 		m_ArgForSystem[0].defaultValue = g_FalseBoolean;
+		m_ArgsForWindow[2].defaultValue = g_NegOneInt;
+		m_ArgsForWindow[3].defaultValue = g_NegOneInt;
+		m_ArgsForWindow[4].defaultValue = g_NullString;
+		m_ArgsForWindow[5].defaultValue = g_ZeroLongInt;
 		m_ArgForWPrint[0].defaultValue = g_NullString;
 #ifdef DEBUG
 		m_ArgForXStack[0].defaultValue = g_MaximumInt;
@@ -484,6 +492,10 @@ static void DefineBuiltInStatement(const struct BuiltInStatement *command)
 		SetFromLong(&m_DefError1, (long)ER_UNDEFINED, T_INT);
 		InitScalarAsString(&m_DefInputAndLineInput1);
 		QsInitStaticNTS(&m_DefInputAndLineInput1.value.string, "?");
+		InitScalarAsString(&m_DefScreen2);
+		QsInitStaticNTS(&m_DefScreen2.value.string, "New Screen");
+		InitScalarAsString(&m_DefWindow2);
+		QsInitStaticNTS(&m_DefWindow2.value.string, "New Window");
 		SetFromLong(&m_DefSound3, 127, T_INT);
 		
 		m_DefaultsInitialised = TRUE;

@@ -285,21 +285,12 @@ with different kinds of events (Trap.priority).
 The 'sequencing' value is used to order events of equal priority which occured
 'at the same time' from the point of view of the interpreter - i.e. happened during
 execution of the same statement and are both detected in its event checking epilogue.
-
-Sequencing dependent events:
-
-There are some equal-priority events which have a logical ordering, because 
-they depend on each other. These events are generally in pairs. For example,
-on platforms suporting GUI interaction, there are MOUSEDOWN and MOUSEUP events.
-If the mouse button is currently down, and both MOUSEDOWN and MOUSEUP events are 
-detected 'at the same time', trap the MOUSEUP ahead of the MOUSEDOWN.
-Conversely, if the mouse button is not already down, favour a MOUSEDOWN.
-
-Sequencing independent events (the default approach):
-
-Equal-priority events are scheduled on a round-robin basis. The event with the
+By default, these events are scheduled on a round-robin basis. The event with the
 lowest sequencing number is chosen, and then its sequencing number is set to one greater
-than the current maximum, sending it to the back of the queue for next time. */
+than the current maximum, sending it to the back of the queue for next time. 
+
+A more subtle sequencing function could be used if needed, e.g. for events which
+should occur in balanced pairs. */
 static void PrioritiseWithDefaultStrategy(struct Process *proc,
 	struct Trap *current, struct Trap **best, unsigned long *maxSequencing)
 {

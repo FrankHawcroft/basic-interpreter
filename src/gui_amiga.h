@@ -217,9 +217,9 @@ static PfWindowHandle OpenWindowNative(
 	const QString *screenTitle,
 	unsigned long flags)
 {
+	const short defaultTopLeftX = 100, defaultTopLeftY = 60;
 	ULONG intuiFlags;
 	char *csTitle, *csScreenTitle;
-	/*struct Screen *winScreen;*/
 	struct Window *theWindow;
 	struct TagItem tags[5];
 	struct ExtNewWindow newWindow;
@@ -229,10 +229,6 @@ static PfWindowHandle OpenWindowNative(
 
 	csTitle = QsDupAsNTS(title);
 	csScreenTitle = QsIsNull(screenTitle) ? NULL : QsDupAsNTS(screenTitle);
-	
-	/* Set up screen pointer (NULL if WB). */
-
-	/* winScreen = (screenID != -1) ? screen[screenID] : NULL; */
 
 	/* Set up IDCMP flags. These are the same for _every_ window, because
 	they all share the same msg port. Some events might never be received,
@@ -249,17 +245,19 @@ static PfWindowHandle OpenWindowNative(
 	tags[0].ti_Tag = WA_ScreenTitle;
 	tags[0].ti_Data = (ULONG)csScreenTitle;
 	tags[1].ti_Tag = WA_InnerWidth;
-	tags[1].ti_Data = extent->bottomRight.x - extent->topLeft.x;
+	tags[1].ti_Data = extent->bottomRight.x  == -1 
+		? 200 : extent->bottomRight.x - (extent->topLeft.x == -1 ? defaultTopLeftX : extent->topLeft.x);
 	tags[2].ti_Tag = WA_InnerHeight;
-	tags[2].ti_Data = extent->bottomRight.y - extent->topLeft.y;
+	tags[2].ti_Data = extent->bottomRight.y  == -1 
+		? 100 : extent->bottomRight.y - (extent->topLeft.y == -1 ? defaultTopLeftY : extent->topLeft.y);
 	tags[3].ti_Tag = WA_AutoAdjust;
 	tags[3].ti_Data = TRUE;
 	tags[4].ti_Tag = TAG_DONE;
 
 	/* Set up NewWindow structure. */
 
-	newWindow.LeftEdge = extent->topLeft.x;
-	newWindow.TopEdge = extent->topLeft.y;
+	newWindow.LeftEdge = extent->topLeft.x == -1 ? defaultTopLeftX : extent->topLeft.x;
+	newWindow.TopEdge = extent->topLeft.y == -1 ? defaultTopLeftY : extent->topLeft.y;
 	newWindow.Width = newWindow.Height = 0; /* Use WA_InnerWidth and WA_InnerHeight instead. */
 	newWindow.DetailPen = newWindow.BlockPen = -1; /* Use screen's pens. */
 	newWindow.IDCMPFlags = 0L; /* Set once open. */
@@ -1391,7 +1389,9 @@ static bool TranslateKeyPressNative(const PfWindowEvent *event, PfKeypress *pres
 
 static void GetKeyPressDataNative(QString *s, const PfKeypress *press)
 {
-	if(press->vanilla) 
+	if(press->code == 0 && press->qualifier == 0)
+		QsInitNull(s);
+	else if(press->vanilla) 
 		QsCopyChar(s, (char)press->code);
 	else {
 		USHORT keyData[2];

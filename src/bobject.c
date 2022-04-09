@@ -149,7 +149,7 @@ void ConvertToObject(const QString *token, BObject *obj, short callNestLevel)
 		else {
 			obj->category = LITERAL;
 			InitScalar(&obj->value.scalar, QsEqNoCase(token, &g_Missing) ? T_MISSING : T_EMPTY, FALSE);
-			if(!QsEqNoCase(token, &g_Missing))
+			/*if(!QsEqNoCase(token, &g_Missing))*/
 				SetAdditionalErrorMessage("Not found: %.*s", QsGetData(token), QsGetLength(token));
 		}
 	}
