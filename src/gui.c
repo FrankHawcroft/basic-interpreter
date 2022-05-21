@@ -316,7 +316,7 @@ void WindowClose_(BObject *arg, unsigned count)
 		CauseError(ER_BAD_WINDOW_ID);
 		return;
 	}
-
+	
 	RemoveWindow(id);
 }
 
@@ -1298,9 +1298,12 @@ static void AllocateAnimatedObjects(void)
 	}
 }
 
-static void AlterObject(int what, const BObject *objectId, const BObject *val, unsigned nVal)
+static void AlterObject(int what, const BObject *arg, unsigned count)
 {
+	const BObject *objectId = &arg[0]; /* first param is always an object id */
+	const BObject *val = &arg[1]; /* remaining parameters vary */
 	short id = objectId->value.scalar.value.number.s;
+	short firstVal = val[0].value.scalar.value.number.s;
 	struct AnimatedObject *obj;
 	unsigned n;
 	
@@ -1309,7 +1312,7 @@ static void AlterObject(int what, const BObject *objectId, const BObject *val, u
 		return;
 	}
 	
-	if(Gui() == NULL) {
+	if(Gui() == NULL || Gui()->outputWindow == NULL_WINDOW_HANDLE) {
 		CauseError(ER_NO_OUTPUT_WINDOW);
 		return;
 	}
@@ -1324,63 +1327,80 @@ static void AlterObject(int what, const BObject *objectId, const BObject *val, u
 	obj = &Gui()->animObj[id];
 	
 	if(what == 1) /* OBJECT.AX */
-		obj->ax = val[0].value.scalar.value.number.s;
+		obj->ax = firstVal;
 	else if(what == 2) /* OBJECT.AY */
-		obj->ay = val[0].value.scalar.value.number.s;
+		obj->ay = firstVal;
 	else if(what == 3) { /* OBJECT.CLIP */
-		obj->clipRegion.topLeft.x = val[0].value.scalar.value.number.s;
+		obj->clipRegion.topLeft.x = firstVal;
 		obj->clipRegion.topLeft.y = val[1].value.scalar.value.number.s;
 		obj->clipRegion.bottomRight.x = val[2].value.scalar.value.number.s;
 		obj->clipRegion.bottomRight.y = val[3].value.scalar.value.number.s;
 	}
 	else if(what == 4) { /* OBJECT.CLOSE */
 		RemoveAnimatedObject(id);
-		for(n = 0; n < nVal; n++)
+		for(n = 0; n < count; n++)
 			RemoveAnimatedObject(val[n].value.scalar.value.number.s);
 	}
 	else if(what == 5) { /* OBJECT.HIT */ /* TODO two masks */
-		obj->collisionMask = val[0].value.scalar.value.number.s;
+		obj->collisionMask = firstVal;
 	}
 	else if(what == 6) { /* OBJECT.OFF */
 		obj->visible = obj->moving = FALSE;
-		for(n = 0; n < nVal; n++)
+		for(n = 0; n < count; n++)
 			Gui()->animObj[val[n].value.scalar.value.number.s].visible
 				= Gui()->animObj[val[n].value.scalar.value.number.s].moving = FALSE;
 	}
 	else if(what == 7) { /* OBJECT.ON */
 		obj->visible = obj->moving = TRUE;
-		for(n = 0; n < nVal; n++)
+		for(n = 0; n < count; n++)
 			Gui()->animObj[val[n].value.scalar.value.number.s].visible
 				= Gui()->animObj[val[n].value.scalar.value.number.s].moving = TRUE;
 	}
 	else if(what == 8) /* OBJECT.PLANES */ /* TODO */
 		obj->ax = obj->ax;
 	else if(what == 9) /* OBJECT.PRIORITY */
-		obj->priority = val[0].value.scalar.value.number.s;
-	else if(what == 10) /* OBJECT.SHAPE */ /* TODO */
-		obj->ax = obj->ax;
+		obj->priority = firstVal;
+	else if(what == 10) /* OBJECT.SHAPE */ /* TODO actual shape & colour data; and delete old one if there */
+		obj->image = CreateAnimatedObjectNative(Gui()->outputWindow);
 	else if(what == 11) { /* OBJECT.START */
 		obj->moving = TRUE;
-		for(n = 0; n < nVal; n++)
+		for(n = 0; n < count; n++)
 			Gui()->animObj[val[n].value.scalar.value.number.s].moving = TRUE;
 	}
 	else if(what == 12) { /* OBJECT.STOP */
 		obj->moving = FALSE;
-		for(n = 0; n < nVal; n++)
+		for(n = 0; n < count; n++)
 			Gui()->animObj[val[n].value.scalar.value.number.s].moving = FALSE;
 	}
 	else if(what == 13) /* OBJECT.VX */
-		obj->vx = val[0].value.scalar.value.number.s;
+		obj->vx = firstVal;
 	else if(what == 14) /* OBJECT.VY */
-		obj->vy = val[0].value.scalar.value.number.s;
+		obj->vy = firstVal;
 	else if(what == 15) /* OBJECT.X */
-		obj->position.x = val[0].value.scalar.value.number.s;
+		obj->position.x = firstVal;
 	else if(what == 16) /* OBJECT.Y */
-		obj->position.y = val[0].value.scalar.value.number.s;
+		obj->position.y = firstVal;
 		
 	if(id >= Gui()->animObjCount)
 		Gui()->animObjCount = id;
 }
+
+void ObjectAX_(BObject *arg, unsigned count) { AlterObject(1, arg, count); }
+void ObjectAY_(BObject *arg, unsigned count) { AlterObject(2, arg, count); }
+void ObjectClip_(BObject *arg, unsigned count) { AlterObject(3, arg, count); }
+void ObjectClose_(BObject *arg, unsigned count) { AlterObject(4, arg, count); }
+void ObjectHit_(BObject *arg, unsigned count) { AlterObject(5, arg, count); }
+void ObjectOff_(BObject *arg, unsigned count) { AlterObject(6, arg, count); }
+void ObjectOn_(BObject *arg, unsigned count) { AlterObject(7, arg, count); }
+void ObjectPlanes_(BObject *arg, unsigned count) { AlterObject(8, arg, count); }
+void ObjectPriority_(BObject *arg, unsigned count) { AlterObject(9, arg, count); }
+void ObjectShape_(BObject *arg, unsigned count) { AlterObject(10, arg, count); }
+void ObjectStart_(BObject *arg, unsigned count) { AlterObject(11, arg, count); }
+void ObjectStop_(BObject *arg, unsigned count) { AlterObject(12, arg, count); }
+void ObjectVX_(BObject *arg, unsigned count) { AlterObject(13, arg, count); }
+void ObjectVY_(BObject *arg, unsigned count) { AlterObject(14, arg, count); }
+void ObjectX_(BObject *arg, unsigned count) { AlterObject(15, arg, count); }
+void ObjectY_(BObject *arg, unsigned count) { AlterObject(16, arg, count); }
 
 void Collision_(Scalar *result, const BObject *arg, unsigned count)
 {
@@ -1438,10 +1458,15 @@ static void GetObjectProperty(Scalar *result, const BObject *objectId, int wante
 	SetFromLong(result, val, T_INT);
 }
 
-void ObjectX_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 1); }
-void ObjectY_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 2); }
-void ObjectVX_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 3); }
-void ObjectVY_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 4); }
+void GetObjectProperty_(Scalar *result, const BObject *arg, unsigned count)
+{
+	GetObjectProperty(result, arg, arg[1].value.scalar.value.number.s);
+}
+
+/*void GetObjectX_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 1); }
+void GetObjectY_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 2); }
+void GetObjectVX_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 3); }
+void GetObjectVY_(Scalar *result, const BObject *arg, unsigned count) { GetObjectProperty(result, arg, 4); }*/
 
 /* Do all the animation display updates, and return true if any collisions. */
 bool AnimatedObjectCollided(void)
@@ -1451,9 +1476,11 @@ bool AnimatedObjectCollided(void)
 
 static void RemoveAnimatedObject(int id)
 {
-	FreeAnimatedObjectNative(Gui()->animObj[id].image);
-	memset(&Gui()->animObj[id], 0, sizeof(Gui()->animObj[id]));
-	Gui()->animObj[id].window = NULL_WINDOW_HANDLE;
-	if(id + 1 == Gui()->animObjCount)
-		--Gui()->animObjCount;
+	struct AnimatedObject *obj = &Gui()->animObj[id];
+	if(obj->image != NULL && WindowExists(obj->window))
+		FreeAnimatedObjectNative(obj->window, obj->image, Gui()->animObjCount <= 1); /* TODO using this count is wrong */
+	memset(obj, 0, sizeof(*obj));
+	obj->window = NULL_WINDOW_HANDLE;
+	if(id >= Gui()->animObjCount)
+		Gui()->animObjCount = id - 1;
 }

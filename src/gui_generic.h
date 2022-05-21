@@ -106,7 +106,9 @@ static int GetMenuItemStateNative(PfWindowHandle win, char *menuName, char *item
 
 /* Animation: */
 
-static void FreeAnimatedObjectNative(PfAnimatedObjectHandle mob) { };
+static PfAnimatedObjectHandle CreateAnimatedObjectNative(PfWindowHandle win/*, unsigned char *data */) { return NULL; }
+
+static void FreeAnimatedObjectNative(PfWindowHandle win, PfAnimatedObjectHandle mob, bool last) { }
 
 /* Events: */
 

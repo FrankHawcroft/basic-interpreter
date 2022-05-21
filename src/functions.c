@@ -914,7 +914,8 @@ static const enum TypeRule m_ArgForMki[1] = { TR_NUM_TO_INT };		/* Mki(i) */
 static const enum TypeRule m_ArgForMkl[1] = { TR_NUM_TO_LONG };		/* Mkl(i) */
 static const enum TypeRule m_ArgForMks[1] = { TR_NUM_TO_SINGLE };		/* Mks(i) */
 static const enum TypeRule m_ArgForMouse[1] = { TR_NUM_TO_INT };		/* Mouse(n) */
-static const enum TypeRule m_ArgForObjectFcns[1] = { TR_NUM_TO_INT }; /* ObjectX(id), ObjectY(id), ObjectVX(id), ObjectVY(id) */
+/*static const enum TypeRule m_ArgForObjectFcns[1] = { TR_NUM_TO_INT }; */ /* ObjectX(id), ObjectY(id), ObjectVX(id), ObjectVY(id) */
+static const enum TypeRule m_ArgsForGetObjectProperty[2] = { TR_NUM_TO_INT, TR_NUM_TO_INT };
 static const enum TypeRule m_ArgForPeek[1] = { TR_INT_TO_LONG };		/* Peek(addr), PeekL(addr), PeekW(addr) */
 static const enum TypeRule m_ArgsForPoint[2] = { TR_NUM_TO_INT, TR_NUM_TO_INT }; /* Point(x, y) */
 static const enum TypeRule m_ArgForRandom[1] = { TR_NUM_TO_LONG };	/* Random(m) */
@@ -984,10 +985,11 @@ static const struct BuiltInFunction m_FuncDefinitions[] = {
 	{"MKL", Mkl_, TR_STRING_ONLY, m_ArgForMkl, 1},
 	{"MKS", Mks_, TR_STRING_ONLY, m_ArgForMks, 1},
 	{"MOUSE", Mouse_, TR_INT_ONLY, m_ArgForMouse, 1},
-	{"OBJECTVX", ObjectVX_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
+	{"GETOBJECTPROPERTY", GetObjectProperty_, TR_INT_ONLY, m_ArgsForGetObjectProperty, 2},
+	/*{"OBJECTVX", ObjectVX_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
 	{"OBJECTVY", ObjectVY_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
 	{"OBJECTX", ObjectX_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
-	{"OBJECTY", ObjectY_, TR_INT_ONLY, m_ArgForObjectFcns, 1},
+	{"OBJECTY", ObjectY_, TR_INT_ONLY, m_ArgForObjectFcns, 1},*/
 	{"PEEK", Peek_, TR_INT_ONLY, m_ArgForPeek, 1},
 	{"PEEKL", PeekL_, TR_LONG_ONLY, m_ArgForPeek, 1},
 	{"PEEKW", PeekW_, TR_INT_ONLY, m_ArgForPeek, 1},
