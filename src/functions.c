@@ -86,7 +86,7 @@ static void DisposeExpr(struct CompiledExpr *expr, bool converted)
 		else {
 			short n;
 			for(n = 0; n < expr->length; n++)
-				RemoveObject((BObject *)&expr->body.obj[n], FALSE);
+				DisposeIfScalar((BObject *)&expr->body.obj[n]);
 			Dispose((BObject *)expr->body.obj);
 		}
 	}
@@ -480,12 +480,12 @@ static void CallProgramaticallyDefinedFunction(
 			PopObject(workingStack, result);
 			conversionError = Conform(&booleanConversion, 1, result, 1);
 			if(conversionError != SUCCESS) {
-				RemoveObject(result, FALSE);
+				DisposeIfScalar(result);
 				SetObjectToError(result, conversionError);
 			}
 			else {
 				fired = GetBoolean(&result->value.scalar);
-				RemoveObject(result, FALSE);
+				DisposeIfScalar(result);
 			}
 		}
 	}
@@ -1142,7 +1142,7 @@ void CallByName_(Scalar *result, const BObject *arg, unsigned count)
 	else
 		CopyScalar(result, &resultObj.value.scalar);
 
-	RemoveObject(&resultObj, FALSE);
+	DisposeIfScalar(&resultObj);
 }
 
 /* Doesn't include program name, unlike C's argc. */

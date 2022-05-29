@@ -10,13 +10,13 @@ NB_OBJS = audio.o basicio.o bitvector.o bobject.o buffer.o cache.o \
 	syntax.o vars.o
 
 nba : $(NB_OBJS)
-	m68k-amigaos-gcc $(NB_OBJS) -o $@ -noixemul -lm
+	m68k-amigaos-gcc $(NB_OBJS) -o $@ -pg -noixemul -lm
 
 clean :
 	rm *.o
 
 .c.o :
-	m68k-amigaos-gcc -o $@ -c $*.c -noixemul
+	m68k-amigaos-gcc -o $@ -c $*.c -pg -noixemul
 
 audio.o : interpreter.h common.h qstring.h errors.h platform.h builtin.h \
 	heap.h process.h

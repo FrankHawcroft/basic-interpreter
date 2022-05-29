@@ -92,19 +92,19 @@ static bool ScalarIsSane(const Scalar *v)
 
 #endif /* DEBUG */
 
-/* Set an error in the destination (to) - from the optional source if it's already one;
+/* Set an error in the destination (to) - from the source if it's already one;
 if no error in either place, don't set it.
 	Unlike SetError, assumes the destination has been initialised. */
 INLINE Error PropagateError(Scalar *to, const Scalar *from, Error newError)
 {
-	/* Save the error first in case to == from: */
-	Error propagatedError = from != NULL && ScalarIsError(from) ? from->value.error : newError;
-	if(propagatedError != SUCCESS) {
+	if(newError == SUCCESS && !ScalarIsError(from))
+		return SUCCESS;
+	else {
+		/* Save the error first in case to == from: */
+		Error propagatedError = ScalarIsError(from) ? from->value.error : newError;
 		DisposeScalar(to);
-		SetError(to, propagatedError);
-		return propagatedError;
+		return SetError(to, propagatedError);
 	}
-	return SUCCESS;
 }
 
 /* Return an error if present. */
@@ -170,27 +170,23 @@ _not_ copied however. Therefore, the caller must take care to ensure
 the destination is not freed inappropriately. */
 void SetToValue(Scalar *dest, const Scalar *src)
 {
-	SimpleType srcType;
-	
 	assert(ScalarIsSane(src));
-	
-	srcType = NonPointer(src->type);
+
 	if(!IsPointer(src))
 		*dest = *src;
-	else if(srcType == T_INT || srcType == T_LONG)
-		SetFromLong(dest, GetLong(src), srcType);
-	else if(srcType == T_SINGLE || srcType == T_DOUBLE)
-		SetFromDouble(dest, GetDouble(src), srcType);
-	else if(srcType == T_STRING) {
-		dest->type = T_STRING;
-		dest->value.string = *src->value.pointer.tp;
+	else {
+		dest->type = NonPointer(src->type);
+		switch(dest->type) {
+			case T_INT: dest->value.number.s = *src->value.pointer.sp; break;
+			case T_LONG: dest->value.number.l = *src->value.pointer.lp; break;
+			case T_SINGLE: dest->value.number.f = *src->value.pointer.fp; break;
+			case T_DOUBLE: dest->value.number.d = *src->value.pointer.dp; break;
+			case T_CHAR: SetCharacter(dest, *src->value.pointer.cp); break;
+			case T_BOOL: SetBoolean(dest, *src->value.pointer.bp); break;
+			case T_STRING: dest->value.string = *src->value.pointer.tp; break;
+		}
+		assert(ScalarIsSane(dest));
 	}
-	else if(srcType == T_CHAR)
-		SetCharacter(dest, *src->value.pointer.cp);
-	else if(srcType == T_BOOL)
-		SetBoolean(dest, *src->value.pointer.bp);
-		
-	assert(ScalarIsSane(dest));
 }
 
 /* Dereferences either argument if it is a pointer. If the source and destination
@@ -198,29 +194,35 @@ don't have the same type, creates a 'type mismatch' error in the destination.
 	Owned memory (e.g. in strings) is _not_ copied. */
 void SetDereferencingBoth(Scalar *dest, const Scalar *src)
 {
-	SimpleType srcType;
-	
 	assert(ScalarIsSane(src) && ScalarIsSane(dest));
-	
-	srcType = NonPointer(src->type);
-	if(NonPointer(dest->type) != srcType)
-		PropagateError(dest, src, BADARGTYPE);
-	else if(!IsPointer(dest))
-		SetToValue(dest, src);
-	else if(srcType == T_INT)
-		*dest->value.pointer.sp = (short)GetLong(src);
-	else if(srcType == T_LONG)
-		*dest->value.pointer.lp = GetLong(src);
-	else if(srcType == T_STRING)
-		*dest->value.pointer.tp = *(QString *)GetPointer((Scalar *)src); /* Doesn't QsCopy! */
-	else if(srcType == T_SINGLE)
-		*dest->value.pointer.fp = (float)GetDouble(src);
-	else if(srcType == T_DOUBLE)
-		*dest->value.pointer.dp = GetDouble(src);
-	else if(srcType == T_CHAR)
-		*dest->value.pointer.cp = GetCharacter(src);
-	else if(srcType == T_BOOL)
-		*dest->value.pointer.bp = GetBoolean(src);
+
+	if(NonPointer(dest->type) == NonPointer(src->type)) {
+		if(IsPointer(dest)) {
+			switch(src->type) {
+				case T_INT: *dest->value.pointer.sp = src->value.number.s; break;
+				case T_INT | T_POINTER: *dest->value.pointer.sp = *src->value.pointer.sp; break;
+				case T_LONG: *dest->value.pointer.lp = src->value.number.l; break;
+				case T_LONG | T_POINTER: *dest->value.pointer.lp = *src->value.pointer.lp; break;
+				case T_SINGLE: *dest->value.pointer.fp = src->value.number.f; break;
+				case T_SINGLE | T_POINTER: *dest->value.pointer.fp = *src->value.pointer.fp; break;
+				case T_DOUBLE: *dest->value.pointer.dp = src->value.number.d; break;
+				case T_DOUBLE | T_POINTER: *dest->value.pointer.dp = *src->value.pointer.dp; break;
+				case T_STRING: case T_STRING | T_POINTER:
+					*dest->value.pointer.tp = *(QString *)GetPointer((Scalar *)src); /* Doesn't QsCopy! */
+					break;
+				case T_CHAR: case T_CHAR | T_POINTER:
+					*dest->value.pointer.cp = GetCharacter(src);
+					break;
+				case T_BOOL: case T_BOOL | T_POINTER:
+					*dest->value.pointer.bp = GetBoolean(src);
+					break;
+			}
+		}
+		else
+			SetToValue(dest, src);
+	}
+	else
+		PropagateError(dest, src, BADARGTYPE);		
 		
 	assert(ScalarIsSane(dest));
 }
@@ -334,19 +336,7 @@ void SetFromShort(Scalar *dest, short value, SimpleType type)
 void SetFromDouble(Scalar *dest, double value, SimpleType type)
 {
 	dest->type = type;
-	if(type == T_INT) {
-		if(value > SHRT_MAX || value < SHRT_MIN) 
-			SetError(dest, OVERFLOWERR);
-		else
-			dest->value.number.s = (short)value;
-	}
-	else if(type == T_LONG) {
-		if(value > LONG_MAX || value < LONG_MIN) 
-			SetError(dest, OVERFLOWERR);
-		else
-			dest->value.number.l = (long)value;
-	}
-	else if(type == T_SINGLE) {
+	if(type == T_SINGLE) {
 		if(fabs(value) > FLT_MAX)
 			SetError(dest, OVERFLOWERR);
 		else
@@ -354,6 +344,18 @@ void SetFromDouble(Scalar *dest, double value, SimpleType type)
 	}
 	else if(type == T_DOUBLE)
 		dest->value.number.d = value;
+	else if(type == T_INT) {
+		if(value > SHRT_MAX || value < SHRT_MIN) 
+			SetError(dest, OVERFLOWERR);
+		else
+			dest->value.number.s = (short)value; /* TODO should round */
+	}
+	else if(type == T_LONG) {
+		if(value > LONG_MAX || value < LONG_MIN) 
+			SetError(dest, OVERFLOWERR);
+		else
+			dest->value.number.l = (long)value; /* TODO should round */
+	}
 	else 
 		SetError(dest, BADARGTYPE);
 	
@@ -791,7 +793,8 @@ Error ScalarToString(const Scalar *value, QString *str)
 	Error result;
 	
 	QsInitNull(str);
-	CopyScalar(&copy, value);
+	InitScalar(&copy, NonPointer(value->type), FALSE);
+	CopyDereferencingSource(&copy, value);
 	if((result = ChangeType(&copy, TR_ANY_TO_STRING)) == SUCCESS)
 		QsCopy(str, &copy.value.string);
 	DisposeScalar(&copy);
@@ -1177,7 +1180,7 @@ Error ParseAs(const QString *s, Scalar *v, SimpleType typeRequired)
 	else if(typeRequired == T_BOOL)
 		error = ParseBoolean(s, v);
 	
-	PropagateError(v, NULL, error);
+	PropagateError(v, v, error);
 	
 	assert(ScalarIsSane(v));
 	

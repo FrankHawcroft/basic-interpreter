@@ -12,38 +12,46 @@
 
 #define EXPR_STK_LIMIT 667 /* due to increasing size by scale factor of 1.5, means the max height is 1000 */
 
-static bool ExtendStackIfNecessary(struct Stack *stack, int required)
+static bool ExtendStack(struct Stack *stack, int required)
 {
-	bool ok = TRUE;
-	
-	if(StkSpaceRemaining(stack) < required) {
-		if(StkHeight(stack) <= EXPR_STK_LIMIT) {
-			unsigned limit = StkLimit(stack);
-			unsigned newSize = (3 * limit) / 2;
-			if(StkHeight(stack) + required > newSize)
-				newSize = StkHeight(stack) + required;
-			ok = StkResize(stack, newSize);
+	bool ok = FALSE;
+	unsigned limit = StkLimit(stack);
+	unsigned newSize = (3 * limit) / 2;
+		
+	if(StkHeight(stack) + required > newSize)
+		newSize = StkHeight(stack) + required;
+		
+	if(StkHeight(stack) <= EXPR_STK_LIMIT) {
+		ok = StkResize(stack, newSize);
 /*
 #ifdef DEBUG
-			fprintf(stderr, 
-				ok ? "[ExprStack: extended from size %u --> %u]\n" 
-				   : "[ExprStack: FAILED to extend from size %u --> %u]\n", limit, newSize);
+		fprintf(stderr, 
+			ok ? "[ExprStack: extended from size %u --> %u]\n" 
+				: "[ExprStack: FAILED to extend from size %u --> %u]\n", limit, newSize);
 #endif
 */
-		}
-		else
-			ok = FALSE;
-		
-		if(!ok) {
-			BObject err;
-			if(StkFull(stack))
-				CutExprStk(stack, 1);
-			SetObjectToError(&err, ER_STACK_OVERFLOW);
-			StkPush(stack, &err);
-		}
+	}
+/*
+#ifdef DEBUG
+	else
+		fprintf(stderr, "[ExprStack: required size %u is above absolute limit of %u and stack will not be extended!]\n", 
+			newSize, EXPR_STK_LIMIT);
+#endif
+*/	
+	if(!ok) {
+		BObject err;
+		if(StkFull(stack))
+			CutExprStk(stack, 1);
+		SetObjectToError(&err, ER_STACK_OVERFLOW);
+		StkPush(stack, &err);
 	}
 	
 	return ok;
+}
+
+INLINE bool ExtendStackIfNecessary(struct Stack *stack, int required)
+{	
+	return StkSpaceRemaining(stack) >= required || ExtendStack(stack, required);
 }
 
 /* To save copying to a temporary object, expression evaluation doesn't push objects on the stack
@@ -72,17 +80,15 @@ static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 	
 	if(functor->category == OPERATOR) {
 		assert(count == OperandCount(functor->value.opRef)); /* assume syntax checked */
-		result.category = LITERAL;
+		result.category = LITERAL;		
 		if((error = ConformQuickly(ParametersForOperator(functor->value.opRef), param, count)) == SUCCESS)
 			EvalOperation(&result.value.scalar, functor->value.opRef,
 				&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
 	}
-	else if(functor->category == FUNCTION) {
-		if((error = ConformForApplication(functor, param, count)) == SUCCESS)
+	else if((error = ConformForApplication(functor, param, count)) == SUCCESS) {
+		if(functor->category == FUNCTION)	
 			CallFunction(&result, functor->value.function, param, count, stack);
-	}
-	else if(IsVariable(functor)) {
-		if((error = ConformForApplication(functor, param, count)) == SUCCESS
+		else if(IsVariable(functor)
 		&& (error = IndexArray(&result.value.variable, VarPtr(functor), param, count)) == SUCCESS)
 			result.category = (result.value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF;
 	}
@@ -101,7 +107,7 @@ static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 		need to be disposed of, but this is caught by syntax checking, and the risk of a memory
 		leak (if syntax checking is bypassed or buggy) isn't worth the overhead on every
 		legitimate application. */
-	/*RemoveObject(functor, FALSE);*/
+	/*DisposeIfScalar(functor);*/
 	
 	/*fprintf(stderr, "[Eval-->: ");
 	DumpObject(&result);
@@ -231,18 +237,14 @@ void CreateExprStk(struct Stack *stack, unsigned maxHeight)
 		DefaultOutOfMemoryHandler(maxHeight * sizeof(BObject));
 }
 
-static void ShallowDispose(BObject *obj) { RemoveObject(obj, FALSE); }
-
-#define ESTK_DISPOSE (StackItemDisposer)&ShallowDispose
-
 void ClearExprStk(struct Stack *stack)
 {
-	StkClear(stack, ESTK_DISPOSE);
+	StkClear(stack, (StackItemDisposer)&DisposeIfScalar);
 }
 
 void CutExprStk(struct Stack *stack, int count)
 {
-	StkDiscard(stack, count, ESTK_DISPOSE);
+	StkDiscard(stack, count, (StackItemDisposer)&DisposeIfScalar);
 }
 
 void DisposeExprStk(struct Stack *stack)

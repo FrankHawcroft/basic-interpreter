@@ -191,11 +191,6 @@ BObject *LookUpLocal(const QString *symbol, short callNestLevel)
 	}
 }
 
-static void DisposeDefinition(void *object)
-{
-	RemoveObject(object, TRUE);
-}
-
 INLINE unsigned NumBins(bool lowMem, short callNestLevel)
 {
 	if(callNestLevel == SCOPE_BUILTIN) return lowMem ? 103 : 809;
@@ -215,7 +210,7 @@ static Error DefineQuickly(struct Definition *defn, short callNestLevel)
 	/* TODO make HtCreate (optionally?) tolerant of mem alloc failure - */
 	if(relevantTable == NULL)
 		relevantTable = proc->environment[EnvironmentIndex(callNestLevel)]
-			= HtCreate(NumBins(proc->opts->lowMemory, callNestLevel), DisposeDefinition, NULL);
+			= HtCreate(NumBins(proc->opts->lowMemory, callNestLevel), &DisposeObject, NULL);
 
 	HtAddPreallocated(relevantTable, defn);
 	

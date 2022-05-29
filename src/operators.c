@@ -159,9 +159,9 @@ const struct Parameter *ParametersForOperator(const struct Operator *op)
 }
 
 /* Evaluate a unary or binary operation.
-	Type conversion and error checking is assumed to have been done already - see Conform.
-	All operand methods follow the convention that 'result' is an out parameter and does not have
-to be initialised before calling. */
+	Type conversion and error checking is assumed to have been done already - see Conform and ConformQuickly.
+	All operand methods follow the convention that 'result' is an uninitialised out parameter.
+	If evaluation fails, an error will be left in 'result'. */
 void EvalOperation(Scalar *result, const struct Operator *operation, const Scalar *a, const Scalar *b)
 {
 	assert(operation != NULL);
@@ -170,7 +170,7 @@ void EvalOperation(Scalar *result, const struct Operator *operation, const Scala
 	assert(operation->numOperands == UNARY || operation->numOperands == BINARY); /* Paranoia. */
 	assert((operation->numOperands == UNARY) == (b == NULL));
 	assert(!ScalarIsError(a) && (b == NULL || !ScalarIsError(b)));
-	
+
 	if(operation->numOperands == BINARY)
 		(*operation->method.binaryMethod)(result, a, b);
 	else
@@ -216,7 +216,7 @@ INLINE void SetIntResult(Scalar *result, long val, bool overflow, SimpleType t1,
 {
 	if(!overflow)
 		SetFromLong(result, val, 
-			t1 == T_INT && t2 == T_INT && val >= SHRT_MIN && val <= SHRT_MAX ? T_INT : T_LONG);
+			NonPointer(t1) == T_INT && NonPointer(t2) == T_INT && val >= SHRT_MIN && val <= SHRT_MAX ? T_INT : T_LONG);
 }
 
 /* Floating point overflow detection is avoided on the Amiga because a bit slow. */
@@ -236,7 +236,7 @@ INLINE void SetFPResult(Scalar *result, double val, SimpleType t1, SimpleType t2
 	else
 #endif
 		SetFromDouble(result, val,
-			t1 == T_DOUBLE || t2 == T_DOUBLE || fabs(val) > FLT_MAX ? T_DOUBLE : T_SINGLE);
+			NonPointer(t1) == T_DOUBLE || NonPointer(t2) == T_DOUBLE || fabs(val) > FLT_MAX ? T_DOUBLE : T_SINGLE);
 }
 
 static void Exponentiation_(Scalar *result, const Scalar *a, const Scalar *b)
@@ -288,7 +288,7 @@ static void Multiplication_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void Division_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(GetDouble(b) == 0.0)
+	if(GetDouble(b) == 0.0 && TypeIsNumeric(NonPointer(b->type)))
 		SetError(result, ZERODIVISOR);
 	else
 		SetFPResult(result, GetDouble(a) / GetDouble(b), a->type, b->type);
@@ -296,7 +296,8 @@ static void Division_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void Addition_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(TypeIsTextual(a->type) || TypeIsTextual(b->type)) {
+	if(TypeIsTextual(NonPointer(a->type)) || TypeIsTextual(NonPointer(b->type))) {
+		Concatenation_(result, a, b); /*
 		Scalar op1str, op2str;
 		CopyScalar(&op1str, a);
 		CopyScalar(&op2str, b);
@@ -305,7 +306,7 @@ static void Addition_(Scalar *result, const Scalar *a, const Scalar *b)
 		else
 			SetError(result, BADARGTYPE);
 		DisposeScalar(&op1str);
-		DisposeScalar(&op2str);
+		DisposeScalar(&op2str);*/
 	}
 	else {
 		bool overflow = TRUE; /* assume f.p. unless both integral */
@@ -331,7 +332,7 @@ static void Subtraction_(Scalar *result, const Scalar *a, const Scalar *b)
 {
 	bool overflow = TRUE; /* assume f.p. unless both integral */
 
-	if(TypeIsExact(a->type) && TypeIsExact(b->type)) {
+	if(TypeIsExact(NonPointer(a->type)) && TypeIsExact(NonPointer(b->type))) {
 		long la = GetLong(a), lb = GetLong(b);
 		long diff = la - lb;
 		overflow = (lb > 0 && diff > la) || (lb < 0 && diff < la);
@@ -393,40 +394,60 @@ INLINE void SetTruncated(Scalar *dest, long v, SimpleType t1, SimpleType t2)
 
 static void BitwiseOR_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetTruncated(result, GetLong(a) | GetLong(b), a->type, b->type);
+	SetTruncated(result, GetLong(a) | GetLong(b), NonPointer(a->type), NonPointer(b->type));
 }
 
 static void BitwiseAND_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetTruncated(result, GetLong(a) & GetLong(b), a->type, b->type);
+	SetTruncated(result, GetLong(a) & GetLong(b), NonPointer(a->type), NonPointer(b->type));
 }
 
 static void BitwiseXOR_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetTruncated(result, GetLong(a) ^ GetLong(b), a->type, b->type);
+	SetTruncated(result, GetLong(a) ^ GetLong(b), NonPointer(a->type), NonPointer(b->type));
 }
 
 static void BitwiseNOT_(Scalar *result, const Scalar *a)
 {
-	SetTruncated(result, ~GetLong(a), a->type, a->type);
+	SetTruncated(result, ~GetLong(a), NonPointer(a->type), NonPointer(a->type));
 }
 
 static void Concatenation_(Scalar *result, const Scalar *a, const Scalar *b)
 {
+	Error error = BADARGTYPE;
+	
 	InitScalarAsString(result);
-	if(!QsJoin(&result->value.string, &a->value.string, &b->value.string))
-		SetError(result, OVERFLOWERR);
+	if(NonPointer(a->type) == T_STRING && NonPointer(b->type) == T_STRING)
+		error = QsJoin(&result->value.string,
+					(const QString *)GetPointer((Scalar *)a), (const QString *)GetPointer((Scalar *)b))
+			? SUCCESS : NOMEMORY;
+	else {
+		QString sa, sb;
+		QsInitNull(&sa); QsInitNull(&sb);
+		if((error = ScalarToString(a, &sa)) == SUCCESS && (error = ScalarToString(b, &sb)) == SUCCESS)
+			error = QsJoin(&result->value.string, &sa, &sb) ? SUCCESS : NOMEMORY;
+		QsDispose(&sa); QsDispose(&sb);
+	}
+	
+	if(error != SUCCESS)
+		SetError(result, error);
 }
 
 static void CharSetMembership_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBoolean(result, QsSearchForChar(&b->value.string, a->value.character) != NULL);
+	const QString *s = NonPointer(a->type) == T_STRING ? (const QString *)GetPointer((Scalar *)a) : NULL;
+	if(s != NULL && QsGetLength(s) != 1)
+		SetError(result, OUTSIDEDOMAIN);
+	else {
+		QsChar ch = s != NULL ? QsGetFirst(s) : GetCharacter(a);
+		SetBoolean(result, QsSearchForChar((const QString *)GetPointer((Scalar *)b), ch) != NULL);
+	}
 }
 
 static void Modulo_(Scalar *result, const Scalar *a, const Scalar *b)
 {
 	long modulus = GetLong(b);
-	if(modulus == 0)
+	if(modulus == 0 && TypeIsNumeric(NonPointer(b->type)))
 		SetError(result, ZERODIVISOR);
 	else if(a->type == T_INT && b->type == T_INT)
 		SetFromShort(result, a->value.number.s % b->value.number.s, T_INT);
@@ -437,7 +458,7 @@ static void Modulo_(Scalar *result, const Scalar *a, const Scalar *b)
 static void WholeDivision_(Scalar *result, const Scalar *a, const Scalar *b)
 {
 	long divisor = GetLong(b);
-	if(divisor == 0)
+	if(divisor == 0 && TypeIsNumeric(NonPointer(b->type)))
 		SetError(result, ZERODIVISOR);
 	else if(a->type == T_INT && b->type == T_INT)
 		SetFromShort(result, a->value.number.s / b->value.number.s, T_INT);
@@ -455,36 +476,30 @@ INLINE void SetBooleanOrError(Scalar *result, bool val, Error error)
 
 static void GreaterOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error = SUCCESS;
-	SetBooleanOrError(result, Compare(a, b, &error) >= 0, error);
+	SetBooleanOrError(result, Compare(a, b, &result->value.error) >= 0, result->value.error);
 }
 
 static void Equal_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error = SUCCESS;
-	SetBooleanOrError(result, Compare(a, b, &error) == 0, error);
+	SetBooleanOrError(result, Compare(a, b, &result->value.error) == 0, result->value.error);
 }
 
 static void LessOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error = SUCCESS;
-	SetBooleanOrError(result, Compare(a, b, &error) <= 0, error);
+	SetBooleanOrError(result, Compare(a, b, &result->value.error) <= 0, result->value.error);
 }
 
 static void Greater_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error = SUCCESS;
-	SetBooleanOrError(result, Compare(a, b, &error) > 0, error);
+	SetBooleanOrError(result, Compare(a, b, &result->value.error) > 0, result->value.error);
 }
 
 static void Less_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error = SUCCESS;
-	SetBooleanOrError(result, Compare(a, b, &error) < 0, error);
+	SetBooleanOrError(result, Compare(a, b, &result->value.error) < 0, result->value.error);
 }
 
 static void NotEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	Error error = SUCCESS;
-	SetBooleanOrError(result, Compare(a, b, &error) != 0, error);
+	SetBooleanOrError(result, Compare(a, b, &result->value.error) != 0, result->value.error);
 }

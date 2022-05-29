@@ -19,7 +19,6 @@ void InitObject(BObject *obj, enum SymbolType kind)
 	obj->category = kind;
 	if(kind == LITERAL)
 		obj->value.scalar = *g_Empty;
-		/*InitScalar(&obj->value.scalar, T_EMPTY, FALSE);*/
 	else if((kind & IS_VARIABLE) && !(kind & VARIABLE_IS_POINTER))
 		InitVariable(&obj->value.variable, T_EMPTY, FALSE); 
 	else
@@ -31,16 +30,19 @@ bool IsEmpty(const BObject *obj)
 	return obj == NULL  || (obj->category == LITERAL && GetSimpleType(obj) <= T_MISSING);
 }
 
-/* Duplicate an object. Literal values are cloned, but for other types, a simple structure copy is sufficient. */
+/* Duplicate an object. Literal values are cloned, but for other types, a simple structure copy is sufficient.
+	The order of source type checking is optimised for EvalPreconverted. */
 void CopyObject(BObject *dest, const BObject *source)
 {
 	assert(dest != NULL && source != NULL);
 
-	if(source->category == LITERAL) {
+	if(source->category & VARIABLE_IS_POINTER)
+		*dest = *source;
+	else if(source->category == LITERAL) {
 		dest->category = LITERAL;
 		CopyScalar(&dest->value.scalar, &source->value.scalar);
 	}
-	else if((source->category & IS_VARIABLE) && !(source->category & VARIABLE_IS_POINTER)) {
+	else if(IsVariable(source)) { /* embedded variable */
 		dest->category = source->category;
 		CopyScalar(&dest->value.variable.value, &source->value.variable.value);
 	}
@@ -66,23 +68,25 @@ SimpleType GetSimpleType(const BObject *obj)
 		return T_EMPTY;
 }
 
-/* Does not dispose of 'complex' types such as functions, subprograms, etc. unless
-the second parameter is true. 
-	A shallow disposal - obj itself is not disposed of, just its contents. */
-void RemoveObject(BObject *obj, bool definition)
+/* obj itself is not disposed of, just its contents. */
+void DisposeObject(BObject *obj)
 {
 	assert(obj != NULL);
 
+	if(IsVariable(obj))
+		DisposeVariableObject(obj);
+	else if(obj->category == STATEMENT)
+		DisposeStatement(obj->value.statement);
+	else if(obj->category == FUNCTION)
+		DisposeFunction(obj->value.function);
+	else
+		DisposeIfScalar(obj);
+}
+
+void DisposeIfScalar(BObject *obj)
+{
 	if(obj->category == LITERAL)
 		DisposeScalar(&obj->value.scalar);
-	else if(definition) {
-		if(IsVariable(obj))
-			DisposeVariableObject(obj);
-		else if(obj->category == STATEMENT)
-			DisposeStatement(obj->value.statement);
-		else if(obj->category == FUNCTION)
-			DisposeFunction(obj->value.function);
-	}
 }
 
 bool Dynamic(const BObject *obj)
@@ -183,31 +187,46 @@ void SetSymbolReference(BObject *obj, enum SymbolType kind, void *value)
 	obj->category = kind;
 }
 
+INLINE Error CopyScalarToObject(BObject *obj, const Scalar *src)
+{
+	CopyDereferencingSource(&obj->value.scalar, src);
+	obj->category = LITERAL;
+	return SUCCESS;
+}
+
+/* Split into a separate function because it's a minority case, to keep DereferenceObject
+small - when variables are looked up, a pointer object is created rather than an embedded
+variable. */
+static Error DereferenceScalarVariable(BObject *obj)
+{
+	/* Need to save the scalar out of the embedded variable before copying it into the same object. */
+	Scalar val = obj->value.variable.value;
+	
+	assert(IsVariable(obj));
+	assert(!(obj->category & VARIABLE_IS_ARRAY));
+	
+	return CopyScalarToObject(obj, &val);
+}
+
 /* Yields, where possible, a scalar value from an object.
 	Returns an error if this is not a meaningful operation for the type of object:
 it must be a non-array variable, if not already a literal. Parameterless functions
 are NOT called. An existing error is propagated. */
 Error DereferenceObject(BObject *obj)
 {
-	Error error = SCALAREXPECTED; /* assume an array, unevaluated function, or label, subprogram, etc. */
-	
 	assert(obj != NULL);
 	
-	if(obj->category == LITERAL) /* should be the most common case */
-		error = !ObjectIsError(obj) ? SUCCESS : ObjectAsError(obj);
-	else if(IsVariable(obj)) {
-		struct Variable *v = (obj->category & VARIABLE_IS_POINTER) ? obj->value.varRef : &obj->value.variable; /*VarPtr(obj);*/
-		if(!(obj->category & VARIABLE_IS_ARRAY) && v->dim.few[0] == -1) {
-			Scalar result;
-			CopyDereferencingSource(&result, &v->value);
-			/* obj does not need to be deleted, because it's a variable reference. */
-			obj->category = LITERAL;
-			obj->value.scalar = result;
-			error = SUCCESS;
-		}
-	}
-
-	return error;
+	if(obj->category == LITERAL) /* should be the most common case - the result of an expression */
+		return !ObjectIsError(obj) ? SUCCESS : ObjectAsError(obj);
+	else if((obj->category & VARIABLE_IS_ARRAY) && VarPtr(obj)->dim.few[0] != -1) /* insufficiently subscripted array */
+		return SCALAREXPECTED;
+	else if(obj->category & VARIABLE_IS_POINTER)
+		/* obj does not need to be deleted, because it's just a variable reference. */
+		return CopyScalarToObject(obj, &obj->value.varRef->value);
+	else if(IsVariable(obj))
+		return DereferenceScalarVariable(obj);
+	else
+		return SCALAREXPECTED; /* assume an unevaluated function, or label, subprogram, etc. */
 }
 
 #ifdef DEBUG

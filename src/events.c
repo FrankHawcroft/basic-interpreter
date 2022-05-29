@@ -77,7 +77,7 @@ struct Trap {
 	void (*transition)(struct Trap *, enum HandlerState);
 	
 	/* Used to resolve which event should be handled, based on priority and sequencing. */
-	void (*prioritise)(struct Process *proc, struct Trap *current, struct Trap **best, unsigned long *maxSequencing);
+	void (*prioritise)(const struct Process *proc, struct Trap *current, struct Trap **best, unsigned long *maxSequencing);
 	
 	/* The programatically-defined event handler. */
 	union {
@@ -291,7 +291,7 @@ than the current maximum, sending it to the back of the queue for next time.
 
 A more subtle sequencing function could be used if needed, e.g. for events which
 should occur in balanced pairs. */
-static void PrioritiseWithDefaultStrategy(struct Process *proc,
+static void PrioritiseWithDefaultStrategy(const struct Process *proc,
 	struct Trap *current, struct Trap **best, unsigned long *maxSequencing)
 {
 	assert(current != NULL && best != NULL && maxSequencing != NULL);
@@ -481,7 +481,7 @@ handled. */
 bool CheckForEvents(struct Process *proc)
 {
 	enum EventType et;
-	bool anyEvents = FALSE, handledEvent = FALSE;
+	bool anyEvents = FALSE;
 
 	PollUIEvents(proc);
 	CheckAudio(proc);
@@ -489,23 +489,25 @@ bool CheckForEvents(struct Process *proc)
 	/* Retrieve events, recording any which are sufficiently recent and interesting: */
 
 	for(et = FIRST_EVENT_TYPE; et <= LAST_EVENT_TYPE; et++) {
-		struct Trap *t = &proc->trap[et];	
-		if(t->status != DISABLED) {
-			(*t->poll)(t);
+		if(proc->trap[et].status != DISABLED) {
+			(*proc->trap[et].poll)(&proc->trap[et]);
 			anyEvents |= EventAvailable(proc, et);
 		}
 	}
 
 	/* Handle, or not: */
 	
-	if(anyEvents) {
+	if(!anyEvents)
+		return FALSE;
+	else {
 		struct Trap *userTrap = ChooseTrap(proc);
+		bool handledEvent = FALSE;
 		
 		for(et = FIRST_EVENT_TYPE; et <= LAST_EVENT_TYPE; et++)
 			handledEvent |= HandleEvent(&proc->trap[et], userTrap);
+		
+		return handledEvent;
 	}
-	
-	return handledEvent;
 }
 
 void ReenableEventTraps(struct Process *proc, short newCallNestLevel)

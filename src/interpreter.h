@@ -540,7 +540,8 @@ extern void InitObject(BObject *, enum SymbolType);
 extern bool IsEmpty(const BObject *);
 extern void CopyObject(BObject *dest, const BObject *source);
 extern SimpleType GetSimpleType(const BObject *);
-extern void RemoveObject(BObject *, bool);
+extern void DisposeObject(BObject *);
+extern void DisposeIfScalar(BObject *);
 extern Error ObjectAsError(const BObject *);
 #define ObjectIsError(obj) ((obj)->category == LITERAL && (obj)->value.scalar.type == T_ERROR)
 #define IndicatesError(obj) (ObjectAsError(obj) != SUCCESS) /* subtly different from the above */

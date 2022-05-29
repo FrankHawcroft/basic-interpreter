@@ -17,5 +17,4 @@ FOR t=-inside/10 TO outside/10 STEP .1
 		PSET 200+x,y*f+200
 	NEXT angle
 NEXT t
-'wait 10
-'xfree
+wait 10

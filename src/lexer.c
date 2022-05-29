@@ -601,7 +601,7 @@ void DisposeTokenSequence(struct TokenSequence *tokSeq)
 	if(tokSeq->preconverted != NULL) {
 		unsigned short i;
 		for(i = 0; i < tokSeq->length; i++)
-			RemoveObject(&tokSeq->preconverted[i], FALSE);
+			DisposeIfScalar(&tokSeq->preconverted[i]);
 		Dispose(tokSeq->preconverted);
 	}
 	ClearTokenSequence(tokSeq);

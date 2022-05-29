@@ -141,11 +141,6 @@ static const char *FindEndSub(const char *startOfSub)
 	return found == NULL ? Proc()->currentPosition : found;
 }
 
-static void DisposeDefinition(void *object)
-{
-	RemoveObject(object, TRUE);
-}
-
 void Sub_(const QString *toks, unsigned nToks)
 {
 	const QString *subprogramName = &toks[0];
@@ -221,7 +216,7 @@ void Sub_(const QString *toks, unsigned nToks)
 		/* Pre-create local environment if static. */
 		
 		if(isStatic) {	
-			stmt->localStatics = HtCreate(5 + numParams / 2 + numParams % 2, DisposeDefinition, NULL);
+			stmt->localStatics = HtCreate(5 + numParams / 2 + numParams % 2, &DisposeObject, NULL);
 			if(numParams > 0) {
 				stmt->predefinedParameter = New(sizeof(struct Variable *) * numParams);
 				memset(stmt->predefinedParameter, 0, sizeof(struct Variable *) * numParams);

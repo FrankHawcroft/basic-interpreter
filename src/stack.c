@@ -112,10 +112,14 @@ void StkPop(struct Stack *stk, void *item)
 	--stk->height;
 }
 
-static int Scaled(const PfGranularType *higher, const PfGranularType *lower, const struct Stack *stk)
+#ifdef OLD_COMPILER_DOES_NOT_INLINE
+#define Scaled(higher, lower, stk) (((higher) - (lower)) / (stk)->itemSize)
+#else
+INLINE int Scaled(const PfGranularType *higher, const PfGranularType *lower, const struct Stack *stk)
 {
 	return (higher - lower) / stk->itemSize;
 }
+#endif
 
 int StkSpaceRemaining(const struct Stack *stk)
 {

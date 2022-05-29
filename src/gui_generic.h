@@ -10,7 +10,7 @@
 
 typedef void *PfWindowHandle;
 typedef void *PfScreenHandle;
-typedef int PfAnimatedObjectHandle;
+typedef void *PfAnimatedObjectHandle;
 
 #define NULL_SCREEN_HANDLE NULL
 #define NULL_WINDOW_HANDLE NULL

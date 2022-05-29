@@ -34,6 +34,9 @@ typedef struct VSprite *PfAnimatedObjectHandle;
 #define NULL_SCREEN_HANDLE NULL
 #define NULL_WINDOW_HANDLE NULL
 
+static PfWindowHandle OutputWindow(void);
+static bool WindowExists(const PfWindowHandle w);
+
 typedef struct {
 	USHORT code;
 	USHORT qualifier;

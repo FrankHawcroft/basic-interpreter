@@ -83,7 +83,7 @@ void StorePreconvertedObjects(struct TokenSequence *ts, short callNestLevelWhenE
 		if(!allResolved) {
 			unsigned short m;
 			for(m = 0; m < n; m++)
-				RemoveObject(&ts->preconverted[m], FALSE);
+				DisposeIfScalar(&ts->preconverted[m]);
 			Dispose(ts->preconverted);
 			ts->preconverted = NULL;
 		}
@@ -268,7 +268,7 @@ static SimpleType WithLeftContext(enum TypeRule required, const QString *token)
 		if(GetSimpleType(&left) != T_EMPTY)
 			leftContext = GetSimpleType(&left);
 		
-		RemoveObject(&left, FALSE);
+		DisposeIfScalar(&left);
 	}
 	
 	return leftContext;
@@ -544,7 +544,7 @@ static bool ConvertLiteral(const struct Parameter *formal, int fcount, QString *
 			MakeQuotedToken(&val.value.scalar, tok);
 		}
 		
-		RemoveObject(&val, FALSE);
+		DisposeIfScalar(&val);
 		
 		return changed;
 	}

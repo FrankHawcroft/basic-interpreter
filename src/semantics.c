@@ -213,28 +213,30 @@ can't be taken into consideration. It can only state whether it MIGHT be
 possible to convert a value of this type to another type. */
 static bool TypeMayBeOK(const struct PrimitiveTypeCharacteristics *actualType, enum TypeRule requirement)
 {
-	bool textual, numeric;
-	
 	assert(actualType != NULL);
 	
-	textual = (actualType->properties & T_IS_TEXTUAL) != 0, numeric = (actualType->properties & T_IS_NUMERIC) != 0;
-	
-	/* Some cases not expressed by current TypeRule values aren't covered here. */
-	return (requirement & TD_FLEXIBLE)
-		|| (requirement & actualType->code) /* All strict conversions, and some others. */
-		|| ((requirement & TD_LOOSE) && (requirement & NUMERIC_TYPES)
-			&& !textual)
-		|| ((requirement & TD_LOOSE) && (requirement & TEXTUAL_TYPES)
-			&& textual)
-		|| ((requirement & TD_LOOSE) && (requirement & T_BOOL))
-		|| ((requirement & TD_CHECKED) && (requirement & NUMERIC_TYPES)
-			&& numeric)
-		|| ((requirement & TD_CHECKED) && (requirement & INTEGRAL_TYPES)
-			&& (numeric || actualType->code == T_BOOL))
-		|| ((requirement & TD_CHECKED) && (requirement & TEXTUAL_TYPES)
-			&& textual)
-		|| ((requirement & TD_PRECISE) && (requirement & INTEGRAL_TYPES)
-			&& (actualType->code & INTEGRAL_TYPES));
+	if(requirement & actualType->code) /* All strict conversions, and some others. */
+		return TRUE;
+	else {
+		bool textual = (actualType->properties & T_IS_TEXTUAL) != 0, 
+			numeric = (actualType->properties & T_IS_NUMERIC) != 0;
+		
+		/* Some cases not expressed by current TypeRule values aren't covered here. */
+		return (requirement & TD_FLEXIBLE)
+			|| ((requirement & TD_LOOSE) && (requirement & NUMERIC_TYPES)
+				&& !textual)
+			|| ((requirement & TD_LOOSE) && (requirement & TEXTUAL_TYPES)
+				&& textual)
+			|| ((requirement & TD_LOOSE) && (requirement & T_BOOL))
+			|| ((requirement & TD_CHECKED) && (requirement & NUMERIC_TYPES)
+				&& numeric)
+			|| ((requirement & TD_CHECKED) && (requirement & INTEGRAL_TYPES)
+				&& (numeric || actualType->code == T_BOOL))
+			|| ((requirement & TD_CHECKED) && (requirement & TEXTUAL_TYPES)
+				&& textual)
+			|| ((requirement & TD_PRECISE) && (requirement & INTEGRAL_TYPES)
+				&& (actualType->code & INTEGRAL_TYPES));
+	}
 }
 
 /* This function does type checking with a 'contextual' item, typically a
@@ -496,7 +498,7 @@ Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count)
 		BObject *a = &actual[n];
 
 		if(f->kind == LITERAL && (error = DereferenceObject(a)) == SUCCESS) { /* deref propagates errors */
-			SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(&actual[n - 1]);
+			SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(a - 1);
 			error = ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
 		}
 		else if(ObjectIsError(a))
@@ -535,7 +537,7 @@ SimpleType TypeOfToken(const QString *t)
 		
 		ConvertToObject(t, &obj, Proc()->callNestLevel);
 		st = GetSimpleType(&obj);
-		RemoveObject(&obj, FALSE);
+		DisposeIfScalar(&obj);
 		return st;
 	}
 }
