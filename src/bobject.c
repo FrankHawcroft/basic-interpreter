@@ -68,8 +68,7 @@ SimpleType GetSimpleType(const BObject *obj)
 		return T_EMPTY;
 }
 
-/* obj itself is not disposed of, just its contents. */
-void DisposeObject(BObject *obj)
+void DisposeObjectContents(BObject *obj)
 {
 	assert(obj != NULL);
 

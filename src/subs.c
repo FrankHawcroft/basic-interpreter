@@ -216,7 +216,7 @@ void Sub_(const QString *toks, unsigned nToks)
 		/* Pre-create local environment if static. */
 		
 		if(isStatic) {	
-			stmt->localStatics = HtCreate(5 + numParams / 2 + numParams % 2, &DisposeObject, NULL);
+			stmt->localStatics = HtCreate(5 + numParams / 2 + numParams % 2, &DisposeObjectContents, NULL);
 			if(numParams > 0) {
 				stmt->predefinedParameter = New(sizeof(struct Variable *) * numParams);
 				memset(stmt->predefinedParameter, 0, sizeof(struct Variable *) * numParams);

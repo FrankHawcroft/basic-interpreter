@@ -466,40 +466,43 @@ static void WholeDivision_(Scalar *result, const Scalar *a, const Scalar *b)
 		SetFromLong(result, GetLong(a) / divisor, T_LONG);
 }
 
-INLINE void SetBooleanOrError(Scalar *result, bool val, Error error)
+INLINE bool SetComparisonOrError(Scalar *result, const Scalar *a, const Scalar *b)
 {
+	Error error = SUCCESS;
+	int comparison = Compare(a, b, &error);
 	if(error == SUCCESS)
-		SetBoolean(result, val);
+		SetFromLong(result, comparison, T_LONG);
 	else
 		SetError(result, error);
+	return error == SUCCESS;
 }
 
 static void GreaterOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBooleanOrError(result, Compare(a, b, &result->value.error) >= 0, result->value.error);
+	if(SetComparisonOrError(result, a, b)) SetBoolean(result, GetLong(result) >= 0);
 }
 
 static void Equal_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBooleanOrError(result, Compare(a, b, &result->value.error) == 0, result->value.error);
+	if(SetComparisonOrError(result, a, b)) SetBoolean(result, GetLong(result) == 0);
 }
 
 static void LessOrEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBooleanOrError(result, Compare(a, b, &result->value.error) <= 0, result->value.error);
+	if(SetComparisonOrError(result, a, b)) SetBoolean(result, GetLong(result) <= 0);
 }
 
 static void Greater_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBooleanOrError(result, Compare(a, b, &result->value.error) > 0, result->value.error);
+	if(SetComparisonOrError(result, a, b)) SetBoolean(result, GetLong(result) > 0);
 }
 
 static void Less_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBooleanOrError(result, Compare(a, b, &result->value.error) < 0, result->value.error);
+	if(SetComparisonOrError(result, a, b)) SetBoolean(result, GetLong(result) < 0);
 }
 
 static void NotEqual_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	SetBooleanOrError(result, Compare(a, b, &result->value.error) != 0, result->value.error);
+	if(SetComparisonOrError(result, a, b)) SetBoolean(result, GetLong(result) != 0);
 }

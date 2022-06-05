@@ -218,9 +218,13 @@ static bool TypeMayBeOK(const struct PrimitiveTypeCharacteristics *actualType, e
 	if(requirement & actualType->code) /* All strict conversions, and some others. */
 		return TRUE;
 	else {
-		bool textual = (actualType->properties & T_IS_TEXTUAL) != 0, 
-			numeric = (actualType->properties & T_IS_NUMERIC) != 0;
+		bool internal = (actualType->properties & T_IS_INTERNAL) != 0,
+			 textual = (actualType->properties & T_IS_TEXTUAL) != 0, 
+			 numeric = (actualType->properties & T_IS_NUMERIC) != 0;
 		
+		if(internal) /* error, missing, or empty is never OK - indicates an earlier problem */
+			return FALSE;
+			
 		/* Some cases not expressed by current TypeRule values aren't covered here. */
 		return (requirement & TD_FLEXIBLE)
 			|| ((requirement & TD_LOOSE) && (requirement & NUMERIC_TYPES)
@@ -497,12 +501,14 @@ Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count)
 		const struct Parameter *f = &formal[n];
 		BObject *a = &actual[n];
 
-		if(f->kind == LITERAL && (error = DereferenceObject(a)) == SUCCESS) { /* deref propagates errors */
-			SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(a - 1);
-			error = ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
+		if(f->kind == LITERAL) {
+			if((error = DereferenceObject(a)) == SUCCESS) { /* deref propagates errors */
+				SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(a - 1);
+				error = ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
+			}
 		}
-		else if(ObjectIsError(a))
-			error = ObjectAsError(a);
+		else if(!Resolved(a)) /* there is no substitution of defaults in quick conformance */
+			error = ObjectAsError(a) != SUCCESS ? ObjectAsError(a) : UNDEFINEDVARORFUNC;
 	}
 	
 	return error;

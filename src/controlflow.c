@@ -670,19 +670,22 @@ void EndIf_(BObject *arg, unsigned count)
 
 static Error EvalCondition(const QString *expr, unsigned len, struct Stack *evalSpace, bool *fired)
 {
-	Error error;
+	Error error = SUCCESS;
+	QString *prefixForm = NULL;
+	BObject *result = NULL;
+	
 	if((error = CheckExpressionSyntax(expr, len, Proc()->currentStatementStart)) == SUCCESS) {
-		QString *prefixForm = InfixToPrefix(expr, len, NULL);
-		if(prefixForm != NULL) {
+		error = BADSYNTAX; /* assume two or more exprs, or some other syntactically seemingly valid mistake */
+		if((prefixForm = InfixToPrefix(expr, len, NULL)) != NULL) {
 			Eval(prefixForm, DefaultConvert, 0, evalSpace);
-			Dispose(prefixForm);
-		
-			*fired = StkHeight(evalSpace) == 1 
-				&& (error = DereferenceObject(PeekExprStk(evalSpace, 0))) == SUCCESS
-				&& GetBoolean(&(PeekExprStk(evalSpace, 0)->value.scalar));
+			Dispose(prefixForm);		
+			if(StkHeight(evalSpace) == 1) {
+				result = PeekExprStk(evalSpace, 0);
+				*fired = (error = DereferenceObject(result)) == SUCCESS
+					&& (error = (Resolved(result) ? SUCCESS : UNDEFINEDVARORFUNC)) == SUCCESS
+					&& GetBoolean(&result->value.scalar);
+			}
 		}
-		else
-			error = BADSYNTAX;
 	}
 	return error;
 }

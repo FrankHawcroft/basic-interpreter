@@ -626,25 +626,41 @@ static void RenameFunction(QString *token, bool functionDefinition, unsigned sho
 	}
 }
 
+/* The count of lexical actual parameter places, whether occupied or not - e.g.
+			
+	WINDOW 2; ; 0; 0; 200; 100
+				
+has 6 places, but only 5 supplied parameters. */
+static int ActualParameterPlaces(const struct TokenSequence *ts)
+{
+	unsigned short tn;
+	int numPlaces = 0;
+	for(tn = 0; ts->length > 1 && tn != ts->length; tn++)
+		numPlaces += TerminatesStatementParameter(QsGetFirst(&ts->rest[tn]));
+	return numPlaces;
+}
+
 /* It's necessary to insert special placeholders for missing parameters because
 parameter separators (semicolons) are removed when converting infix to prefix. 
 The actual default values could be inserted, but that would entail converting to string
-form and back again, and this approach has the virtue of simplicity. */
-static void InsertPlaceholder(struct TokenSequence *ts, int index, int *numActualParams)
+form and back again, and this approach has the virtue of simplicity - the complexity
+is divided between the lexical side here, and the semantic side in semantics.c. */
+static void InsertPlaceholder(struct TokenSequence *ts, unsigned short *idx, bool macro)
 {
-	bool endsParameter = TerminatesStatementParameter(QsGetFirst(&ts->rest[index]));
-
-	*numActualParams += endsParameter;
-	if(endsParameter 
-	  && (index == 0 || (index > 0 && QsGetFirst(&ts->rest[index - 1]) == ';'))) {
-		ShiftTokens(ts, index - 1, 1);
-		QsCopy(&ts->rest[index], &g_Missing);
+	if(!macro && ts->length > 1) {
+		bool endsParameter = TerminatesStatementParameter(QsGetFirst(&ts->rest[*idx]));
+		
+		if(endsParameter && (*idx == 0 || QsGetFirst(&ts->rest[*idx - 1]) == ';')) {
+			ShiftTokens(ts, *idx - 1, 1);
+			QsCopy(&ts->rest[*idx], &g_Missing);
+			++*idx;
+		}
 	}
 }
 
-static void AppendPlaceholders(struct TokenSequence *ts, int numActualParams, int minActuals)
+static void AppendPlaceholders(struct TokenSequence *ts, int numActualPlaces, int desiredActuals)
 {
-	while(numActualParams < minActuals) {
+	while(numActualPlaces < desiredActuals) {
 		ExpandTokenSequence(ts, ts->length + 2);
 		if(ts->length > 1 && QsGetFirst(&ts->rest[ts->length - 2]) != ';') {
 			QsCopy(&ts->rest[ts->length - 1], &g_Semicolon);
@@ -653,25 +669,25 @@ static void AppendPlaceholders(struct TokenSequence *ts, int numActualParams, in
 		QsCopy(&ts->rest[ts->length - 1], &g_Missing);
 		QsCopy(&ts->rest[ts->length], &g_Pipe);
 		++ts->length;
-		numActualParams++;
+		numActualPlaces++;
 	}
 }
 
 /* Cheats ... semantic infection, but better than the alternative complicated ways of dealing with default values.*/
-static int MinActuals(const BObject *cmd)
+static int DesiredActuals(const BObject *cmd)
 {
-	int minActuals = 0;
+	int wanted = 0, numFormals;
 	
-	if(cmd != NULL && cmd->category == STATEMENT && cmd->value.statement->formalCount > 0) {
+	if(cmd != NULL && cmd->category == STATEMENT && (numFormals = cmd->value.statement->formalCount) > 0) {
 		int fn;
-		for(fn = 0; fn < cmd->value.statement->formalCount; fn++) {
+		for(fn = 0; fn < numFormals; fn++) {
 			const struct Parameter *p = &cmd->value.statement->formal[fn];
-			minActuals += (p->defaultValue == NULL
-				&& p->maxCount < MAX_TOKENS) || fn + 1 < cmd->value.statement->formalCount ? p->maxCount : 1;
+			wanted += p->maxCount < MAX_TOKENS && (p->defaultValue == NULL || fn + 1 < numFormals)
+				? p->maxCount : 1;
 		}
 	}
 	
-	return minActuals;
+	return wanted;
 }
 
 static bool MacroInvocation(const BObject *cmd)
@@ -744,6 +760,7 @@ void MakeSavoury(struct TokenSequence *ts)
 		int nestLevel = 0;
 		unsigned short i;
 		const BObject *cmd = LookUp(&ts->statementName, SCOPE_GLOBAL);
+			/* Don't assume cmd exists - in the syntax-checking pass, subprograms won't be found. */
 		bool usesKeywordSeparators = ts->length > 1 && UsesParameterSeparatingKeywords(&ts->statementName);
 		bool macro = MacroInvocation(cmd);
 		bool sub = QsEqNoCase(&ts->statementName, &g_SubKeyword);
@@ -768,8 +785,10 @@ void MakeSavoury(struct TokenSequence *ts)
 				StandardiseSeparator(tok, nestLevel, usesKeywordSeparators, macro);
 			}
 		
-			/* This may invalidate tokens, so do it last - */
+			/* These may move tokens, so do them last - fortunately, their conditions don't overlap. */
 			InsertDummyFunctionInvocation(ts, i, sub);
+			
+			InsertPlaceholder(ts, &i, macro);
 		}
 
 		/* Standardise the parameter terminator - */
@@ -777,14 +796,11 @@ void MakeSavoury(struct TokenSequence *ts)
 			QsCopy(&ts->rest[ts->length - 1], &g_Pipe);
 		
 		/* Add placeholders for defaults. */
-		if(!macro) {
-			int numActuals = 0;
-			
-			if(ts->length > 1)
-				for(i = 0; i < ts->length; i++)
-					InsertPlaceholder(ts, i, &numActuals);
+		if(!macro && cmd != NULL) {
+			int numActualPlaces = ActualParameterPlaces(ts);
+			int desiredActualPlaces = DesiredActuals(cmd);
 
-			AppendPlaceholders(ts, numActuals, MinActuals(cmd));
+			AppendPlaceholders(ts, numActualPlaces, desiredActualPlaces);
 		}
 	}
 }
