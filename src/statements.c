@@ -18,6 +18,9 @@
 static struct Parameter m_ArgForArea[1] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 2, FALSE}};
 	
+static struct Parameter m_ArgForAreaFill[1] = {
+	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE}};
+	
 static struct Parameter m_ArgForCase[1] = {
 	{LITERAL, TR_ANY, NULL, NO_NAME, UNLIMITED, FALSE}};
 
@@ -272,7 +275,7 @@ struct BuiltInStatement {
 
 static const struct BuiltInStatement m_StmtDefinitions[] = {		
 	{KW_AREA, Area_, DefaultConvert, DefaultInactive, m_ArgForArea, 1},
-	{"AREAFILL", AreaFill_, DefaultConvert, DefaultInactive, NULL, 0},
+	{"AREAFILL", AreaFill_, DefaultConvert, DefaultInactive, m_ArgForAreaFill, 1},
 	{"AREASTEP", AreaStep_, DefaultConvert, DefaultInactive, m_ArgForArea, 1},
 	{"BEEP", Beep_, DefaultConvert, DefaultInactive, NULL, 0},
 	{"BREAK", Break_, DefaultConvert, DefaultInactive, NULL, 0},
@@ -422,10 +425,16 @@ bool StatementIsEmpty(const struct Statement *command)
 	return command == NULL || (!IsSubprogram(command) && command->method.macro == EmptyStatement_);
 }
 
+extern void ForwardDefineAllSubprograms(void);
+
 /* Statements aren't allowed to be overloaded with anything else, and are always visible at SCOPE_GLOBAL. */
 Error GetStatement(const QString *statementName, const struct Statement **stmt)
 {
 	BObject *stmtDefn = LookUp(statementName, SCOPE_GLOBAL);
+	if(stmtDefn == NULL) {
+		ForwardDefineAllSubprograms();
+		stmtDefn = LookUp(statementName, SCOPE_GLOBAL);
+	}
 	if(stmtDefn == NULL || stmtDefn->category != STATEMENT) {
 		*stmt = NULL;
 		return PositionError(UNDEFINEDSUB, Proc()->currentStatementStart, QsGetData(statementName));
@@ -456,6 +465,7 @@ static void DefineBuiltInStatement(const struct BuiltInStatement *command)
 	
 	if(!m_DefaultsInitialised) {
 		/* 1. Generic defaults - */
+		m_ArgForAreaFill[0].defaultValue = g_ZeroInt;
 		m_ArgForClear[0].defaultValue = g_ZeroLongInt;
 		m_ArgForClose[0].defaultValue = g_MinimumInt;
 		m_ArgForColour[0].defaultValue = g_NegOneInt;

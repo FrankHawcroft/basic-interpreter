@@ -76,7 +76,7 @@ static void DrawLineNative(PfWindowHandle win, const BasicPoint *p1, const Basic
 
 static bool AddVertexToPolygonNative(PfWindowHandle win, const BasicPoint *p) { return FALSE; }
 
-static bool FillPolygonNative(PfWindowHandle win) { return FALSE; }
+static bool FillPolygonNative(PfWindowHandle win, short mode) { return FALSE; }
 
 static bool FloodFillNative(PfWindowHandle win, const BasicPoint *p, short penOrDefault) { return FALSE; }
 

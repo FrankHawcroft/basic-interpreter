@@ -391,6 +391,52 @@ void Colour_(BObject *arg, unsigned count)
 		SetWindowPenNative(win, FALSE, bgID);
 }
 
+void PX_(Scalar *result, const BObject *arg, unsigned count)
+{
+	BasicPoint p;
+	PfWindowHandle win = OutputWindow();
+	
+	if(!FeatureAvailable(PSet_)) {
+		SetError(result, NOTIMPLEMENTED);
+		return;
+	}
+	
+#if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
+	if(win == NULL_WINDOW_HANDLE) {
+		SetError(result, ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+#else
+	InitGfx();
+#endif
+	
+	GetCurrentPenPositionNative(win, &p);
+	SetFromLong(result, p.x, T_INT);
+}
+
+void PY_(Scalar *result, const BObject *arg, unsigned count)
+{
+	BasicPoint p;
+	PfWindowHandle win = OutputWindow();
+	
+	if(!FeatureAvailable(PSet_)) {
+		SetError(result, NOTIMPLEMENTED);
+		return;
+	}
+	
+#if !DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED
+	if(win == NULL_WINDOW_HANDLE) {
+		SetError(result, ER_NO_OUTPUT_WINDOW);
+		return;
+	}
+#else
+	InitGfx();
+#endif
+	
+	GetCurrentPenPositionNative(win, &p);
+	SetFromLong(result, p.y, T_INT);
+}
+
 void Point_(Scalar *result, const BObject *arg, unsigned count)
 {
 	BasicPoint p;
@@ -657,9 +703,9 @@ void AreaStep_(BObject *arg, unsigned count)
 	AddPointToArea(pen.x + arg[0].value.scalar.value.number.s, pen.y + arg[1].value.scalar.value.number.s);
 }
 
-/* TODO mode parameter: 0 = fill with current pattern; 1 = invert */
 void AreaFill_(BObject *arg, unsigned count)
 {
+	short mode = arg[0].value.scalar.value.number.s; /* 0 = fill with current pattern; 1 = invert */
 	PfWindowHandle win = OutputWindow();
 	
 	if(!FeatureAvailable(Area_)) {
@@ -676,7 +722,7 @@ void AreaFill_(BObject *arg, unsigned count)
 	InitGfx();
 #endif
 	
-	if(!FillPolygonNative(win))
+	if(!FillPolygonNative(win, mode))
 		CauseError(ER_AREA);
 }
 

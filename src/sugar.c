@@ -56,6 +56,8 @@ const char KW_ONGOSUB[] = "ONGOSUB~";
 const char KW_ONGOTO[] = "ONGOTO~";
 const char KW_OPEN[] = "OPEN";
 const char KW_PRINT[] = "PRINT";
+const char KW_PX[] = "PX~";
+const char KW_PY[] = "PY~";
 const char KW_RETURN[] = "RETURN";
 const char KW_RETURNTO[] = "RETURNTO~";
 const char KW_SCREEN[] = "SCREEN";
@@ -68,6 +70,8 @@ const QString g_DataKeyword = {(char *)KW_DATA, 4};
 const QString g_ElseKeyword = {(char *)KW_ELSE, 4};
 const QString g_EndKeyword = {(char *)KW_END, 3};
 const QString g_GoToKeyword = {(char *)KW_GOTO, 4};
+const QString g_PX = {(char *)KW_PX, 3};
+const QString g_PY = {(char *)KW_PY, 3};
 
 const QString g_Pipe = {"|", 1};
 const QString g_Semicolon = {";", 1};
@@ -508,6 +512,30 @@ static void TranslateEventTrappingControl(struct TokenSequence *ts)
 	}
 }
 
+/* LINE STEP(dx, dy) ... --> LINE PX~(dx), PY~(dy) ...
+	etc. for a variety of graphics functions: CIRCLE, AREA, PAINT, ... */
+static void MakePenRelativeGraphicsExplicit(struct TokenSequence *ts)
+{
+	if(ts->length >= 7 && QsEqNoCase(&ts->rest[0], &m_StepKeyword)) {
+		QString *scan;
+		int relNesting = 0;
+		unsigned short i;
+		
+		QsCopy(&ts->rest[0], &g_PX);
+		
+		for(scan = &ts->rest[1], i = 1;
+		  relNesting >= 0 && i < ts->length && !(QsGetFirst(scan) == ',' && relNesting == 1); scan++, i++)
+			Nest(scan, &relNesting);
+			
+		if(QsGetFirst(scan) == ',' && relNesting == 1) {
+			QsCopy(scan, &g_RParen);
+			ShiftTokens(ts, i, 2);
+			QsCopy(&ts->rest[i + 1], &g_PY);
+			QsCopy(&ts->rest[i + 2], &g_LParen);
+		}
+	}
+}
+
 /* ON <expr> GOTO <label1>[, <label2> ...] --> ONGOTO~ <expr>, <label1>[, <label2> ...]
 ON <expr> GOSUB <label1>[, <label2> ...] --> ONGOSUB~ <expr>, <label1>[, <label2> ...]
 ON <eventspec> GOTO 0 --> DISABLE <eventspec> */
@@ -753,6 +781,8 @@ void MakeSavoury(struct TokenSequence *ts)
 	TranslateEventTrappingControl(ts);
 	
 	TranslateComputedJump(ts);
+	
+	MakePenRelativeGraphicsExplicit(ts);
 	
 	EnsureExistsIfBuiltIn(&ts->statementName);
 	

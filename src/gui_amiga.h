@@ -1103,13 +1103,19 @@ static bool AddVertexToPolygonNative(PfWindowHandle win, const BasicPoint *p)
 	return succeeded;
 }
 
-static bool FillPolygonNative(PfWindowHandle win)
+static bool FillPolygonNative(PfWindowHandle win, short mode)
 {
 	int id = (int)win->UserData;
-	if(m_AreaVectorBuffer[id] == NULL || !m_AreaActive[id])
-		return FALSE;
-	m_AreaActive[id] = FALSE;
-	return AreaEnd(win->RPort) != -1;
+	bool success = FALSE;
+	if(m_AreaVectorBuffer[id] != NULL && m_AreaActive[id])
+	{
+		BYTE savedDrawMode = win->RPort->DrawMode;
+		m_AreaActive[id] = FALSE;
+		SetDrMd(win->RPort, mode == 1 ? INVERSVID : savedDrawMode);
+		success = AreaEnd(win->RPort) != -1;
+		SetDrMd(win->RPort, savedDrawMode);
+	}
+	return success;
 }
 
 static bool FloodFillNative(PfWindowHandle win, const BasicPoint *p, short penOrDefault)

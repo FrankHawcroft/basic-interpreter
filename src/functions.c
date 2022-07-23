@@ -918,6 +918,7 @@ static const enum TypeRule m_ArgForMouse[1] = { TR_NUM_TO_INT };		/* Mouse(n) */
 static const enum TypeRule m_ArgsForGetObjectProperty[2] = { TR_NUM_TO_INT, TR_NUM_TO_INT };
 static const enum TypeRule m_ArgForPeek[1] = { TR_INT_TO_LONG };		/* Peek(addr), PeekL(addr), PeekW(addr) */
 static const enum TypeRule m_ArgsForPoint[2] = { TR_NUM_TO_INT, TR_NUM_TO_INT }; /* Point(x, y) */
+static const enum TypeRule m_ArgForPX[1] = { TR_NUM_TO_INT };		/* Px~(x), Py~(y) */
 static const enum TypeRule m_ArgForRandom[1] = { TR_NUM_TO_LONG };	/* Random(m) */
 static const enum TypeRule m_ArgsForFRead[2] = { TR_NUM_TO_INT, TR_NUM_TO_LONG }; /* FRead(n, m) */
 static const enum TypeRule m_ArgForSAdd[1] = { TR_STRING_ONLY };		/* SAdd(s) */
@@ -994,6 +995,8 @@ static const struct BuiltInFunction m_FuncDefinitions[] = {
 	{"PEEKL", PeekL_, TR_LONG_ONLY, m_ArgForPeek, 1},
 	{"PEEKW", PeekW_, TR_INT_ONLY, m_ArgForPeek, 1},
 	{"POINT", Point_, TR_INT_ONLY, m_ArgsForPoint, 2},
+	{KW_PX, PX_, TR_INT_ONLY, m_ArgForPX, 1},
+	{KW_PY, PY_, TR_INT_ONLY, m_ArgForPX, 1},
 	{"RANDOM", Random_, TR_INTEGRAL, m_ArgForRandom, 1},
 	{"RND", Rnd_, TR_SINGLE_ONLY, NULL, 0},
 	{"SADD", SAdd_, TR_LONG_ONLY, m_ArgForSAdd, 1},

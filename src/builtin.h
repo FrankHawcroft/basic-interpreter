@@ -190,6 +190,8 @@ extern void Peek_(Scalar *, const BObject *, unsigned);
 extern void PeekL_(Scalar *, const BObject *, unsigned);
 extern void PeekW_(Scalar *, const BObject *, unsigned);
 extern void Point_(Scalar *, const BObject *, unsigned);
+extern void PX_(Scalar *, const BObject *, unsigned);
+extern void PY_(Scalar *, const BObject *, unsigned);
 extern void Random_(Scalar *, const BObject *, unsigned);
 extern void Rnd_(Scalar *, const BObject *, unsigned);
 extern void SAdd_(Scalar *, const BObject *, unsigned);

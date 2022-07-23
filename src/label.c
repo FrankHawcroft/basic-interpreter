@@ -31,12 +31,10 @@ bool AddLabel(const QString *name, const char *labelledPosition, short callNestL
 		return existing->category == LABEL && labelledPosition == existing->value.labelPos;
 }
 
-const char *ScanStatementPrefix(const char *code, QString *lineNumToken, QString *labelToken, QString *stmtToken)
+const char *ScanIfSubprogramOrLabelled(const char *code, struct TokenSequence *tokens)
 {
 	bool candidate = FALSE, whitespaceOnlyPrefix = FALSE;
 	const char *sub = QsGetData(&g_SubKeyword), *scan;
-	
-	QsInitNull(lineNumToken); QsInitNull(labelToken); QsInitNull(stmtToken);
 	
 	/* Tokenising the entire statement is slow, so try to avoid it.
 		Only lines containing '[END]SUB', a label, or line number are of interest;
@@ -51,24 +49,36 @@ const char *ScanStatementPrefix(const char *code, QString *lineNumToken, QString
 	}
 	
 	if(candidate) {
-		struct TokenSequence tokens;
 		Error scanError;
 		
-		CreateTokenSequence(&tokens, 6);
+		CreateTokenSequence(tokens, 6);
 		
-		if((scanError = Tokenise(&code, &tokens, FALSE)) == SUCCESS) {
-			MakeSavoury(&tokens);
-			QsCopy(lineNumToken, &tokens.lineNumber);
-			QsCopy(labelToken, &tokens.label);
-			QsCopy(stmtToken, &tokens.statementName);
-		}
-		
-		DisposeTokenSequence(&tokens);
+		if((scanError = Tokenise(&code, tokens, FALSE)) == SUCCESS)
+			MakeSavoury(tokens);
 		
 		return scanError == SUCCESS ? code : NULL;
 	}
 	else
 		return *scan == NUL ? scan : scan + 1;
+}
+
+static const char *ScanStatementPrefix(const char *code, QString *lineNumToken, QString *labelToken, QString *stmtToken)
+{
+	const char *following;
+	struct TokenSequence tokens;
+	
+	tokens.length = 0;
+	
+	QsInitNull(lineNumToken); QsInitNull(labelToken); QsInitNull(stmtToken);
+	
+	if((following = ScanIfSubprogramOrLabelled(code, &tokens)) != NULL && tokens.length != 0) {
+		QsCopy(lineNumToken, &tokens.lineNumber);
+		QsCopy(labelToken, &tokens.label);
+		QsCopy(stmtToken, &tokens.statementName);
+		DisposeTokenSequence(&tokens);
+	}
+
+	return following;
 }
 
 /* Searches for the named label or line number, either within the body of a subprogram, or within the main program

@@ -763,6 +763,8 @@ extern const char KW_ONGOSUB[];
 extern const char KW_ONGOTO[];
 extern const char KW_OPEN[];
 extern const char KW_PRINT[];
+extern const char KW_PX[];
+extern const char KW_PY[];
 extern const char KW_RETURN[];
 extern const char KW_RETURNTO[];
 extern const char KW_SCREEN[];
@@ -780,6 +782,8 @@ extern const QString g_ElseKeyword;
 extern const QString g_EndKeyword;
 extern const QString g_EndSubKeyword;
 extern const QString g_GoToKeyword;
+extern const QString g_PX; /* px~ (internal graphics function - offset by pen x) */
+extern const QString g_PY; /* py~ (internal graphics function - offset by pen y) */
 extern const QString g_StaticKeyword;
 extern const QString g_SubKeyword;
 extern const QString g_ThenKeyword;
