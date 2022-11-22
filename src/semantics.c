@@ -481,7 +481,7 @@ Error ConformForApplication(const BObject *applied, BObject *actual, unsigned ac
 	/* Error result here assumes usage in expr rather than command context - */
 	if(proto == NULL)
 		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
-	else if((applied->category == FUNCTION && applied->value.function->numArgs != FN_VAR_ARGS)
+	else if((applied->category == FUNCTION && applied->value.function->numArgs == (short)actualCount)
 		 || (IsVariable(applied) && actualCount == 1))
 		return ConformQuickly(proto, actual, numFormals);
 	else
