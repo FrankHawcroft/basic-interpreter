@@ -429,7 +429,7 @@ static void Immediate(void)
 }
 
 extern bool ProgramSyntaxCheckPassed(void);
-extern void PrintStackTrace(int maxDepth);
+extern void PrintStackTrace(int maxDepth, bool raw);
 extern void CreateStatementCache(void);
 
 int Loop(void)
@@ -503,7 +503,7 @@ int Loop(void)
 	
 			UnwindForErrorReport(&file, &line, &stmt);
 			ReportError(proc->pendingError, file, line, stmt, proc->additionalErrorInfo);
-			PrintStackTrace(5);
+			PrintStackTrace(10, FALSE);
 			
 			proc->pendingError = SUCCESS;
 			proc->returnCode = Opts()->immediate || proc->mode != MODE_HALTED_FOR_EXIT

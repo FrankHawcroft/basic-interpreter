@@ -1138,19 +1138,22 @@ static void PrintNodeInfo(int offset)
 	fprintf(stderr, "\n");
 }
 
-void PrintStackTrace(int maxDepth)
+void PrintStackTrace(int maxDepth, bool raw)
 {
 	int stackHeight = ControlFlowStackHeight(Proc()), offset;
 
-	if(maxDepth > stackHeight)
-		maxDepth = stackHeight;
+	if(!raw && stackHeight <= 1)
+		return; /* avoid clutter in error message */
+	
+	if(maxDepth > stackHeight - 1) /* - 1 to avoid BOS sentinel */
+		maxDepth = stackHeight - 1;
 
-	fprintf(stderr, "---- Stack trace: ----\n");
+	fprintf(stderr, "Stack trace:\n");
 	fprintf(stderr, "---- top of stack ----\n");
 	for(offset = 0; offset < maxDepth; offset++)
 		PrintNodeInfo(offset);
 
-	if(maxDepth == stackHeight)
+	if(maxDepth == stackHeight - 1)
 		fprintf(stderr, "---- bottom of stack ----\n");
 	else
 		fprintf(stderr, "---- %d item(s) below ----\n", stackHeight - maxDepth);
@@ -1183,7 +1186,7 @@ void XFree_(BObject *arg, unsigned count)
 
 void XStack_(BObject *arg, unsigned count)
 {
-	PrintStackTrace(arg[0].value.scalar.value.number.s);
+	PrintStackTrace(arg[0].value.scalar.value.number.s, TRUE);
 }
 
 void XCache_(BObject *arg, unsigned count)

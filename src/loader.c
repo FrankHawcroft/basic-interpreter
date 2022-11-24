@@ -238,5 +238,5 @@ bool ProgramSyntaxCheckPassed(void)
 	/* Reset current position for start of execution. */
 	proc->currentStatementStart = proc->currentPosition = FileBufferBase(proc->buffer);
 	
-	return errorCount == 0;
+	return error == SUCCESS && errorCount == 0;
 }

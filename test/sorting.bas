@@ -58,7 +58,7 @@ sub QuickSort(A&(), (Low%), (High%))
 end sub
 
 sub MakeRandom(A&())
-	for i = lbound(A, 1) to ubound(A, 1) '' TODO found by typo letter l for digit 1 that 'undefined var' name isn't printed any more
+	for i = lbound(A, 1) to ubound(A, 1)
 		A(i) = random(100)
 	next
 end sub

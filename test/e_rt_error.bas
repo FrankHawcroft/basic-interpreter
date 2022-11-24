@@ -1,6 +1,7 @@
 REM Test a deadend runtime error.
 
-x = y '' undefined 'y'
+x = 1 'y '' undefined 'y'
+x$ = "z" '' type mismatch
 
 dim a(5)
 'a(1, 2) = 1
