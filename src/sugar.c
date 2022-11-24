@@ -203,7 +203,7 @@ static bool IsSimpleWord(const QString *token)
 	return isalpha(QsGetFirst(token)) && isalpha(QsGetLast(token));
 }
 
-static bool IsTwoWordForm(const QString *stmt, const QString *following)
+bool IsTwoWordForm(const QString *stmt, const QString *following)
 {
 	static const QString *canBeSeparated[][2] = {
 		{ &m_AreaKeyword, &m_FillKeyword },

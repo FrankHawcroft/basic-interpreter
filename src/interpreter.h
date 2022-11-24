@@ -696,6 +696,7 @@ extern void Nest(const QString *, int *nesting);
 
 extern void MakeSavoury(struct TokenSequence *);
 extern bool IsParameterSeparatingKeyword(const QString *token);
+extern bool IsTwoWordForm(const QString *stmt, const QString *following);
 
 /*** Syntax and parsing -- syntax.c ***/
 

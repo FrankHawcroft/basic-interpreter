@@ -701,7 +701,7 @@ static Error CompileAndExecute(const QString *toks, struct Stack *evalSpace)
 	CreateTokenSequence(&ts, 10);
 	ts.start = Proc()->currentStatementStart;
 	
-	hasExplicitStatement = GetStatement(&toks[0], &cmd) == SUCCESS;
+	hasExplicitStatement = GetStatement(&toks[0], &cmd) == SUCCESS || IsTwoWordForm(&toks[0], &toks[1]);
 	if(hasExplicitStatement)
 		QsCopy(&ts.statementName, &toks[0]);
 
