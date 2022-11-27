@@ -27,7 +27,7 @@ sub InsertionSort(A&())
 		j% = i
 		Finished? = false
 		repeat
-			if A(j - 1) < A(j) then | swap A(j), A(j - 1) | else | Finished = true | endif
+			if A(j - 1) < A(j) then | swap A(j), A(j - 1) | else | Finished = true | endif '' TODO same as the if ... then exit sub problem
 			j = j - 1
 		until j <= lbound(A, 1) or Finished
 	next
@@ -55,6 +55,44 @@ sub QuickSort(A&(), (Low%), (High%))
 	Partition A, Low, High, P
 	QuickSort A, Low, P
 	QuickSort A, P + 1, High
+end sub
+
+sub MergeSubarrays(A&(), (Low%), (Middle%), (High%))
+	dim T&(High - Low + lbound(A, 1))
+	ei% = Low
+	ej% = Middle + 1
+	oi% = lbound(A, 1)
+	while ei <= Middle and ej <= High
+		if A(ei) > A(ej)
+			T(oi) = A(ei)
+			ei = ei + 1
+		else
+			T(oi) = A(ej)
+			ej = ej + 1
+		endif
+		oi = oi + 1
+	wend
+	for ei = ei to Middle
+		T(oi) = A(ei)
+		oi = oi + 1
+	next
+	for ej = ej to High
+		T(oi) = A(ej)
+		oi = oi + 1
+	next
+	oi = lbound(A, 1)
+	for i = Low to High
+		A(i) = T(oi)
+		oi = oi + 1
+	next
+end sub
+
+sub MergeSort(A&(), (Low%), (High%))
+	if Low >= High then exitsub '' done! '' TODO 'exit sub' with a space causes strange cf stack or jumping behaviour
+	Middle% = (Low + High) \ 2
+	MergeSort A, Low, Middle
+	MergeSort A, Middle + 1, High
+	MergeSubarrays A, Low, Middle, High
 end sub
 
 sub MakeRandom(A&())
@@ -106,3 +144,9 @@ QuickSort A, lbound(A, 1), ubound(A, 1)
 PrintArray A
 print
 
+MakeRandom A
+PrintArray A
+print ">>> MergeSort >>>"
+MergeSort A, lbound(A, 1), ubound(A, 1)
+PrintArray A
+print
