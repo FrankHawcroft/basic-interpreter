@@ -38,7 +38,11 @@ static bool ExtendStack(struct Stack *stack, int required)
 			newSize, EXPR_STK_LIMIT);
 #endif
 */	
-	if(!ok) {
+
+	/* Checking for empty stack might seem excessive, but this error can be triggered by advance checking
+		(see: EvalPreconverted), and with a ridiculous number of parameters or a very small stack
+		size limit, could happen on the very first expression evaluation in a statement. */
+	if(!ok && (StkHeight(stack) == 0 || ObjectAsError(PeekExprStk(stack, 0)) != ER_STACK_OVERFLOW)) {
 		BObject err;
 		if(StkFull(stack))
 			CutExprStk(stack, 1);
@@ -68,39 +72,39 @@ INLINE void AdjustStackPointersFollowingDirectPush(struct Stack *stack)
 	++stack->height;
 }
 
+/* Pardon my MSVC/80386 optimisation bias: this function minimises the number of local variables,
+	assuming a teeny number of registers, but quick indexed/scaled addressing and calls, and
+	extensive inlining ... */
+	
+#define GetParams(stack, count) PeekExprStk((stack), (int)(count) - 1)
+
 static void Apply(const BObject *functor, struct Stack *stack, unsigned count)
 {
-	BObject *param;
-	Error error = ARRAYEXPECTED;
 	BObject result;
 	
-	assert(count != 0 && count <= StkHeight(stack)); /* TODO height same means infinite recursion. Detect? */
+	assert(count <= StkHeight(stack));
 	
-	param = PeekExprStk(stack, (int)count - 1);
-	
-	if(functor->category == OPERATOR) {
-		assert(count == OperandCount(functor->value.opRef)); /* assume syntax checked */
-		result.category = LITERAL;		
-		if((error = ConformQuickly(ParametersForOperator(functor->value.opRef), param, count)) == SUCCESS)
+	if(SetObjectToError(&result, ConformForApplication(functor, GetParams(stack, count), count)) == SUCCESS) {
+		if(functor->category == OPERATOR)
 			EvalOperation(&result.value.scalar, functor->value.opRef,
-				&param[0].value.scalar, count == 1 ? NULL : &param[1].value.scalar);
+				&GetParams(stack, count)->value.scalar, count == 1 ? NULL : &GetParams(stack, 1)->value.scalar);
+		else if(functor->category == FUNCTION)
+			CallFunction(&result, functor->value.function, GetParams(stack, count), count, stack);
+		else {
+			assert(IsVariable(functor));
+			if(IndexArray(&result.value.variable, VarPtr(functor), GetParams(stack, count), count) == SUCCESS)
+				result.category = (result.value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF;
+			else
+				SetObjectToError(&result, IndexArray(&result.value.variable, VarPtr(functor), GetParams(stack, count), count));
+		}
 	}
-	else if((error = ConformForApplication(functor, param, count)) == SUCCESS) {
-		if(functor->category == FUNCTION)	
-			CallFunction(&result, functor->value.function, param, count, stack);
-		else if(IsVariable(functor)
-		&& (error = IndexArray(&result.value.variable, VarPtr(functor), param, count)) == SUCCESS)
-			result.category = (result.value.variable.dim.few[0] != -1 ? ARRAY : SCALAR_VAR) | VARIABLE_IS_REF;
+	
+	/* Only need to check stack space if not popping any arguments. */
+	if(count != 0 || (!StkFull(stack) && !ObjectIsError(PeekExprStk(stack, 0)))) {
+		CutExprStk(stack, count);
+		*(BObject *)stack->top = result;
+		AdjustStackPointersFollowingDirectPush(stack);
 	}
-	
-	if(error != SUCCESS)
-		SetObjectToError(&result, error);
-	
-	CutExprStk(stack, count);
-	
-	/* Because one or more args have just been popped, no need to check stack space. */
-	*(BObject *)stack->top = result;
-	AdjustStackPointersFollowingDirectPush(stack);
 	
 	/* Strictly, the applied object should be disposed of, but not doing it saves time for all
 		valid objects (arrays, functions, operators). If a string literal was appplied, it would
@@ -169,8 +173,12 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			/* If not an 'apply' form it's an unsubscripted variable, a literal, a label, or a
 				parameterless function. Intern directly to the TOS, to avoid an extra object copy. */
 			
-			if(StkFull(exprStack) && !ExtendStackIfNecessary(exprStack, 1))
-				return ct + 1; /* TODO - wrong - need to search for the matching rparen or an EOS marker */
+			if(StkFull(exprStack) && !ExtendStackIfNecessary(exprStack, 1)) {
+				/* Skip out of the expression. A stack overflow error will be left on the TOS. */
+				for( ; (firstCh = QsGetFirst(ct)) != '|' && firstCh != ')'; ct++)
+					;
+				return ct;
+			}
 			
 			intern(tokIndex, ct, (BObject *)exprStack->top);
 			
@@ -195,8 +203,12 @@ const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack,
 	assert(stackSpaceRequired >= 0);
 	
 	/* Avoid checking stack space repeatedly in the loop - */
-	if(!ExtendStackIfNecessary(exprStack, stackSpaceRequired))
-		return exprSeq + stackSpaceRequired - 1; /* TODO - wrong - need to search for the matching rparen or an EOS marker */
+	if(!ExtendStackIfNecessary(exprStack, stackSpaceRequired)) {
+		/* Skip out of the expression. A stack overflow error will be left on the TOS. */
+		for( ; exprSeq->category != PUNCTUATION || !exprSeq->value.punctuation->terminatesExpressionSequence; exprSeq++)
+			;
+		return exprSeq;
+	}
 
 	for( ; exprSeq->category != PUNCTUATION || !exprSeq->value.punctuation->terminatesExpressionSequence; exprSeq++) {
 		if(exprSeq->category == PUNCTUATION) {

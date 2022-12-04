@@ -311,41 +311,38 @@ SimpleType TargetType(enum TypeRule required, SimpleType source)
 /* applied may be a subprogram, function, operator, or array variable */
 const struct Parameter *GetPrototype(const BObject *applied, int *numFormals)
 {
-	const struct Parameter *proto;
-	
 	assert(applied != NULL);
 	assert(numFormals != NULL);
 
-	if(applied->category == FUNCTION) {
-		proto = applied->value.function->parameter;
+	if(applied->category == OPERATOR) {
+		*numFormals = OperandCount(applied->value.opRef);
+		return ParametersForOperator(applied->value.opRef);
+	}
+	else if(applied->category == FUNCTION) {
 		if((*numFormals = applied->value.function->numArgs) == FN_VAR_ARGS) {
-			proto = &m_AnyArgs;
 			*numFormals = 1;
+			return &m_AnyArgs;
 		}
+		else
+			return applied->value.function->parameter;
 	}
 	else if(IsVariable(applied)) {
 		bool array = IsArray(applied);
-		proto = array ? &m_ArrayIndex : NULL;
 		*numFormals = array ? 1 : 0;
+		return array ? &m_ArrayIndex : NULL;
 	}
 	else if(applied->category == STATEMENT) {
-		proto = applied->value.statement->formal;
 		*numFormals = applied->value.statement->formalCount;
 		if(IsMacro(applied->value.statement)) {
-			proto = &m_AnyArgs;
 			*numFormals = 1;
+			return &m_AnyArgs;
 		}
+		else
+			return applied->value.statement->formal;
 	}
-	else if(applied->category == OPERATOR) {
-		proto = ParametersForOperator(applied->value.opRef);
-		*numFormals = OperandCount(applied->value.opRef);
-	}
-	else {
-		proto = NULL;
-		*numFormals = INT_MIN;
-	}
-
-	return proto;
+	
+	*numFormals = INT_MIN;
+	return NULL;
 }
 
 /* Assumes a C-like convention that a 'varargs' parameter (see statements.c/UNLIMITED),
@@ -479,11 +476,12 @@ Error ConformForApplication(const BObject *applied, BObject *actual, unsigned ac
 	int numFormals;
 	const struct Parameter *proto = GetPrototype(applied, &numFormals);
 	/* Error result here assumes usage in expr rather than command context - */
-	if(proto == NULL)
-		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
-	else if((applied->category == FUNCTION && applied->value.function->numArgs == (short)actualCount)
-		 || (IsVariable(applied) && actualCount == 1))
+	if(applied->category == OPERATOR
+	  || (applied->category == FUNCTION && applied->value.function->numArgs == (short)actualCount)
+	  || (IsVariable(applied) && actualCount == 1))
 		return ConformQuickly(proto, actual, numFormals);
+	else if(proto == NULL || applied->category == STATEMENT)
+		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
 	else
 		return Conform(proto, numFormals, actual, actualCount);
 }

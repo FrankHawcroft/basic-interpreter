@@ -546,8 +546,8 @@ extern Error ObjectAsError(const BObject *);
 #define ObjectIsError(obj) ((obj)->category == LITERAL && (obj)->value.scalar.type == T_ERROR)
 #define IndicatesError(obj) (ObjectAsError(obj) != SUCCESS) /* subtly different from the above */
 #define Resolved(obj) ((obj)->category != LITERAL || ((obj)->value.scalar.type & USABLE_TYPES) != 0)
-extern void SetObjectToError(BObject *, Error);
-extern void SetObjectToErrorWithAdditionalMessage(BObject *, Error, const char *msgFmt, const QString *obj);
+extern Error SetObjectToError(BObject *, Error);
+extern Error SetObjectToErrorWithAdditionalMessage(BObject *, Error, const char *msgFmt, const QString *obj);
 extern bool IsUserDefined(const BObject *);
 extern void ConvertToObject(const QString *token, BObject *obj, short callNestLevel);
 extern void SetSymbolReference(BObject *, enum SymbolType, void *);

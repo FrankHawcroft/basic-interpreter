@@ -110,13 +110,14 @@ end sub
 
 option base 1
 
-Size% = 10
+Size% = 1000
 dim A&(Size)
 
 def IsSorted?(i%) where i >= ubound(A, 1) as 1
 def IsSorted?(i%) as A(i) >= A(i + 1) and IsSorted(i + 1) '' only checks descending order!
 
 MakeRandom A
+tron
 PrintArray A
 print ">>> BubbleSort >>>"
 BubbleSort A

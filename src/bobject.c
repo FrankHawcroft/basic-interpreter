@@ -102,22 +102,24 @@ Error ObjectAsError(const BObject *obj)
 }
 
 /* Sets the object to the given error. The object passed is assumed to be uninitialised. */
-void SetObjectToError(BObject *obj, Error error)
+Error SetObjectToError(BObject *obj, Error error)
 {
 	assert(obj != NULL);
 
 	obj->category = LITERAL;
-	SetError(&obj->value.scalar, error);
-	Proc()->additionalErrorInfo[0] = NUL; /* Try to avoid an old additional message being printed. */
+	if(error != SUCCESS)
+		Proc()->additionalErrorInfo[0] = NUL; /* Try to avoid an old additional message being printed. */
+	return SetError(&obj->value.scalar, error);
 }
 
-void SetObjectToErrorWithAdditionalMessage(BObject *obj, Error error, const char *msgFmt, const QString *contextualObject)
+Error SetObjectToErrorWithAdditionalMessage(BObject *obj, Error error, const char *msgFmt, const QString *contextualObject)
 {
 	assert(obj != NULL);
 	assert(msgFmt != NULL);
 	
 	SetObjectToError(obj, error);
 	SetAdditionalErrorMessage(msgFmt, QsGetData(contextualObject), QsGetLength(contextualObject));
+	return error;
 }
 
 bool IsUserDefined(const BObject *obj)
