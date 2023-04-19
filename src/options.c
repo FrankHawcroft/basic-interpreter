@@ -246,12 +246,13 @@ static long EstimatedProgramSize(const char *sourceFile)
 	return length < 0 ? EXPECTED_PROGRAM_SIZE : length;
 }
 
-static long EstimatedBufferSizeRequired(const char *prelude, const char *oneLiner, const char *file)
+static long EstimatedBufferSizeRequired(const char *prelude, const char *oneLiner, const char *file, bool lowMemory)
 {
 	long preludeSize = prelude == NULL ? 0 : EXPECTED_PRELUDE_SIZE; /* EstimatedProgramSize(Prelude()), */
 	long programSize = EstimatedProgramSize(oneLiner != NULL ? NULL : file);
 	long totalSize = preludeSize + EXPECTED_MERGE_MODULE_SCALE_FACTOR * programSize;
-	return totalSize > MIN_BUFFER_SIZE ? totalSize : MIN_BUFFER_SIZE;
+	long minSizeToAllocate = MIN_BUFFER_SIZE / (lowMemory ? 2 : 1);
+	return totalSize > minSizeToAllocate ? totalSize : minSizeToAllocate;
 }
 
 bool ProcessCommandLineArgs(int argCount, const char *argVector[], struct Options *options)
@@ -327,7 +328,7 @@ bool ProcessCommandLineArgs(int argCount, const char *argVector[], struct Option
 		options->initialHeapSize = options->fixedSizeHeap 
 			? options->heapSize : DEFAULT_INITIAL_HEAP_SIZE / (options->lowMemory ? 2 : 1);
 		options->initialBufferSize = options->bufferLen <= 0
-			? EstimatedBufferSizeRequired(options->prelude, options->execute, options->fileName) : options->bufferLen;
+			? EstimatedBufferSizeRequired(options->prelude, options->execute, options->fileName, options->lowMemory) : options->bufferLen;
 	}
 	
 	return argumentsOK;
