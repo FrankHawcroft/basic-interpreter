@@ -331,7 +331,7 @@ static const struct BuiltInStatement m_StmtDefinitions[] = {
 	{"KILL", Kill_, DefaultConvert, DefaultInactive, m_ArgForKill, 1},
 	{KW_LETQ_LOCAL, Let_, LocalScalarAssignConvert, DefaultInactive, m_ArgsForConstAndLet, 2}, /* Quicker for local scalars. */
 	{KW_LETQ_PREDEF, Let_, DefaultConvert, DefaultInactive, m_ArgsForConstAndLet, 2}, /* Quicker for predefined vars. */
-	{"LINE", Line_, DefaultConvert, DefaultInactive, m_ArgForLine, 1},
+	{KW_LINE, Line_, DefaultConvert, DefaultInactive, m_ArgForLine, 1},
 	{"LINEINPUT", LineInput_, DefaultConvert, DefaultInactive, m_ArgsForLineInput, 2},
 	{"LOAD", Load_, DefaultConvert, DefaultInactive, m_ArgForLoad, 1},
 	{"MENU", Menu_, DefaultConvert, DefaultInactive, m_ArgsForMenu, 3},

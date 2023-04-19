@@ -226,8 +226,14 @@ Error DereferenceObject(BObject *obj)
 		return CopyScalarToObject(obj, &obj->value.varRef->value);
 	else if(IsVariable(obj))
 		return DereferenceScalarVariable(obj);
-	else
+	else {
+#ifdef DEBUG
+		fprintf(stderr, "Oh dear, dereferencing unexpected obj: ");
+		DumpObject(obj);
+		fputc('\n', stderr);
+#endif
 		return SCALAREXPECTED; /* assume an unevaluated function, or label, subprogram, etc. */
+	}
 }
 
 #ifdef DEBUG

@@ -755,6 +755,7 @@ extern const char KW_LEN[];
 extern const char KW_LETQ_LOCAL[]; /* Internal only - faster interning. */
 extern const char KW_LETQ_PREDEF[]; /* Internal only - faster interning. */
 extern const char KW_LET[];
+extern const char KW_LINE[];
 extern const char KW_MID[];
 extern const char KW_NAME[];
 extern const char KW_NEXT[];

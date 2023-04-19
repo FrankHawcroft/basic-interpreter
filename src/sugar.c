@@ -47,6 +47,7 @@ const char KW_LEN[] = "LEN";
 const char KW_LET[] = "LET";
 const char KW_LETQ_LOCAL[] = "LETQL~"; /* For cached statements - faster interning. */
 const char KW_LETQ_PREDEF[] = "LETQP~"; /* For cached statements - faster interning. */
+const char KW_LINE[] = "LINE";
 const char KW_MID[] = "MID";
 const char KW_NAME[] = "NAME";
 const char KW_NEXT[] = "NEXT";
@@ -118,6 +119,7 @@ static const QString m_Instr2Keyword = {"INSTR2", 6};
 static const QString m_LenKeyword = {(char *)KW_LEN, 3};
 static const QString m_LetKeyword = {(char *)KW_LET, 3};
 static const QString m_LetMidKeyword = {"LETMID", 6};
+static const QString m_LineKeyword = {(char *)KW_LINE, 4};
 static const QString m_LSetKeyword = {"LSET", 4};
 static const QString m_MidKeyword = {(char *)KW_MID, 3};
 static const QString m_Mid2Keyword = {"MID2", 4};
@@ -213,6 +215,7 @@ bool IsTwoWordForm(const QString *stmt, const QString *following)
 		{ &g_EndKeyword, &g_SubKeyword },
 		{ &m_ExitKeyword, &g_SubKeyword },
 		{ &m_LetKeyword, &m_MidKeyword },
+		{ &m_LineKeyword, &m_InputKeyword },
 		{ &m_OptionKeyword, &m_BaseKeyword },
 		{ &m_ScreenKeyword, &m_CloseKeyword },
 		{ &m_SoundKeyword, &m_ResumeKeyword },

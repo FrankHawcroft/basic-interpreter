@@ -199,10 +199,12 @@ bool ProgramSyntaxCheckPassed(void)
 		
 		if(error == SUCCESS)
 			MakeSavoury(&tokens);
-		else if(!QsIsNull(&tokens.statementName))
+		else if(!QsIsNull(&tokens.statementName)) {
 			/* Look up the command even if tokenisation failed, so that block control structure nesting can
 				be tracked if possible. */
-			GetStatement(&tokens.statementName, &tokens.command);
+			BObject *stmtDefn = LookUp(&tokens.statementName, SCOPE_GLOBAL);
+			tokens.command = stmtDefn != NULL && stmtDefn->category == STATEMENT ? stmtDefn->value.statement : NULL;
+		}
 
 		if(error == SUCCESS && CanAssumeCommonSyntax(tokens.command))
 			error = CheckStatementSyntax(&tokens);

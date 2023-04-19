@@ -35,6 +35,8 @@ void PrintVerboseTracingPrefix(char pass)
 
 Error Prepare(struct TokenSequence *tokSeq)
 {	
+	Error error = SUCCESS;
+	
 	assert(tokSeq != NULL);
 
 	/* Standardise idiosyncratic syntax to make expression parsing easier. */
@@ -48,14 +50,16 @@ Error Prepare(struct TokenSequence *tokSeq)
 	}
 #endif
 
-	/* At this stage (cf the syntax checking pass), a resolved statement is required.
-		MakeSavoury is assumed to have looked it up. */
+	/* Now attempt to resolve the statement. MakeSavoury has attempted to retrieve it after dealing with
+		sugar like two-word forms (END IF --> ENDIF etc.) and synonyms, but if it's a forward-declared
+		subprogram, it won't have been found. GetStatement will forward-declared all subprograms if
+		necessary. */
 
-	if(tokSeq->command == NULL)
-		return GetStatement(&tokSeq->statementName, &tokSeq->command); /* i.e. a positioned UNDEFINED error */
+	if(tokSeq->command == NULL && (error = GetStatement(&tokSeq->statementName, &tokSeq->command)) != SUCCESS)
+		return error; /* i.e. a positioned UNDEFINED error */
 	
-	if(RequiresSyntaxCheck(tokSeq) && CheckStatementSyntax(tokSeq) != SUCCESS)
-		return CheckStatementSyntax(tokSeq);
+	if(RequiresSyntaxCheck(tokSeq) && (error = CheckStatementSyntax(tokSeq)) != SUCCESS)
+		return error;
 
 	/* Convert parameter expressions from infix to prefix form. */
 
