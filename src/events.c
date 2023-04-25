@@ -87,6 +87,8 @@ struct Trap {
 			const char *context; /* Enclosing subprogram body - NULL if none. */
 		} simpleLocation;
 	} handler;
+	
+	const char *nextStatement;
 
 	/* True if the handler is a sub (ON ... CALL ...) rather than a label (ON ... GOTO ...). */
 	bool subprogramHandler;
@@ -323,6 +325,7 @@ static void PrioritiseWithDefaultStrategy(const struct Process *proc,
 static void ResetTrap(struct Trap *trap)
 {
 	trap->sequencing = 0;
+	trap->nextStatement = NULL;
 	trap->subprogramHandler = FALSE;
 	trap->handler.simpleLocation.label = NULL;
 	trap->handler.simpleLocation.context = NULL;
@@ -458,10 +461,12 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 				t->status = SUSPENDED;
 				t->suspendedAt = Proc()->callNestLevel;
 			}
-
+		
 		Proc()->activeEvent[type] = evt;
 		
 		/* Call the subprogram or jump to the label. */
+		
+		userHandler->nextStatement = Proc()->currentPosition;
 		
 		if(userHandler->subprogramHandler)
 			CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE);
@@ -837,6 +842,7 @@ void Resume_(const QString *toks, unsigned nToks)
 	const char *label = NULL;
 	struct Trap *activeTrap;
 	short originalNestLevel = Proc()->callNestLevel, trapNestLevel;
+	bool resumeAtNextStatement = QsEqNoCase(labelName, &g_NextKeyword);
 	
 	/* Check argument syntax: */
 
@@ -861,17 +867,17 @@ void Resume_(const QString *toks, unsigned nToks)
 	occurred, because EXITSUB calls ReenableEventTraps, which can change the status
 	of traps and events. */
 
-	if(activeTrap->subprogramHandler) {
-		assert(originalNestLevel > SCOPE_MAIN);
-		
-		do {
+	if(resumeAtNextStatement) {
+		while(Proc()->callNestLevel > trapNestLevel)
 			ExitSub_(NULL, 0);
-			label = FindReferencedLabel(labelName, NULL);
-		}
-		while(label == NULL && Proc()->callNestLevel > SCOPE_MAIN);
+		label = activeTrap->subprogramHandler ? Proc()->currentPosition : activeTrap->nextStatement;
 	}
 	else {
-		label = FindReferencedLabel(labelName, NULL);
+		assert(!activeTrap->subprogramHandler || originalNestLevel > SCOPE_MAIN);
+		
+		if(!activeTrap->subprogramHandler)
+			label = FindReferencedLabel(labelName, NULL);
+		
 		while(label == NULL && Proc()->callNestLevel > SCOPE_MAIN) {
 			ExitSub_(NULL, 0);
 			label = FindReferencedLabel(labelName, NULL);
@@ -898,7 +904,10 @@ void Resume_(const QString *toks, unsigned nToks)
 	
 	/* Slip out of any GOSUBs or block control structures remaining on the stack: */
 
-	DiscardCurrentControlFlow();
+	if(!resumeAtNextStatement)
+		DiscardCurrentControlFlow();
+
+	ReenableEventTraps(Proc(), Proc()->callNestLevel);
 
 	/* Explicitly mark the trap as not executing. This is redundant
 		for subprogram traps but required for GOTO ones: */

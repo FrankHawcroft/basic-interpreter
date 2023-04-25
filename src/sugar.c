@@ -71,6 +71,7 @@ const QString g_DataKeyword = {(char *)KW_DATA, 4};
 const QString g_ElseKeyword = {(char *)KW_ELSE, 4};
 const QString g_EndKeyword = {(char *)KW_END, 3};
 const QString g_GoToKeyword = {(char *)KW_GOTO, 4};
+const QString g_NextKeyword = {(char *)KW_NEXT, 4};
 const QString g_PX = {(char *)KW_PX, 3};
 const QString g_PY = {(char *)KW_PY, 3};
 
@@ -148,6 +149,7 @@ static const QString m_ToKeyword = {"TO", 2};
 static const QString m_WaitKeyword = {"WAIT", 4};
 static const QString m_WindowKeyword = {"WINDOW", 6};
 static const QString m_WindowInfoKeyword = {"WINDOWINFO", 10};
+static const QString m_WPrintKeyword = {"WPRINT", 6};
 static const QString m_QuotedTab = {"\"\t\"", 3};
 static const QString m_QuotedLinefeed = {"\"\n\"", 3};
 static const QString m_QuestionMark = {"?", 1};
@@ -187,7 +189,9 @@ static bool TerminatesStatementParameter(char token)
 
 static bool IsPrint(const QString *stmt)
 {
-	return QsEqNoCase(stmt, &m_PrintKeyword) || QsEqNoCase(stmt, &m_FPrintKeyword);
+	return QsEqNoCase(stmt, &m_PrintKeyword)
+		|| QsEqNoCase(stmt, &m_FPrintKeyword)
+		|| QsEqNoCase(stmt, &m_WPrintKeyword);
 }
 
 static bool IsArrayCreator(const QString *stmt)

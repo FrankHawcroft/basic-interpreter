@@ -784,6 +784,7 @@ extern const QString g_ElseKeyword;
 extern const QString g_EndKeyword;
 extern const QString g_EndSubKeyword;
 extern const QString g_GoToKeyword;
+extern const QString g_NextKeyword;
 extern const QString g_PX; /* px~ (internal graphics function - offset by pen x) */
 extern const QString g_PY; /* py~ (internal graphics function - offset by pen y) */
 extern const QString g_StaticKeyword;
