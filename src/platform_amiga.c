@@ -137,6 +137,12 @@ void PfStart()
 		TimerBase = NULL;
 		TimerIO = NULL;
 	}
+
+#ifdef __GNUC__
+	/* Try to make console I/O slightly quicker than treacle flowing over a glacier. */
+	setvbuf(stderr, NULL, _IOLBF, 128);
+	setvbuf(stdout, NULL, PfIsInteractive(stdout) ? _IOLBF : _IOFBF, PfIsInteractive(stdout) ? 128 : 512);
+#endif
 }
 
 void PfFinish()
