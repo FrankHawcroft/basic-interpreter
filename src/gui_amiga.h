@@ -1280,6 +1280,8 @@ static void RenderTextNative(PfWindowHandle win, const QsChar *text, size_t nCha
 		else if(text[n] == '\t') {
 			BasicPoint p;
 			GetCurrentPenPositionNative(win, &p);
+			if(nChars == 1 && (p.x / charWidth) % tabInterval == 0)
+				p.x += charWidth + 1;
 			while((p.x / charWidth) % tabInterval != 0) {
 				Text(rp, " ", 1); /* Do it this way so previous gfx are overwritten. */
 				GetCurrentPenPositionNative(win, &p);
@@ -1292,7 +1294,7 @@ static void RenderTextNative(PfWindowHandle win, const QsChar *text, size_t nCha
 		}
 	}
 	
-	if(nChars != 0 && text[nChars - 1] != '\n')
+	if(nChars == 0 || text[nChars - 1] != '\n')
 		/* Correct for the baseline offset, so further WPRINT statements carry on along the same row. */
 		Move(rp, rp->cp_x, rp->cp_y - charHeight);
 }
