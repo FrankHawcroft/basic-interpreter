@@ -130,7 +130,7 @@ void PfStart()
 		|| (DiskFontBase = OpenLibrary("diskfont.library", 0L)) == NULL) {
 			/* Assume the C lib is available at this point but nothing else. If dos.library failed to open,
 			   chances are this error message will fail anyway ... */
-			fputs("Unable to open a needed Amiga system library  - need dos, intuition, graphics, layers, diskfont. Exiting.\n", stderr);
+			fputs("Unable to open a needed Amiga system library - need dos, intuition, graphics, layers, diskfont. Exiting.\n", stderr);
 			exit(21);
 		}
 #endif

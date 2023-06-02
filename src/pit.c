@@ -199,59 +199,67 @@ static bool BuiltInFunctionIsDeterministic(void (*fm)(Scalar *, const BObject *,
 
 #define MAX_FUNCTION_DETERMINISM_CHECK_RECURSION 5
 
-static bool IsDeterministic(const QString *t, bool inFunction, unsigned depth, struct HashTable *fcns)
+static bool IsDeterministic(const QString *t, bool inFunction, unsigned depth, struct HashTable *knownFcns)
 {
 	static const bool exists = TRUE;
 	
 	const BObject *defn;
 	
+	/* Check if diving too deep - */
 	if(depth > MAX_FUNCTION_DETERMINISM_CHECK_RECURSION)
 		return FALSE;
 	
-	if(HtLookUp(fcns, t) != NULL || IsConstant(t))
+	/* Check for recursive call, literal, or global constant - */
+	if(HtLookUp(knownFcns, t) != NULL || IsConstant(t))
 		return TRUE;
 	
 	defn = LookUpCheckingType(t, Proc()->callNestLevel);
 		
-	if(defn == NULL) /* Assume function compilation (and therefore optimisation) happens at first call.
-						Therefore, any referenced global vars are assumed to exist at this point - else
-						an error will occur on evaluation, so no harm in classifying the function incorrectly. */
+	/* Assume function compilation (and therefore optimisation) happens at first call.
+		Therefore, any referenced global vars are assumed to exist at this point - else
+		an error will occur on evaluation, so no harm in classifying the function incorrectly. */
+	if(defn == NULL)
 		return inFunction;
-	else if(IsVariable(defn)
+	
+	/* Check for global variable - */
+	if(IsVariable(defn)
 	  && (IsArray(defn)
 		|| LookUp(t, SCOPE_MAIN) == defn
 		|| LookUp(t, Proc()->callNestLevel - inFunction) == defn))
 				/*GetActualCallNestLevel(t, defn) <= Proc()->callNestLevel - inFunction)) */
-		return FALSE; /* Refers to a global or subprogram variable. IsConstant covers global constants. */
+		return FALSE;
+
 	/*else if(defn->category == OPERATOR)
 		return TRUE;*/
-	else if(defn->category == FUNCTION) {
+	
+	/* Check function - */
+	if(defn->category == FUNCTION) {
 		const struct Function *f = defn->value.function;
-		if(IsDefFunction(f)) {
-			const struct Piece *piece;
+		const struct Piece *piece;
+		
+		if(!IsDefFunction(f))
+			return BuiltInFunctionIsDeterministic(f->method);
+				
+		if(f->staticFunction)
+			return TRUE; /* TODO figure it out ... but works for prelude ones */
 			
-			if(f->staticFunction)
-				return TRUE; /* TODO figure it out ... */
+		HtAdd(knownFcns, t, (void *)&exists); /* cast away const */
 			
-			HtAdd(fcns, t, (void *)&exists); /* cast away const */
-			
-			for(piece = f->def; piece != NULL; piece = piece->next) {
-				const QString *scan;
-				for(scan = piece->condition.body.s; scan != NULL && scan < piece->condition.body.s + piece->condition.length; scan++)
-					if(HtLookUp(fcns, scan) == NULL && !IsDeterministic(scan, TRUE, depth + 1, fcns))
-						return FALSE;
-				for(scan = piece->value.body.s; scan != NULL && scan < piece->value.body.s + piece->value.length; scan++)
-					if(HtLookUp(fcns, scan) == NULL && !IsDeterministic(scan, TRUE, depth + 1, fcns))
-						return FALSE;
-			}
-			
-			HtDelete(fcns, t);
+		for(piece = f->def; piece != NULL; piece = piece->next) {
+			const QString *scan;
+			for(scan = piece->condition.body.s; scan != NULL && scan < piece->condition.body.s + piece->condition.length; scan++)
+				if(HtLookUp(knownFcns, scan) == NULL && !IsDeterministic(scan, TRUE, depth + 1, knownFcns))
+					return FALSE;
+			for(scan = piece->value.body.s; scan != NULL && scan < piece->value.body.s + piece->value.length; scan++)
+				if(HtLookUp(knownFcns, scan) == NULL && !IsDeterministic(scan, TRUE, depth + 1, knownFcns))
+					return FALSE;
 		}
-		else
-			return BuiltInFunctionIsDeterministic(f->method);		
+			
+		HtDelete(knownFcns, t);				
 	}
 	
-	return TRUE; /* Assume operator, punctuation, or label. */
+	/* Otherwise, assume operator, punctuation, or label - */
+	return TRUE; 
 }
 
 /* Assumes in prefix form and already determined to be syntactically and semantically valid -
@@ -274,26 +282,25 @@ static SimpleType WithLeftContext(enum TypeRule required, const QString *token)
 	return leftContext;
 }
 
-static void MakeQuotedToken(const Scalar *v, QString *t)
+static bool MakeQuotedToken(const Scalar *v, QString *t)
 {
-	QsInitNull(t);
-
 	if(v->type == T_STRING) {
+		const QString *s = (const QString *)GetPointer((Scalar *)v);
+		if(QsSearchForChar(s, '\"') != NULL)
+			return FALSE;
+		QsDispose(t);
 		QsCopyChar(t, '\"');
-		QsAppend(t, (const QString *)GetPointer((Scalar *)v));
+		QsAppend(t, s);
 		QsAppendChar(t, '\"');
+		return TRUE;
 	}
 	else {
 		QsChar convBuffer[64];
-
 		convBuffer[0] = NUL;
-
+		
 		if(v->type == T_CHAR) {
-			/* TODO also, there's the quote problem */
-			if(GetCharacter(v) != 0)
-				sprintf(convBuffer, "\"%c\"", GetCharacter(v));
-			else
-				strcpy(convBuffer, "\"\"");
+			int c = GetCharacter(v);
+			sprintf(convBuffer, c != '\"' && (isprint(c) || c == ' ') ? "\"%c\"" : "@%x", c);
 		}
 		else if(v->type == T_BOOL)
 			sprintf(convBuffer, "%d", (int)GetBoolean(v));
@@ -307,39 +314,18 @@ static void MakeQuotedToken(const Scalar *v, QString *t)
 		else if(v->type == T_LONG)
 			sprintf(convBuffer, "&h%lX&", GetLong(v));
 		else if(v->type == T_SINGLE || v->type == T_DOUBLE)
-			sprintf(convBuffer, "%f%c", GetDouble(v), SpecifierFromType(v->type));
-
-		QsCopyNTS(t, convBuffer);
+			sprintf(convBuffer, "%.*g%c", v->type == T_SINGLE ? 8 : 16, GetDouble(v), SpecifierFromType(v->type));
+		else
+			assert(FALSE); /* unknown type, or pointer */
+		
+		if(strlen(convBuffer) != 0) {
+			QsDispose(t);
+			QsCopyNTS(t, convBuffer);
+			return TRUE;
+		}
 	}
+	return FALSE;
 }
-/*
-#define MAX_TRACKED_NESTING 10
-
-static const BObject *FunctorFor(const QString *ts, unsigned short nToks, const QString *t)
-{
-	const BObject *functor[MAX_TRACKED_NESTING];
-	unsigned short paramNumber;
-	int nesting;
-	
-	unsigned short rt;
-				int relNesting = 0, fcount = 0;
-				const struct Parameter *formal = NULL;
-				
-				actual = 0;
-				for(rt = t - 1; rt >= 1 && relNesting >= 0; rt--) {
-					QString *rtok = &tokSeq->rest[rt];
-					Nest(rtok, &relNesting);
-					actual += relNesting == 0 && (QsGetFirst(rtok) == '(' || !IsPunctuation(rtok));
-					if(relNesting == 0 && IsLParen(rtok - 1)) {
-						const struct Operator *op = ResolveOperator(rtok);
-						if(op != NULL) {
-							formal = ParametersForOperator(op);
-							fcount = OperandCount(op);
-						}
-					}
-				}
-}
-*/
 
 /* Substitution of literals for named constants
    ============================================
@@ -353,14 +339,7 @@ not necessarily stable (i.e. values can change when printed then parsed). */
 static bool InlineNamedConstant(QString *tok)
 {
 	const BObject *defn = ResolveGlobalNamedConstant(tok);
-
-	if(defn != NULL	&& SuitableForInlining(VarData(defn))) {
-		QsDispose(tok);
-		MakeQuotedToken(VarData(defn), tok);
-		return TRUE;
-	}
-
-	return FALSE;
+	return defn != NULL	&& SuitableForInlining(VarData(defn)) && MakeQuotedToken(VarData(defn), tok);
 }
 
 /* Substitution of named constants for literals
@@ -372,31 +351,32 @@ literals at global scope will be pre-converted. */
 static bool CreateNamedConstant(QString *tok, bool inFunction)
 {
 	static int constNumber = 0;
+	
+	Scalar n;
 	bool created = FALSE;
 	
-	if(IsNumeric(tok) && Proc()->callNestLevel > SCOPE_MAIN && !InStaticContext(Proc())) {
-		Scalar n;
+	if(!IsNumeric(tok) || Proc()->callNestLevel <= SCOPE_MAIN || InStaticContext(Proc()))
+		return FALSE;
+			
+	ParseToken(tok, &n);
+	if(!TypeIsExact(n.type)) {
+		BObject *c;
+		QString name;
+		char nameBuffer[64];
 		
-		ParseToken(tok, &n);
-		if(!TypeIsExact(n.type)) {
-			BObject *c; /* vvv */
-			QString name;
-			char nameBuffer[64];
+		sprintf(nameBuffer, "fc%d~", constNumber++);
+		QsCopyNTS(&name, nameBuffer);
+		
+		if((c = DefineVariable(&name, n.type, SCOPE_GLOBAL, FALSE)) != NULL) {
+			c->category = NAMED_CONST;
+			CopyScalar(VarData(c), &n);
 			
-			sprintf(nameBuffer, "fc%d~", constNumber++);
-			QsCopyNTS(&name, nameBuffer);
+			QsCopy(tok, &name);
 			
-			if((c = DefineVariable(&name, n.type, SCOPE_GLOBAL, FALSE)) != NULL) {
-				c->category = NAMED_CONST; /* vvv */
-				CopyScalar(VarData(c), &n);
-				
-				QsCopy(tok, &name);
-				
-				created = TRUE;
-			}
-			
-			QsDispose(&name);
+			created = TRUE;
 		}
+		
+		QsDispose(&name);
 	}
 	
 	return created;
@@ -464,9 +444,8 @@ static bool EvaluateConstantValuedExpression(QString *tok, bool inFunction)
 	{
 		QString expr[MAX_CONSTANT_EXPR_LENGTH];
 		int i;
-		struct Stack stk;
 		struct HashTable *fcns = HtCreate(11, NULL, &QsEqNoCase);
-		bool evalIt = IsDeterministic(tok + 1, inFunction, 0, fcns);
+		bool evalIt = IsDeterministic(tok + 1, inFunction, 0, fcns), succeeded = FALSE;
 	
 		HtDispose(fcns);
 		
@@ -480,30 +459,36 @@ static bool EvaluateConstantValuedExpression(QString *tok, bool inFunction)
 		QsCopy(&expr[i], &g_Pipe);
 
 		/* Evaluate it. */
-
-		CreateExprStk(&stk, nParams);
-		Eval(expr, DefaultConvert, 0, &stk);
-
-		assert(StkHeight(&stk) == 1);
-		assert(PeekExprStk(&stk, 0)->category == LITERAL);
-
-		for(i = 0; i < nParams + 3; i++)
-			QsDispose(&expr[i]);
-
-		/* Substitute the value, and mark remaining tokens as unused. */
-		/* TODO if f.p., shouldn't do this ... or at least, ensure more sig digits in MQT! */
-		QsDispose(tok);
-		MakeQuotedToken(&(PeekExprStk(&stk, 0)->value.scalar), tok);
 		
-		/* Clean up. */
+		{
+			struct Stack stk;
+			CreateExprStk(&stk, nParams);
 		
-		DisposeExprStk(&stk);
-		for(i = 1; i < nParams + 3; i++) {
-			QsDispose(tok + i);
-			QsCopy(tok + i, &m_Removed);
+			Eval(expr, DefaultConvert, 0, &stk);
+
+			assert(StkHeight(&stk) == 1);
+			assert(PeekExprStk(&stk, 0)->category == LITERAL);
+
+			for(i = 0; i < nParams + 3; i++)
+				QsDispose(&expr[i]);
+
+			/* Substitute the value, and mark remaining tokens as unused. */
+			
+			succeeded = MakeQuotedToken(&(PeekExprStk(&stk, 0)->value.scalar), tok);
+			
+			/* Clean up. */
+			
+			DisposeExprStk(&stk);
+		}
+		
+		if(succeeded) {
+			for(i = 1; i < nParams + 3; i++) {
+				QsDispose(tok + i);
+				QsCopy(tok + i, &m_Removed);
+			}
 		}
 
-		return TRUE;
+		return succeeded;
 	}
 }
 
@@ -539,10 +524,8 @@ static bool ConvertLiteral(const struct Parameter *formal, int fcount, QString *
 		
 		assert(!IndicatesError(&val));
 		
-		if(changed) {
-			QsDispose(tok);
-			MakeQuotedToken(&val.value.scalar, tok);
-		}
+		if(changed)
+			changed = MakeQuotedToken(&val.value.scalar, tok);
 		
 		DisposeIfScalar(&val);
 		
@@ -566,14 +549,10 @@ static bool SubstituteDefault(const struct Statement *stmt, QString *tok, int ne
 		assert(formal->defaultValue != NULL);
 
 		/*fprintf(stderr, "substituting default for param %d:\n", actual);*/
-		
-		QsDispose(tok);
-		MakeQuotedToken(formal->defaultValue, tok);
-		
+				
+		return MakeQuotedToken(formal->defaultValue, tok);
 		/*QsWrite(tok, stderr);
 		fputc('\n', stderr);*/
-		
-		return TRUE;
 	}
 	
 	return FALSE;
@@ -588,6 +567,7 @@ void Improve(struct TokenSequence *tokSeq)
 {
 	unsigned pass;
 	bool changed = TRUE;
+	bool inFunction = QsIsNull(&tokSeq->statementName);
 	
 	/* Multiple passes are made over the statement, enabling optimisations that are made possible by
 		other optimisations. */
@@ -627,7 +607,6 @@ void Improve(struct TokenSequence *tokSeq)
 		
 		for(t = 0; t < tokSeq->length; t++) {
 			QString *tok = &tokSeq->rest[t];
-			bool inFunction = QsIsNull(&tokSeq->statementName);
 			
 			changed |= InlineNamedConstant(tok);
 			
@@ -650,7 +629,7 @@ void Improve(struct TokenSequence *tokSeq)
 					increment = 1;
 		}
 		
-		if(!QsIsNull(&tokSeq->statementName)) {
+		if(!inFunction) {
 			unsigned actual = 0;
 			int nesting = 0;
 			

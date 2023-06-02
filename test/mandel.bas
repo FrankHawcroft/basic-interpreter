@@ -36,7 +36,7 @@ next
 '' 'Render' to the console -
 for r = 0 to resy - 1
     for c = 0 to resx - 1
-        if plot(c, r) then | print "*"; | else | print " "; | endif
+        if plot(c, r) then print "*"; else print " ";
     next
     print
 next

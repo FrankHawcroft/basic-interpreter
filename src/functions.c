@@ -151,7 +151,7 @@ static void PrintFunctionInfo(const struct Function *f)
 			printf("  guard cond: ");
 			if(piece->condition.body.s == NULL)
 				printf("<default>");
-			else if(f->staticFunction) {
+			else if(f->staticFunction && piece->compiled) {
 				for(i = 0; i < piece->condition.length; i++)
 					DumpObject(&piece->condition.body.obj[i]);
 			}
@@ -159,7 +159,7 @@ static void PrintFunctionInfo(const struct Function *f)
 				PrintFnExprTokens(piece->condition.body.s, piece->condition.length);
 			putchar('\n');
 			printf("  value: ");
-			if(f->staticFunction) {
+			if(f->staticFunction && piece->compiled) {
 				for(i = 0; i < piece->value.length; i++)
 					DumpObject(&piece->value.body.obj[i]);
 			}
@@ -240,6 +240,14 @@ static QString *AsPrefix(const QString *infixExpr, short *nTokens, const char *b
 			optimised.length = optimised.capacity = (unsigned short)prefixFormLength;
 			optimised.rest = prefixForm;
 			Improve(&optimised);
+
+#ifdef DEBUG		
+			if(Opts()->verbose) {
+				fprintf(stderr, "FuncOpt: ");
+				PrintTokSeq(&optimised);
+			}
+#endif
+			
 			prefixForm = optimised.rest; /* May lead to slight memory leak, but quick. */
 			*nTokens = optimised.length;
 		}

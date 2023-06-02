@@ -1201,6 +1201,16 @@ Error ParseToken(const QString *token, Scalar *val)
 		InitScalarAsString(val);
 		QsGetSubstring(&val->value.string, token, 1, QsGetLength(token) - 2);
 	}
+	else if(QsGetFirst(token) == '@') {
+		int ch;
+		if(QsGetLength(token) < 2 || !isxdigit(QsGetCharAt(token, 1))
+		|| sscanf(QsGetData(token) + 1, "%x", &ch) != 1)
+			e = BADCONSTANT;
+		else {
+			val->type = T_CHAR;
+			val->value.character = (QsChar)ch;
+		}
+	}
 	else
 		e = ParseNumericToken(token, val);
 	
