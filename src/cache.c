@@ -343,13 +343,14 @@ void PrintCacheInfo(const struct Cache *c)
 void DumpCache(const struct Cache *cache)
 {
 	if(cache != NULL) {
-		fprintf(stderr, "-- Dumping cache %p\n", (void *)cache);
+		fprintf(stderr, "-- Dumping cache ....%hX\n", PointerDisplayValue(cache));
 #if USE_SIMPLE_ARRAY
 		{
 			unsigned n;
 			for(n = 0; n != cache->tableSize; n++)
 				if(cache->table[n].key != NULL)
-					fprintf(stderr, "%4u: %p => %p\n", n, cache->table[n].key, cache->table[n].value);
+					fprintf(stderr, "%4u: ....%hX => ....%hX\n", n, 
+						PointerDisplayValue(cache->table[n].key), PointerDisplayValue(cache->table[n].value));
 		}
 		fprintf(stderr, "-- End of cache dump\n");
 #else

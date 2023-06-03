@@ -490,7 +490,7 @@ int Loop(void)
 		}
 		
 		/*if(!WithinFileBuffer(proc->buffer, proc->currentStatementStart))
-			fprintf(stderr, "Exiting due to outside buf: %p\n", proc->currentStatementStart);*/
+			fprintf(stderr, "Exiting due to outside buf: ....%hX\n", PointerDisplayValue(proc->currentStatementStart));*/
 		
 		DisposeTokenSequence(&tokSeq);
 		DisposeExprStk(&exprStack);

@@ -244,6 +244,8 @@ short GetCallNestLevel(const BObject *obj)
 	return Proc()->callNestLevel;
 }
 
+DIAGNOSTIC_FN_DECL(unsigned short PointerDisplayValue(const void *));
+
 void DumpObject(const BObject *obj)
 {
 	const char *location = NULL, *file = NULL;
@@ -264,7 +266,7 @@ void DumpObject(const BObject *obj)
 			fprintf(stderr, "<label: file %s, line %d>", file, line);
 			break;
 		case OPERATOR:
-			fprintf(stderr, "<op: %p>", (void *)obj->value.opRef);
+			fprintf(stderr, "<op: ....%hX>", PointerDisplayValue(obj->value.opRef));
 			break;
 		case LITERAL:
 			fprintf(stderr, "<lit(%d): ", obj->value.scalar.type);
@@ -278,21 +280,21 @@ void DumpObject(const BObject *obj)
 			if(IsDefFunction(obj->value.function))
 				fprintf(stderr, "<def func: file %s, line %d>", file, line);
 			else
-				fprintf(stderr, "<func: %p>", (void *)obj->value.function);
+				fprintf(stderr, "<func: ....%hX>", PointerDisplayValue(obj->value.function));
 			break;
 		case STATEMENT:
 			if(IsSubprogram(obj->value.statement))
 				fprintf(stderr, "<sub: file %s, line %d>", file, line);
 			else
-				fprintf(stderr, "<cmd: %p>", (void *)obj->value.statement->method.builtIn);
+				fprintf(stderr, "<cmd: ....%hX>", PointerDisplayValue(obj->value.statement->method.builtIn));
 			break;
 		default:
 			if(obj->category & IS_VARIABLE)
-				fprintf(stderr, "<var(%d) cat=%d @ %d: %p>",
+				fprintf(stderr, "<var(%d) cat=%d @ %d: ....%hX>",
 					VarData(obj)->type,
 					obj->category,
 					GetCallNestLevel(obj),
-					VarPtr(obj));
+					PointerDisplayValue(VarPtr(obj)));
 			else
 				fprintf(stderr, "<UNKNOWN CATEGORY!>");
 			break;

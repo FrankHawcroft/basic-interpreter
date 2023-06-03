@@ -169,7 +169,7 @@ static void PrintFunctionInfo(const struct Function *f)
 		}
 	}
 	else
-		printf("built-in function, method ptr = %p\n", (void *)f->method);
+		printf("built-in function, method ptr = ....%hX\n", PointerDisplayValue(f->method));
 }
 
 #endif /* DEBUG */

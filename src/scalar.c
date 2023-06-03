@@ -574,6 +574,8 @@ static Error WriteNumber(FILE *stream, const union NumericalValue *value, Simple
 	return fputs(buffer, stream) >= 0 ? SUCCESS : LastIOError();
 }
 
+DIAGNOSTIC_FN_DECL(unsigned short PointerDisplayValue(const void *));
+
 /* Prints the value to the given output stream in a readable form.
 Numbers are always printed in decimal format. Boolean values are printed
 as "TRUE" or "FALSE".
@@ -584,7 +586,8 @@ Error WriteScalar(FILE *s, const Scalar *v)
 {
 	if(IsPointer(v))
 #ifdef DEBUG
-		return fprintf(s, "pointer=%p (type=%d)", (void *)v->value.pointer.lp, NonPointer(v->type)) > 0 
+		return fprintf(s, "pointer=....%hX (type=%d)",
+				PointerDisplayValue(v->value.pointer.lp), NonPointer(v->type)) > 0
 			? SUCCESS : LastIOError();
 #else
 		return BADARGTYPE;

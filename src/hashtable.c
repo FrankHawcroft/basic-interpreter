@@ -266,7 +266,7 @@ void HtDump(const struct HashTable *ht)
 					char c = QsGetCharAt(&defn->key, cn);
 					isprint(c) ? fputc(c, stderr) : fprintf(stderr, "\\x%x", c);
 				}
-				fprintf(stderr, " => <%p>%s", defn->value, defn->next == NULL ? ".\n" : ", ");
+				fprintf(stderr, " => <....%hX>%s", PointerDisplayValue(defn->value), defn->next == NULL ? ".\n" : ", ");
 			}
 		}
 	}

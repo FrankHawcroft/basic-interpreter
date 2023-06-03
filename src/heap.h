@@ -101,4 +101,7 @@ DIAGNOSTIC_FN_DECL(void PrintHeapStatus(void));
 /* Run some simple sanity tests. */
 DIAGNOSTIC_FN_DECL(void RunHeapTests(void));
 
+/* Get a form of a pointer suitable for debugging output etc., which doesn't include the whole address. */
+DIAGNOSTIC_FN_DECL(unsigned short PointerDisplayValue(const void *));
+
 #endif /* BAS_HEAP_H_INCLUDED */
