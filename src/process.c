@@ -144,8 +144,8 @@ Error CreateNewProcess(const struct Options *options)
 	DefineBuiltIns();
 	
 #ifdef DEBUG
-	/*if(Opts()->verbose)
-		PrintSymTab();*/
+	if(Opts()->verbose >= 3)
+		PrintSymTab();
 		
 	p->maxNestLevel = SCOPE_MAIN;
 	p->definitions = p->hashTableSearches = p->lookUps = 0;

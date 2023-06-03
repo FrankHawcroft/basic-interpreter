@@ -44,7 +44,7 @@ Error Prepare(struct TokenSequence *tokSeq)
 	MakeSavoury(tokSeq);
 
 #ifdef DEBUG
-	if(Opts()->verbose) {
+	if(Opts()->verbose > 1) {
 		PrintVerboseTracingPrefix('2');
 		PrintTokSeq(tokSeq);
 	}
@@ -73,7 +73,7 @@ Error Prepare(struct TokenSequence *tokSeq)
 		ReplaceTokens(tokSeq, prefixFormSpace, (unsigned short)prefixFormLength);
 		
 #ifdef DEBUG
-		if(Opts()->verbose) {
+		if(Opts()->verbose > 1) {
 			PrintVerboseTracingPrefix('3');
 			PrintTokSeq(tokSeq);
 		}
@@ -103,7 +103,7 @@ static Error Compile(const char **position, struct TokenSequence *tokSeq)
 	error = Tokenise(position, tokSeq, FALSE);
 
 #ifdef DEBUG
-	if(error == SUCCESS && Opts()->verbose) {
+	if(error == SUCCESS && Opts()->verbose > 1) {
 		PrintVerboseTracingPrefix('1');
 		PrintTokSeq(tokSeq);
 	}
@@ -263,7 +263,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 			EvalPreconverted(ts->preconverted, exprStack, ts->length - 1);
 
 #ifdef DEBUG
-		if(ops & OP_VERBOSE) {
+		if((ops & OP_VERBOSE) && Opts()->verbose > 1) {
 			PrintVerboseTracingPrefix('4');
 			DumpExprStk(exprStack);
 		}
@@ -279,7 +279,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 			error = ConformQuickly(ts->command->formal, (BObject *)exprStack->base, ts->command->formalCount);
 
 #ifdef DEBUG
-		if((ops & OP_VERBOSE) && (ops & (OP_CONFORM | OP_CONFORMQ)) && error == SUCCESS) {
+		if((ops & OP_VERBOSE) && Opts()->verbose > 1 && (ops & (OP_CONFORM | OP_CONFORMQ)) && error == SUCCESS) {
 			PrintVerboseTracingPrefix('5');
 			DumpExprStk(exprStack);
 		}

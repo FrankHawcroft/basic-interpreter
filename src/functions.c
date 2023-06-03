@@ -214,6 +214,10 @@ static void StaticFunctionExpressionConvert(unsigned index, const QString *token
 		FunctionExpressionConvert(index, token, result);
 }
 
+#ifdef DEBUG
+extern void PrintVerboseTracingPrefix(char pass);
+#endif
+
 static QString *AsPrefix(const QString *infixExpr, short *nTokens, const char *base, Error *error)
 {
 	QString *prefixForm = NULL;
@@ -243,7 +247,7 @@ static QString *AsPrefix(const QString *infixExpr, short *nTokens, const char *b
 
 #ifdef DEBUG		
 			if(Opts()->verbose) {
-				fprintf(stderr, "FuncOpt: ");
+				PrintVerboseTracingPrefix('f');
 				PrintTokSeq(&optimised);
 			}
 #endif

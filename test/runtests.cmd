@@ -27,7 +27,7 @@ call simple_exprs.cmd %intpath% >> log.txt 2>&1
 rem Different command line options.
 echo ***** Testing command line options >> log.txt
 %intpath% --execute "print 1 + 1" >> log.txt 2>&1
-%intpath% -v -e"print 1 + 1" >> log.txt 2>&1
+%intpath% -v2 -e"print 1 + 1" >> log.txt 2>&1
 %intpath% -d -e"" >> log.txt 2>&1
 %intpath% -o -e"for i = 1 to 3 | print i | next | if i < 3 | error 234 | endif" >> log.txt 2>&1
 %intpath% -l -e"for i = 1 to 3 | print i | next | if i < 3 | error 234 | endif" >> log.txt 2>&1

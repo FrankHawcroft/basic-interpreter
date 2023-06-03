@@ -3,7 +3,7 @@
 /*
 	$VER: main.c 0.16A (5.8.2014)
 	
-	Start up and clean up.
+	Start up and clean up the BASIC interpreter.
 */
 
 #include <stdlib.h>
@@ -31,7 +31,7 @@ static Error InitialiseInterpreter(const struct Options *);
 int main(int argc, const char *argv[])
 {
 	struct Options options;
-	
+
 	PfStart();
 
 	if(!ProcessCommandLineArgs(argc, argv, &options)) {

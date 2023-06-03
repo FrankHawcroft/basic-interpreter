@@ -65,7 +65,7 @@ Short form: -i
 
 	--buf[fer] <size>
 	
-Use a buffer of the given size. The size is in KB by default.
+Use a buffer of the given size for holding the loaded program(s) and any immediate commands. The size is in KB by default.
 
 The suffix 'b', 'k' or 'kb', 'm' or 'mb' (in lower or upper case) may be added to the size to scale it.
 
@@ -78,7 +78,7 @@ Short form:	-b<size>
 
 	--heap <size>
 	
-Use a fixed size heap of the given size. The size is in KB by default.
+Use a fixed size heap for memory allocation by the interpreter. The size is in KB by default.
 
 The suffix 'b', 'k' or 'kb', 'm' or 'mb' (in lower or upper case) may be added to the size to scale it.
 
@@ -91,7 +91,8 @@ Short form: -h<size>
 	
 Profile the program being executed and write a report to <output-file>.
 
-Currently the profiler is extremely simple. It is a line-by-line profiler that simply counts how many times each statement is executed.
+Currently the profiler is extremely simple. It is a line-by-line profiler that simply counts how many times each statement is executed,
+and how long each takes in total, using the OS or C library time functions.
 
 Short form: -p<output-file>
 
@@ -109,7 +110,7 @@ Generally you do not have to use this option. By default, the interpreter will l
 	
 The prelude.bas included with the interpreter contains some common BASIC functions. If you have defined BAS_MODULE_PATH appropriately, these functions will be available and work as expected.
 
-If you use the --prelude option, and the interpreter determines that the parameter is an absolute path, then only that location will be tried. If it is a simple filename, or a relative path, then the locations given above will be searched.
+If you use the --prelude option, and the interpreter determines that the parameter is an absolute path, then only that location will be tried. If it is a simple filename, with no directory part, or a relative path, then the locations given above will be searched.
 
 --noprelude means that the interpreter will not load a prelude. This may be useful if you wish to redefine some of the functions defined in prelude.bas, or to save a small amount of memory and start up time.
 
@@ -134,8 +135,6 @@ Example: on a Unix-like system, search for modules in the home directory and /et
 
 	nb -m~;/etc/basic program.bas
 
-Short form: -m<paths>
-
 
 	--check-only
 	
@@ -147,7 +146,7 @@ Don't actually execute the program - just syntax check it, then quit.
 
 Do not syntax check the program before executing it.
 
-This will stop the interpreter from checking the program for common syntax errors before starting to run it. It will make the program start up slightly faster. Regardless of the use of this option, the prelude is not checked unless --debug-prelude is specified, on the rationale that a prelude module is generally fairly well tested, and does not change frequently.
+This will stop the interpreter from checking the program for common syntax errors before starting to run it. It will make the program start up slightly faster. Regardless of the use of this option, the prelude is not pre-checked unless --debug-prelude is specified, on the rationale that a prelude module is generally fairly well tested, and does not change frequently.
 
 --noscript-mode is the default.
 
@@ -184,10 +183,24 @@ Useful if you have changed prelude.bas or are using your own prelude module.
 Short form: -d
 
 
-	--verbose
+	--verbose [<level>]
 	
-(1) Run the interpreter's internal self-tests before loading anything; (2) print verbose debugging information and warning messages to stderr.
+Print verbose debugging information and warning messages to stderr. The higher the numeric level, the more information is printed:
 
-This option is only available if the interpreter has been compiled in DEBUG mode, i.e. without an NDEBUG or _NDEBUG C macro defined. It might be useful to diagnose a bug in the interpreter, or check how the interpreter compiles a particular statement.
+0 -> no extra output
+1 -> print which program files are being loaded, and also optimiser output if -o is used; the default if no number follows --verbose
+2 -> also print converted forms of each statement before it's executed
+3 -> also print a dump of the symbol table at start up
 
-Short form: -v
+This option is only available if the interpreter has been compiled in DEBUG mode, i.e. without an NDEBUG or _NDEBUG C macro defined. It might be useful to diagnose a bug in the interpreter, or check how the interpreter compiles or optimises a particular statement.
+
+Short form: -v[<level>]
+
+
+	--self-test
+	
+Run the interpreter's internal self-tests before loading anything. The results are printed to stderr.
+
+Like -v, this option is only available if the interpreter has been compiled in DEBUG mode.
+
+Short form: -t

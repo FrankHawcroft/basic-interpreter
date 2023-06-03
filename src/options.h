@@ -30,7 +30,7 @@ struct Options {
 	bool preludeDebugging; /* Check prelude syntax and display errors in prelude? */
 	bool unsafe; /* Allow PEEK, POKE and other statements and functions allowing access to arbitrary memory. */
 #ifdef DEBUG
-	bool verbose; /* Produce verbose debugging output. TODO should be an integer verbosity level */
+	unsigned verbose; /* Verbose debugging output level, 1 - 3. */
 	bool runModuleTests;
 #endif
 };
