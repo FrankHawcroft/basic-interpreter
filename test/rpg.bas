@@ -20,7 +20,7 @@ data "+--------------------+"
 
 cx% = 10 | cy% = 9
 
-'' Stats:
+'' Character stats:
 
 const max_pc% = 4 '' player characters
 const max_npc% = 2 '' non-player characters
@@ -76,9 +76,9 @@ make_party:
 	
 show_party:
 	wcls
-	wprint "Key", "Name",, "HP"
+	wprint "Key", "Name",, "HP", "Class"
 	for i = 1 to max_ch
-		wprint chr(asc("A") + i - 1), c_name(i),, c_hp(i)
+		wprint chr(asc("A") + i - 1), c_name(i),, c_hp(i), c_class(i)
 	next
 	wprint "Press a key to continue ..."
 	sleep
