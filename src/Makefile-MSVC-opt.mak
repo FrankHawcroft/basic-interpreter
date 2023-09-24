@@ -11,13 +11,13 @@ NB_OBJS = audio.obj basicio.obj bitvector.obj bobject.obj buffer.obj \
 	sugar.obj symtab.obj syntax.obj vars.obj
 
 nb : $(NB_OBJS)
-	cl $(NB_OBJS) /O1 /Gr /GL /GS- /MD /DNDEBUG=1 /link /out:nb.exe
+	cl $(NB_OBJS) /O1 /Oi /Gr /GL /GS- /MD /DNDEBUG=1 /link /out:nb.exe
 
 clean :
 	del *.obj
 
 .c.obj :
-	cl /c $*.c /O1 /Gr /GL /GS- /MD /DNDEBUG=1
+	cl /c $*.c /O1 /Oi /Gr /GL /GS- /MD /DNDEBUG=1
 
 audio.obj : interpreter.h common.h qstring.h errors.h platform.h builtin.h \
 	heap.h process.h
