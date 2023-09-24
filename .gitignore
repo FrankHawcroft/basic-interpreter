@@ -180,6 +180,8 @@ ipch/
 *.vsp
 *.vspx
 *.sap
+# FH added - more diagnostic/profiling stuff
+*.diagsession
 
 # Visual Studio Trace Files
 *.e2e
