@@ -1145,7 +1145,7 @@ static void SetWindowAreaPatternNative(PfWindowHandle win, short *pattern, size_
 {
 	struct RastPort *rp = win->RPort;
 	int powerOf2 = 1;
-	while(powerOf2 < nWords / 2) powerOf2 <<= 1;
+	while((1 << powerOf2) < nWords) ++powerOf2;
 	SetAfPt(rp, pattern, powerOf2);
 	SetDrMd(rp, JAM2);
 }
