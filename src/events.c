@@ -491,11 +491,8 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 	
 	if(!DequeueFromCQ(&Proc()->q[type], &evt))
 		return FALSE;
-
-	if(mooted != userHandler) {
+	else if(mooted != userHandler)
 		(*mooted->track)(mooted->status, &Proc()->q[type], &evt);
-		return FALSE;
-	}
 	else {
 		struct Trap *t;
 
@@ -517,9 +514,8 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 			CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE);
 		else
 			Proc()->currentPosition = userHandler->handler.simpleLocation.label;
-		
-		return TRUE;
 	}
+	return TRUE;
 }
 
 extern void PollUIEvents(struct Process *);
