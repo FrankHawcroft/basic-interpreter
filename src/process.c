@@ -138,7 +138,7 @@ Error CreateNewProcess(const struct Options *options)
 	
 	InitProfile(&p->stats);
 	
-	p->breakFlag = FALSE;
+	p->breakFlag = p->abortFlag = FALSE;
 	InitEventTraps();
 
 	DefineBuiltIns();

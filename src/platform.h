@@ -231,6 +231,7 @@ typedef int PfEventNotificationHandle;
 
 /* signal() doesn't seem to work with VBCC, so a polling function needs to be used. */
 extern bool PfTestAndClearBreakSignal(void);
+extern bool PfTestAbortSignal(void);
 
 #else
 #define PF_POLL_FOR_SIGNALS 0

@@ -439,6 +439,11 @@ bool PfTestAndClearBreakSignal()
 		return FALSE;
 }
 
+bool PfTestAbortSignal()
+{
+	return (SetSignal(0L, 0L) & (SIGBREAKF_CTRL_D | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F)) != 0;
+}
+
 PfEventNotificationHandle PfGetBreakEventNotificationHandle(void)
 {
 	return FindTask(NULL)->tc_SigAlloc;
