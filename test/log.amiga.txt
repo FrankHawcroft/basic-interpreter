@@ -98,8 +98,10 @@ String tests completed.
 8A. Simple FOR loop (new variable!)
 8B. Simple FOR loop (step size -1)
 9A. Simple SELECT
+10. SWAP scalar variables
 11A. Simple array creation and assignment to element
 11B. Use of array as FOR loop index
+11C. SWAP array elements
 12A. Simple intrinsic function - INSTR
 12B. Simple intrinsic function - INSTR (not found)
 13A. Subprogram with local hiding global variable
@@ -160,13 +162,12 @@ Random access I/O test completed.
 Forward GOTO arrived
 Forward GOSUB arrived
 +++++ c_events.bas
-Timer handler called:	 0	at timer = 	 46089
-Timer handler called:	 1	at timer = 	 46092
+Timer handler called:	 0	at timer = 	 49472
+Timer handler called:	 1	at timer = 	 49473
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred
 Break handler called:	 4
-Timer handler called:	 5	at timer = 	 46094
 Successful RESUME
 +++++ c_deftype.bas
 hi there!	also a string	 1	x
