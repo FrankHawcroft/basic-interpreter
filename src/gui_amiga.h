@@ -1943,7 +1943,7 @@ static bool TranslatePointerActionNative(const PfWindowEvent *event, PfPointer *
 		WORD prevX = pointer->current.x, prevY = pointer->current.y;
 		pointer->current.x = event->MouseX - event->IDCMPWindow->BorderLeft;
 		pointer->current.y = event->MouseY - event->IDCMPWindow->BorderTop;
-		interestingEvent = prevX != pointer->current.x || prevY != pointer->current.y;
+		interestingEvent |= (prevX != pointer->current.x || prevY != pointer->current.y);
 	}
 	
 	return interestingEvent;
