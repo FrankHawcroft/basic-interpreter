@@ -89,12 +89,18 @@ if x <> 0 then | print "Failed test!" | error 999 | endif
 print "9A. Simple SELECT"
 m = 3 | select m | case 0 | x = 1 | case 1, 2 | x = 2 | otherwise | x = 3 | endselect
 if x <> 3 then | print "Failed test!" | error 999 | endif
+print "10. SWAP scalar variables"
+x1 = 5 | x2 = 3 | swap x1, x2
+if x1 <> 3 or x2 <> 5 then | print "Failed test!" | error 999 | endif
 print "11A. Simple array creation and assignment to element"
 dim a(10) | a(5) = 100
 if a(5) <> 100 then | print "Failed test!" | error 999 | endif
 print "11B. Use of array as FOR loop index"
 for a(1) = 1 to 3 | next
 if a(1) < 3 then | print "Failed test!" | error 999 | endif
+print "11C. SWAP array elements"
+a(1) = 10 | a(2) = 6 | swap a(1), a(2)
+if a(1) <> 6 or a(2) <> 10 then | print "Failed test!" | error 999 | endif
 print "12A. Simple intrinsic function - INSTR"
 i = instr(1, "abcd", "bc")
 m = instr(4, "abcdx", "dx")

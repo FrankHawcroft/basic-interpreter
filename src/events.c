@@ -19,22 +19,25 @@
 #include "audio.h"
 
 enum EventType {
-	EVT_TIMER,   /* A time interval elapsed. */
-	EVT_POINTER, /* Mouse or other pointing device was used. */
-	EVT_INKEY,   /* Key pressed (in a GUI rather than a console). */
-	EVT_MENU,    /* Menu selected. */
-	EVT_BREAK,   /* Ctrl-C or equivalent signal. */
-	EVT_ERROR    /* A trappable error occurred. */
+	EVT_TIMER,     /* A time interval elapsed. */
+	EVT_COLLISION, /* Animated object(s) collided. */
+	EVT_POINTER,   /* Mouse or other pointing device was used. */
+	EVT_INKEY,     /* Key pressed (in a GUI rather than a console). */
+	EVT_MENU,      /* Menu selected. */
+	EVT_BREAK,     /* Ctrl-C or equivalent signal. */
+	EVT_ERROR,     /* A trappable error occurred. */
+	EVT_ABORT      /* A non-trappable 'abort' type signal. */
 };
 
 #define FIRST_EVENT_TYPE EVT_TIMER
-#define LAST_EVENT_TYPE EVT_ERROR
+#define LAST_EVENT_TYPE EVT_ABORT
 #define NUM_EVENT_TYPES (LAST_EVENT_TYPE + 1)
 
 struct Event {
 	/* Miscellaneous value giving more information about the event.
 		For ERROR: the error number.
-		For POINTER: kind of action, and location. */
+		For POINTER: kind of action, and location. 
+		For COLLISION: encoded collision information - id(s) of object(s), window, border. */
 	long lngInfo;
 	
 	/* For ERROR: name of closest label appearing before where error occurred at the same call nest level. 
@@ -47,9 +50,9 @@ struct Event {
 };
 
 enum HandlerState {
-	DISABLED, /* Events not recorded. */
+	DISABLED,  /* Events not recorded. */
 	SUSPENDED, /* Events are queued, but no trapping takes place. */
-	ENABLED /* Event trapping takes place. */
+	ENABLED    /* Event trapping takes place. */
 };
 
 struct Trap {
@@ -75,7 +78,7 @@ struct Trap {
 	void (*transition)(struct Trap *, enum HandlerState);
 	
 	/* Used to resolve which event should be handled, based on priority and sequencing. */
-	void (*prioritise)(struct Process *proc, struct Trap *current, struct Trap **best, unsigned long *maxSequencing);
+	void (*prioritise)(const struct Process *proc, struct Trap *current, struct Trap **best, unsigned long *maxSequencing);
 	
 	/* The programatically-defined event handler. */
 	union {
@@ -85,6 +88,8 @@ struct Trap {
 			const char *context; /* Enclosing subprogram body - NULL if none. */
 		} simpleLocation;
 	} handler;
+	
+	const char *nextStatement;
 
 	/* True if the handler is a sub (ON ... CALL ...) rather than a label (ON ... GOTO ...). */
 	bool subprogramHandler;
@@ -146,6 +151,7 @@ static void PollTimer(struct Trap *t)
 extern bool KeyWasPressed(void);
 extern bool PointerWasOperated(void);
 extern bool MenuWasSelected(void);
+extern bool AnimatedObjectCollided(void);
 	/* TODO should have a registration system where polling functions are added
 		outside the events module itself */
 
@@ -176,11 +182,27 @@ static void PollMenu(struct Trap *t)
 	}
 }
 
+static void PollCollision(struct Trap *t)
+{
+	/* Akin to break handling for the Amiga but more so - AnimatedObjectCollided is a hook
+		to update the display, so must be called regardless of the trap status. */
+	if(AnimatedObjectCollided() && t->status >= SUSPENDED) {
+		struct Event e;
+		InitEvent(&e);
+		EnqueueOnCQ(&Proc()->q[t - Proc()->trap], &e, TRUE); /* TODO store collision info ... */
+	}
+}
+
 #if PF_POLL_FOR_SIGNALS
 
 static bool BreakHasOccurred()
 {
 	return PfTestAndClearBreakSignal();
+}
+
+static bool AbortHasOccurred()
+{
+	return PfTestAbortSignal();
 }
 
 #else
@@ -190,12 +212,22 @@ static void __cdecl RecordBreakSignal(int dummy)
 	Proc()->breakFlag = TRUE;
 }
 
+static void __cdecl RecordAbortSignal(int dummy)
+{
+	Proc()->abortFlag = TRUE;
+}
+
 static bool BreakHasOccurred(void)
 {
 	struct Process *proc = Proc();
 	bool flagValue = proc->breakFlag;
 	proc->breakFlag = FALSE;
 	return flagValue;
+}
+
+static bool AbortHasOccurred()
+{
+	return Proc()->abortFlag; /* Unlike break, don't clear the status - it always means exit. */
 }
 
 #endif /* !PF_POLL_FOR_SIGNALS */
@@ -213,7 +245,16 @@ static void PollBreak(struct Trap *t)
 	}
 }
 
-/* Used to 'handle' events which don't need to be tracked if not active. */
+static void PollAbort(struct Trap *t)
+{
+	if(t->status >= SUSPENDED && AbortHasOccurred()) {
+		struct Event e;
+		InitEvent(&e);
+		EnqueueOnCQ(&Proc()->q[t - Proc()->trap], &e, TRUE);
+	}
+}
+
+/* Used to 'handle' events which don't need to be specially tracked if not active. */
 static void RetentiveTracker(enum HandlerState status, struct CircularQueue *q, struct Event *evt)
 {
 	assert(status != DISABLED);
@@ -238,15 +279,25 @@ static void ErrorTracker(enum HandlerState status, struct CircularQueue *q, stru
 	Proc()->mode = MODE_INTERACTIVE;
 }
 
+static void AbortTracker(enum HandlerState status, struct CircularQueue *q, struct Event *evt)
+{
+	Proc()->pendingError = ER_HALTED;
+	Proc()->mode = MODE_HALTED_FOR_EXIT;
+}
+
 /* If the status is changed to DISABLED, events are purged. */
 static void DefaultTransition(struct Trap *t, enum HandlerState newStatus)
 {
+	enum EventType et = t - Proc()->trap;
 	t->status = newStatus;
 	if(newStatus == DISABLED) {
-		enum EventType et = t - Proc()->trap;
 		InitEvent(&Proc()->activeEvent[et]);
 		ClearCQ(&Proc()->q[et]);
+		if((int)et == Proc()->firstEventPollIndex)
+			++Proc()->firstEventPollIndex;
 	}
+	else if((int)et < Proc()->firstEventPollIndex)
+		Proc()->firstEventPollIndex = (int)et;
 }
 
 static void TransitionTimer(struct Trap *t, enum HandlerState newStatus)
@@ -271,22 +322,13 @@ with different kinds of events (Trap.priority).
 The 'sequencing' value is used to order events of equal priority which occured
 'at the same time' from the point of view of the interpreter - i.e. happened during
 execution of the same statement and are both detected in its event checking epilogue.
-
-Sequencing dependent events:
-
-There are some equal-priority events which have a logical ordering, because 
-they depend on each other. These events are generally in pairs. For example,
-on platforms suporting GUI interaction, there are MOUSEDOWN and MOUSEUP events.
-If the mouse button is currently down, and both MOUSEDOWN and MOUSEUP events are 
-detected 'at the same time', trap the MOUSEUP ahead of the MOUSEDOWN.
-Conversely, if the mouse button is not already down, favour a MOUSEDOWN.
-
-Sequencing independent events (the default approach):
-
-Equal-priority events are scheduled on a round-robin basis. The event with the
+By default, these events are scheduled on a round-robin basis. The event with the
 lowest sequencing number is chosen, and then its sequencing number is set to one greater
-than the current maximum, sending it to the back of the queue for next time. */
-static void PrioritiseWithDefaultStrategy(struct Process *proc,
+than the current maximum, sending it to the back of the queue for next time. 
+
+A more subtle sequencing function could be used if needed, e.g. for events which
+should occur in balanced pairs. */
+static void PrioritiseWithDefaultStrategy(const struct Process *proc,
 	struct Trap *current, struct Trap **best, unsigned long *maxSequencing)
 {
 	assert(current != NULL && best != NULL && maxSequencing != NULL);
@@ -318,6 +360,7 @@ static void PrioritiseWithDefaultStrategy(struct Process *proc,
 static void ResetTrap(struct Trap *trap)
 {
 	trap->sequencing = 0;
+	trap->nextStatement = NULL;
 	trap->subprogramHandler = FALSE;
 	trap->handler.simpleLocation.label = NULL;
 	trap->handler.simpleLocation.context = NULL;
@@ -347,14 +390,20 @@ void InitEventTraps(void)
 	Proc()->activeEvent = New(sizeof(struct Event) * NUM_EVENT_TYPES);
 	
 	InitTrap(&Proc()->trap[EVT_TIMER], "TIMER", DISABLED, 10);
+	InitTrap(&Proc()->trap[EVT_COLLISION], "COLLISION", DISABLED, 12);
 	InitTrap(&Proc()->trap[EVT_POINTER], "MOUSE", DISABLED, 15);
 	InitTrap(&Proc()->trap[EVT_INKEY], "INKEY", DISABLED, 20);
 	InitTrap(&Proc()->trap[EVT_MENU], "MENU", DISABLED, 25);
 	InitTrap(&Proc()->trap[EVT_BREAK], "BREAK", ENABLED, 30);
 	InitTrap(&Proc()->trap[EVT_ERROR], "ERROR", ENABLED, 35);
-			
+	InitTrap(&Proc()->trap[EVT_ABORT], "~~abort", ENABLED, 40); /* can't be referred to in code */
+	
+	Proc()->firstEventPollIndex = EVT_BREAK; /* to save time polling - first one we care about */
+	
 	Proc()->trap[EVT_TIMER].poll = PollTimer;
 	Proc()->trap[EVT_TIMER].transition = TransitionTimer;
+	
+	Proc()->trap[EVT_COLLISION].poll = PollCollision;
 	
 	Proc()->trap[EVT_POINTER].poll = PollPointer;
 	
@@ -368,12 +417,17 @@ void InitEventTraps(void)
 	
 	Proc()->trap[EVT_ERROR].track = ErrorTracker;
 	
+	Proc()->trap[EVT_ABORT].poll = PollAbort;
+	Proc()->trap[EVT_ABORT].track = AbortTracker;
+	
 	CreateCQ(&Proc()->q[EVT_TIMER], sizeof(struct Event), 10, DisposeEvent);
+	CreateCQ(&Proc()->q[EVT_COLLISION], sizeof(struct Event), 16, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_POINTER], sizeof(struct Event), 10, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_INKEY], sizeof(struct Event), 20, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_MENU], sizeof(struct Event), 4, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_BREAK], sizeof(struct Event), 1, DisposeEvent);
 	CreateCQ(&Proc()->q[EVT_ERROR], sizeof(struct Event), 1, DisposeEvent);
+	CreateCQ(&Proc()->q[EVT_ABORT], sizeof(struct Event), 1, DisposeEvent);
 	
 	for(et = FIRST_EVENT_TYPE; et <= LAST_EVENT_TYPE; et++)
 		InitEvent(&Proc()->activeEvent[et]);
@@ -386,6 +440,10 @@ void InitEventTraps(void)
 		Proc()->mode = MODE_HALTED_FOR_EXIT;
 		Proc()->pendingError = INTERNALEVENT;
 	}
+	
+	/* Do not fail if these can't be installed. */
+	signal(SIGTERM, &RecordAbortSignal);
+	signal(SIGABRT, &RecordAbortSignal);
 #endif
 
 	BreakHasOccurred();
@@ -422,11 +480,10 @@ static struct Trap *ChooseTrap(struct Process *proc)
 	return best;
 }
 
-/* Invokes a single event handler on a given event, if it hasn't been
-handled.
+/* Either handle or track an event which may have occurred for the 'mooted' handler.
 	If the 'mooted' handler under consideration is the nominated 'userHandler'
-this handler will be invoked. Otherwise, the tracking function will be called.
-	Returns TRUE if the event has been handled by this call. */
+this handler will be invoked. Otherwise, the 'tracking' function will be called.
+	Returns TRUE if the event has been handled or tracked. */
 static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 {
 	struct Event evt;
@@ -434,11 +491,8 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 	
 	if(!DequeueFromCQ(&Proc()->q[type], &evt))
 		return FALSE;
-
-	if(mooted != userHandler) {
+	else if(mooted != userHandler)
 		(*mooted->track)(mooted->status, &Proc()->q[type], &evt);
-		return FALSE;
-	}
 	else {
 		struct Trap *t;
 
@@ -449,18 +503,19 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 				t->status = SUSPENDED;
 				t->suspendedAt = Proc()->callNestLevel;
 			}
-
+		
 		Proc()->activeEvent[type] = evt;
 		
 		/* Call the subprogram or jump to the label. */
+		
+		userHandler->nextStatement = Proc()->currentPosition;
 		
 		if(userHandler->subprogramHandler)
 			CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE);
 		else
 			Proc()->currentPosition = userHandler->handler.simpleLocation.label;
-		
-		return TRUE;
 	}
+	return TRUE;
 }
 
 extern void PollUIEvents(struct Process *);
@@ -472,31 +527,31 @@ handled. */
 bool CheckForEvents(struct Process *proc)
 {
 	enum EventType et;
-	bool anyEvents = FALSE, handledEvent = FALSE;
+	bool anyEvents = FALSE;
 
 	PollUIEvents(proc);
 	CheckAudio(proc);
 	
 	/* Retrieve events, recording any which are sufficiently recent and interesting: */
 
-	for(et = FIRST_EVENT_TYPE; et <= LAST_EVENT_TYPE; et++) {
-		struct Trap *t = &proc->trap[et];	
-		if(t->status != DISABLED) {
-			(*t->poll)(t);
-			anyEvents |= EventAvailable(proc, et);
-		}
+	for(et = (enum EventType)proc->firstEventPollIndex; et <= LAST_EVENT_TYPE; et++) {
+		(*proc->trap[et].poll)(&proc->trap[et]);
+		anyEvents |= EventAvailable(proc, et);
 	}
 
 	/* Handle, or not: */
 	
-	if(anyEvents) {
+	if(!anyEvents)
+		return FALSE;
+	else {
 		struct Trap *userTrap = ChooseTrap(proc);
+		bool handledEvent = FALSE;
 		
 		for(et = FIRST_EVENT_TYPE; et <= LAST_EVENT_TYPE; et++)
 			handledEvent |= HandleEvent(&proc->trap[et], userTrap);
+		
+		return handledEvent;
 	}
-	
-	return handledEvent;
 }
 
 void ReenableEventTraps(struct Process *proc, short newCallNestLevel)
@@ -642,9 +697,7 @@ void On_(const QString *toks, unsigned nToks)
 
 	if(trap->status != ENABLED)
 		(*trap->transition)(trap, SUSPENDED); /* Note that it's not set to enabled. */
-	trap->suspendedAt = SCOPE_NONEXISTENT;
-		/* This is necessary to ensure a spurious return from an event handler
-			isn't attempted. */
+	trap->suspendedAt = SCOPE_NONEXISTENT; /* Prevent a spurious return from an event handler. */
 }
 
 static void TransitionTrap(const QString *toks, unsigned nToks, enum HandlerState newStatus)
@@ -740,7 +793,7 @@ void Sleep_(BObject *arg, unsigned count)
 			GetAudioEventNotificationHandle());
 	
 		do
-			PfSleepUntilEvent(handle);
+			PfSleep(100 * 1000); /* 100 milliseconds */ /*PfSleepUntilEvent(handle);*/
 		while(!CheckForEvents(proc));
 	}
 }
@@ -748,18 +801,22 @@ void Sleep_(BObject *arg, unsigned count)
 void Wait_(BObject *arg, unsigned count)
 {
 	double remaining = GetDouble(&arg[0].value.scalar); /* Avoid VBCC conversion bug. */
-
+	struct Process *proc = Proc();
+	
 	if(remaining < 0) {
 		CauseError(OUTSIDEDOMAIN);
 		return;
 	}
 
-	while(remaining > 0) {
+	do {
 		const double oneMillion = 1000000.0;
-		unsigned slice = (unsigned)((remaining > 1.0 ? 1.0 : remaining) * oneMillion); /* in micros */
+		unsigned slice = (unsigned)((remaining > 0.25 ? 0.25 : remaining) * oneMillion); /* in micros */
 		PfSleep(slice);
 		remaining -= slice / oneMillion;
+		PollBreak(&proc->trap[EVT_BREAK]);
+		PollAbort(&proc->trap[EVT_ABORT]);
 	}
+	while(remaining > 0 && !EventAvailable(proc, EVT_BREAK) && !EventAvailable(proc, EVT_ABORT));
 }
 
 void Error_(BObject *arg, unsigned count)
@@ -826,6 +883,7 @@ void Resume_(const QString *toks, unsigned nToks)
 	const char *label = NULL;
 	struct Trap *activeTrap;
 	short originalNestLevel = Proc()->callNestLevel, trapNestLevel;
+	bool resumeAtNextStatement = QsEqNoCase(labelName, &g_NextKeyword);
 	
 	/* Check argument syntax: */
 
@@ -850,17 +908,17 @@ void Resume_(const QString *toks, unsigned nToks)
 	occurred, because EXITSUB calls ReenableEventTraps, which can change the status
 	of traps and events. */
 
-	if(activeTrap->subprogramHandler) {
-		assert(originalNestLevel > SCOPE_MAIN);
-		
-		do {
+	if(resumeAtNextStatement) {
+		while(Proc()->callNestLevel > trapNestLevel)
 			ExitSub_(NULL, 0);
-			label = FindReferencedLabel(labelName, NULL);
-		}
-		while(label == NULL && Proc()->callNestLevel > SCOPE_MAIN);
+		label = activeTrap->subprogramHandler ? Proc()->currentPosition : activeTrap->nextStatement;
 	}
 	else {
-		label = FindReferencedLabel(labelName, NULL);
+		assert(!activeTrap->subprogramHandler || originalNestLevel > SCOPE_MAIN);
+		
+		if(!activeTrap->subprogramHandler)
+			label = FindReferencedLabel(labelName, NULL);
+		
 		while(label == NULL && Proc()->callNestLevel > SCOPE_MAIN) {
 			ExitSub_(NULL, 0);
 			label = FindReferencedLabel(labelName, NULL);
@@ -869,7 +927,7 @@ void Resume_(const QString *toks, unsigned nToks)
 
 	/* Sanity check that:
 	
-	1. The label was found in some environment.
+	1. The label was found.
 	2. The label is at a lower or equal nest level than the point of the trap. 
 		Indicates a bug with event handling; hence an assertion. */
 
@@ -887,7 +945,10 @@ void Resume_(const QString *toks, unsigned nToks)
 	
 	/* Slip out of any GOSUBs or block control structures remaining on the stack: */
 
-	DiscardCurrentControlFlow();
+	if(!resumeAtNextStatement)
+		DiscardCurrentControlFlow();
+
+	ReenableEventTraps(Proc(), Proc()->callNestLevel);
 
 	/* Explicitly mark the trap as not executing. This is redundant
 		for subprogram traps but required for GOTO ones: */

@@ -25,6 +25,9 @@
 /* Maximum dimensionality of an array. */
 #define MAX_DIMENSIONS 4
 
+/* Maximum allowed DEF or built-in function parameters. */
+/*#define MAX_FUNCTION_PARAMS 20*/
+
 /*** SimpleType ***/
 
 /* The primitive data types usable by BASIC programs, plus some internal-use ones. */
@@ -305,9 +308,12 @@ struct Statement {
 
 /*** CompiledExpr ***/
 
-union CompiledExpr {
-	const QString *s;
-	const BObject *obj;
+struct CompiledExpr {
+	union {
+		const QString *s;
+		const BObject *obj;
+	} body;
+	short length;
 };
 
 /*** Piece ***/
@@ -316,9 +322,8 @@ union CompiledExpr {
 
 struct Piece {
 	struct Piece *next;
-	union CompiledExpr condition; /* If NULL, always execute this one. */
-	union CompiledExpr value; /* Terminated by an end-of-statement delimiter. */
-	short condExprLength, valExprLength;
+	struct CompiledExpr condition; /* If empty, always execute this one. */
+	struct CompiledExpr value; /* Terminated by an end-of-statement delimiter. */
 	
 	/* Location of the piece in code - this is used for error reporting when the piece is compiled,
 		for profiling, and when printing debug info about the function. */
@@ -535,14 +540,15 @@ extern void InitObject(BObject *, enum SymbolType);
 extern bool IsEmpty(const BObject *);
 extern void CopyObject(BObject *dest, const BObject *source);
 extern SimpleType GetSimpleType(const BObject *);
-extern void RemoveObject(BObject *, bool);
+extern void DisposeObjectContents(BObject *);
+extern void DisposeIfScalar(BObject *);
 extern Error ObjectAsError(const BObject *);
 #define ObjectIsError(obj) ((obj)->category == LITERAL && (obj)->value.scalar.type == T_ERROR)
 #define IndicatesError(obj) (ObjectAsError(obj) != SUCCESS) /* subtly different from the above */
-extern void SetObjectToError(BObject *, Error);
-extern void SetObjectToErrorWithAdditionalMessage(BObject *, Error, const char *msgFmt, const QString *obj);
+#define Resolved(obj) ((obj)->category != LITERAL || ((obj)->value.scalar.type & USABLE_TYPES) != 0)
+extern Error SetObjectToError(BObject *, Error);
+extern Error SetObjectToErrorWithAdditionalMessage(BObject *, Error, const char *msgFmt, const QString *obj);
 extern bool IsUserDefined(const BObject *);
-extern void ConvertToObject(const QString *token, BObject *obj, short callNestLevel);
 extern void SetSymbolReference(BObject *, enum SymbolType, void *);
 extern Error DereferenceObject(BObject *);
 DIAGNOSTIC_FN_DECL(void DumpObject(const BObject *));
@@ -552,6 +558,7 @@ DIAGNOSTIC_FN_DECL(void DumpObject(const BObject *));
 extern BObject *LookUp(const QString *, short callNestLevel);
 extern BObject *LookUpIgnoringType(const QString *, short callNestLevel);
 extern BObject *LookUpCheckingType(const QString *, short callNestLevel);
+extern void ConvertToObject(const QString *, BObject *, short callNestLevel);
 extern BObject *CreateDefinition(const QString *, void *value, enum SymbolType, short callNestLevel);
 extern Error DefineSymbol(const QString *, void *value, enum SymbolType, short callNestLevel);
 extern void ClearOutOfContextItems(short minimumCallNestLevel, short maximumCallNestLevel);
@@ -616,7 +623,6 @@ extern void Do(struct Process *proc, struct TokenSequence *tokSeq, struct Stack 
 extern bool EligibleForCaching(const struct TokenSequence *, short callNestLevelWhenExecuted);
 extern bool NoDynamicallyAllocatedMemory(const struct TokenSequence *);
 extern void StorePreconvertedObjects(struct TokenSequence *, short callNestLevelWhenExecuted);
-extern bool IsAssignmentStatement(const struct Statement *);
 extern const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel);
 extern void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted);
 extern void Improve(struct TokenSequence *);
@@ -649,6 +655,7 @@ extern Error Conform(const struct Parameter *formal, int formalCount, BObject *a
 extern Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count);
 extern Error ConformForApplication(const BObject *applied, BObject *actual, unsigned actualCount);
 extern const struct Parameter *FormalForActual(const struct Parameter *formal, int formalCount, unsigned actual);
+extern bool AmenableToQuickConformance(const struct TokenSequence *ts, bool fullCheck);
 extern bool SemanticallyPredictable(const struct TokenSequence *ts);
 extern SimpleType TypeOfToken(const QString *);
 
@@ -689,6 +696,7 @@ extern void Nest(const QString *, int *nesting);
 
 extern void MakeSavoury(struct TokenSequence *);
 extern bool IsParameterSeparatingKeyword(const QString *token);
+extern bool IsTwoWordForm(const QString *stmt, const QString *following);
 
 /*** Syntax and parsing -- syntax.c ***/
 
@@ -702,7 +710,7 @@ extern struct Parameter *ParseNameList(const QString *first, int nTokens, short 
 /*** Expression evaluation -- eval.c ***/
 
 extern const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, struct Stack *exprStack);
-extern const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack);
+extern const BObject *EvalPreconverted(const BObject *exprSeq, struct Stack *exprStack, int stackSpaceRequired);
 	
 extern void CreateExprStk(struct Stack *, unsigned maxHeight);
 extern void ClearExprStk(struct Stack *);
@@ -747,6 +755,7 @@ extern const char KW_LEN[];
 extern const char KW_LETQ_LOCAL[]; /* Internal only - faster interning. */
 extern const char KW_LETQ_PREDEF[]; /* Internal only - faster interning. */
 extern const char KW_LET[];
+extern const char KW_LINE[];
 extern const char KW_MID[];
 extern const char KW_NAME[];
 extern const char KW_NEXT[];
@@ -756,6 +765,8 @@ extern const char KW_ONGOSUB[];
 extern const char KW_ONGOTO[];
 extern const char KW_OPEN[];
 extern const char KW_PRINT[];
+extern const char KW_PX[];
+extern const char KW_PY[];
 extern const char KW_RETURN[];
 extern const char KW_RETURNTO[];
 extern const char KW_SCREEN[];
@@ -773,6 +784,9 @@ extern const QString g_ElseKeyword;
 extern const QString g_EndKeyword;
 extern const QString g_EndSubKeyword;
 extern const QString g_GoToKeyword;
+extern const QString g_NextKeyword;
+extern const QString g_PX; /* px~ (internal graphics function - offset by pen x) */
+extern const QString g_PY; /* py~ (internal graphics function - offset by pen y) */
 extern const QString g_StaticKeyword;
 extern const QString g_SubKeyword;
 extern const QString g_ThenKeyword;

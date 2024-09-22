@@ -1,10 +1,6 @@
 ***** "e_rt_error.bas"  
-nb: error 119 in e_rt_error.bas line 8: type mismatch - a scalar is required.
-print x '' kind error ('type mismatch')
----- Stack trace: ----
----- top of stack ----
- ? Unknown item
----- bottom of stack ----
+nb: error 108 in e_rt_error.bas line 4: can't redefine existing variable, function, subprogram, or label.
+x$ = "z" '' type mismatch
 ***** "e_syntax_errors.bas"  
 nb: error 114 in e_syntax_errors.bas line 3: bad argument or operand count.
 3443 --

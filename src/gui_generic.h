@@ -10,6 +10,7 @@
 
 typedef void *PfWindowHandle;
 typedef void *PfScreenHandle;
+typedef void *PfAnimatedObjectHandle;
 
 #define NULL_SCREEN_HANDLE NULL
 #define NULL_WINDOW_HANDLE NULL
@@ -22,6 +23,7 @@ typedef int PfWindowEvent;
 
 #define MAX_WINDOWS 1 /* Not really ... */
 #define MAX_SCREENS 1 /* Not really ... */
+#define MAX_OBJECTS 1 /* Not really ... */
 
 #define MULTIPLE_VIRTUAL_SCREENS_SUPPORTED FALSE
 #define DIRECT_TO_SCREEN_GRAPHICS_SUPPORTED FALSE
@@ -74,7 +76,7 @@ static void DrawLineNative(PfWindowHandle win, const BasicPoint *p1, const Basic
 
 static bool AddVertexToPolygonNative(PfWindowHandle win, const BasicPoint *p) { return FALSE; }
 
-static bool FillPolygonNative(PfWindowHandle win) { return FALSE; }
+static bool FillPolygonNative(PfWindowHandle win, short mode) { return FALSE; }
 
 static bool FloodFillNative(PfWindowHandle win, const BasicPoint *p, short penOrDefault) { return FALSE; }
 
@@ -101,6 +103,12 @@ static void RenderTextNative(PfWindowHandle win, const QsChar *text, size_t nCha
 static void AlterMenuNative(PfWindowHandle win, char *mName, char *iName, char *sName, char hotKey, unsigned long flags) { }
 
 static int GetMenuItemStateNative(PfWindowHandle win, char *menuName, char *itemName, char *subitemName) { return 0; }
+
+/* Animation: */
+
+static PfAnimatedObjectHandle CreateAnimatedObjectNative(PfWindowHandle win/*, unsigned char *data */) { return NULL; }
+
+static void FreeAnimatedObjectNative(PfWindowHandle win, PfAnimatedObjectHandle mob, bool last) { }
 
 /* Events: */
 

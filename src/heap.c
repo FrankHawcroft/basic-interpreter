@@ -82,7 +82,7 @@ void SetOutOfMemoryHandler(OutOfMemoryHandler handler)
 	m_OutOfMemoryHandler = handler;
 }
 
-static void DefaultOutOfMemoryHandler(size_t sizeRequested)
+void DefaultOutOfMemoryHandler(size_t sizeRequested)
 {
 	fprintf(stderr, "[Heap] error: out of memory - failed to allocate " SIZE_FMT " bytes - exiting.\n", sizeRequested);
 	DisposeHeap();
@@ -235,7 +235,6 @@ static struct HeapRegion *m_FirstRegion = NULL;
 static PfMutex m_RegionListLock;
 static bool m_FixedSizeHeap;
 
-static void DefaultOutOfMemoryHandler(size_t);
 static struct HeapRegion *AddRegion(size_t);
 static void DisposeRegion(struct HeapRegion *);
 static void RemoveRegion(struct HeapRegion *);
@@ -843,6 +842,9 @@ const char *HeapOptionDescription(void)
 
 #ifdef DEBUG
 
+/* A truncated version of the pointer which can be displayed in debug output etc. */
+unsigned short PointerDisplayValue(const void *p) { return (unsigned short)((intptr_t)p & USHRT_MAX); }
+
 /*** PrintHeapStatus ***/
 
 /* Prints a 'free map' showing used and unused memory in each region, plus a
@@ -868,7 +870,7 @@ void PrintHeapStatus(void)
 			continue;
 		}
 		
-		fprintf(stderr, "%lu blocks in region %p:\n", region->size, (void *)region);
+		fprintf(stderr, "%lu blocks in region ....%hX:\n", region->size, PointerDisplayValue(region));
 		for(block = 0; block < region->size; block += BV_BITS_PER_WORD) {
 			char code = '+'; /* Partially used. */
 			if(BV_MapWord(region->map, block) == ~(Bits)0)

@@ -47,12 +47,12 @@ static const char USAGE_MESSAGE[] =
 	"Usage: %s\n\t[--buf[fer] <size>] [--heap <size>] [--profile <output-file>]\n"
 	"\t[--prelude <prelude-file> | --noprelude] [--module-path <paths>]\n"
 	"\t[--script-mode | --noscript-mode] [--low-memory | --nolow-memory]\n"
-	"\t[--immediate] [--optimise] [--debug-prelude] [--unsafe]"
+	"\t[--immediate] [--optimise] [--debug-prelude] [--unsafe]\n"
 #ifdef DEBUG
-	" [--verbose] [--self-test]"
+	"\t[--verbose [<level>]] [--self-test]\n"
 #endif
-	"\n\t{[--file] <program-file> [<args> ...] | --exec[ute] <statements>}"
-	"\n\nAll options specified after the program-file will be treated as arguments to\n"
+	"\t{[--file] <program-file> [<args> ...] | --exec[ute] <statements>}\n\n"
+	"All options specified after the program-file will be treated as arguments to\n"
 	"the program, not the interpreter.\n"
 	"Short names for the options are:\n"
 	"\t-b<size> -h<size> -p<output-file>\n"
@@ -60,7 +60,7 @@ static const char USAGE_MESSAGE[] =
 	"\t-s|-c -l|-g\n"
 	"\t-i -o -d -u\n"
 #ifdef DEBUG
-	"\t-v -t\n"
+	"\t-v[<level>] -t\n"
 #endif
 	"\t-f<file> -e<statements>\n\n"
 	"This executable has been compiled with these settings: "
@@ -205,11 +205,11 @@ static bool ProcessOption(char option, const char *val, struct Options *options)
 			break;
 		case OA_SCRIPT_MODE:
 		case OA_PRE_CHECKED_MODE:
-			options->initialSyntaxCheck = option == 'c';
+			options->initialSyntaxCheck = option == OA_PRE_CHECKED_MODE;
 			break;
 		case OA_LOW_MEMORY:
 		case OA_ORDINARY_MEMORY:
-			options->lowMemory = option == 'l';
+			options->lowMemory = option == OA_LOW_MEMORY;
 			break;
 		case OA_IMMEDIATE:
 			options->immediate = TRUE;
@@ -225,7 +225,7 @@ static bool ProcessOption(char option, const char *val, struct Options *options)
 			break;
 #ifdef DEBUG
 		case OA_VERBOSE:
-			options->verbose = TRUE;
+			options->verbose = isdigit(*val) ? (unsigned)atoi(val) : 1;
 			break;
 		case OA_SELF_TEST:
 			options->runModuleTests = TRUE;
@@ -246,12 +246,13 @@ static long EstimatedProgramSize(const char *sourceFile)
 	return length < 0 ? EXPECTED_PROGRAM_SIZE : length;
 }
 
-static long EstimatedBufferSizeRequired(const char *prelude, const char *oneLiner, const char *file)
+static long EstimatedBufferSizeRequired(const char *prelude, const char *oneLiner, const char *file, bool lowMemory)
 {
 	long preludeSize = prelude == NULL ? 0 : EXPECTED_PRELUDE_SIZE; /* EstimatedProgramSize(Prelude()), */
 	long programSize = EstimatedProgramSize(oneLiner != NULL ? NULL : file);
 	long totalSize = preludeSize + EXPECTED_MERGE_MODULE_SCALE_FACTOR * programSize;
-	return totalSize > MIN_BUFFER_SIZE ? totalSize : MIN_BUFFER_SIZE;
+	long minSizeToAllocate = MIN_BUFFER_SIZE / (lowMemory ? 2 : 1);
+	return totalSize > minSizeToAllocate ? totalSize : minSizeToAllocate;
 }
 
 bool ProcessCommandLineArgs(int argCount, const char *argVector[], struct Options *options)
@@ -297,7 +298,7 @@ bool ProcessCommandLineArgs(int argCount, const char *argVector[], struct Option
 		}
 		else {
 			/* Assume the program to execute. */
-			option = 'f';
+			option = OA_FILE_TO_RUN;
 			val = argVector[count];
 		}
 		
@@ -327,7 +328,7 @@ bool ProcessCommandLineArgs(int argCount, const char *argVector[], struct Option
 		options->initialHeapSize = options->fixedSizeHeap 
 			? options->heapSize : DEFAULT_INITIAL_HEAP_SIZE / (options->lowMemory ? 2 : 1);
 		options->initialBufferSize = options->bufferLen <= 0
-			? EstimatedBufferSizeRequired(options->prelude, options->execute, options->fileName) : options->bufferLen;
+			? EstimatedBufferSizeRequired(options->prelude, options->execute, options->fileName, options->lowMemory) : options->bufferLen;
 	}
 	
 	return argumentsOK;

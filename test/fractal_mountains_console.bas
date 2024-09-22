@@ -68,7 +68,7 @@ def incr(xa, xb) as -1
 def m(xa, ya, xb, yb) where xa = xb as 0
 def m(xa, ya, xb, yb) as (yb - ya) / (xb - xa)
 
-def charforcolour@(c) where c >= 16 as chr(asc("a") + c)
+def charforcolour@(c) where c >= 16 as chr(asc("a") + c) ' asc("a") = 97
 def charforcolour@(c) where c < 16 as hex(c)
 
 sub plot(x1, y1, x2, y2, x3, y3, c)

@@ -288,7 +288,8 @@ void PfInitSystemTimeStamp(struct PfSystemTimeStamp *timeStamp)
 #ifdef DEBUG
 void PfPrintSystemTimeStamp(const struct PfSystemTimeStamp *timeStamp)
 {
-	fprintf(stderr, "secs = %ld, clocks = %ld\n", timeStamp->secs, timeStamp->clocks);
+	fprintf(stderr, "secs = %.3f, clocks = %ld\n",
+		difftime(timeStamp->secs, (time_t)0), timeStamp->clocks);
 }
 #endif
 

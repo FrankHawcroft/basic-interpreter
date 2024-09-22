@@ -130,13 +130,19 @@ void PfStart()
 		|| (DiskFontBase = OpenLibrary("diskfont.library", 0L)) == NULL) {
 			/* Assume the C lib is available at this point but nothing else. If dos.library failed to open,
 			   chances are this error message will fail anyway ... */
-			fputs("Unable to open a needed Amiga system library  - need dos, intuition, graphics, layers, diskfont. Exiting.\n", stderr);
+			fputs("Unable to open a needed Amiga system library - need dos, intuition, graphics, layers, diskfont. Exiting.\n", stderr);
 			exit(21);
 		}
 #endif
 		TimerBase = NULL;
 		TimerIO = NULL;
 	}
+
+#ifdef __GNUC__
+	/* Try to make console I/O slightly quicker than treacle flowing over a glacier. */
+	setvbuf(stderr, NULL, _IOLBF, 128);
+	setvbuf(stdout, NULL, PfIsInteractive(stdout) ? _IOLBF : _IOFBF, PfIsInteractive(stdout) ? 128 : 512);
+#endif
 }
 
 void PfFinish()
@@ -431,6 +437,11 @@ bool PfTestAndClearBreakSignal()
 	}
 	else
 		return FALSE;
+}
+
+bool PfTestAbortSignal()
+{
+	return (SetSignal(0L, 0L) & (SIGBREAKF_CTRL_D | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F)) != 0;
 }
 
 PfEventNotificationHandle PfGetBreakEventNotificationHandle(void)

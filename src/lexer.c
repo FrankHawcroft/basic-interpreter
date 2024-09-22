@@ -61,7 +61,7 @@ bool IsRParen(const QString *t)
 
 bool IsLiteral(const QString *t)
 {
-	return IsQuotedLiteral(t) || IsNumeric(t);
+	return IsQuotedLiteral(t) || IsNumeric(t) || QsGetFirst(t) == '@';
 }
 
 /* This is not a thorough test - assumes the token has been correctly scanned. */
@@ -496,6 +496,19 @@ static Error GetQuotedLiteralToken(const char **position, QString *t)
 		return BADCONSTANT;
 }
 
+static Error GetCharacterCodeLiteralToken(const char **position, QString *t)
+{
+	const char *start = *position;
+	int ch;
+	
+	++*position; /* move off '@' */
+	if(sscanf(*position, "%x", &ch) != 1)
+		return BADCONSTANT;
+	while(isxdigit(**position)) ++*position;
+	QsInitStaticPtrs(t, start, *position);
+	return SUCCESS;
+}
+
 /* Get the next token from 'position' into the string 'token'. 'leftContxt'
 should be passed the previous token scanned and is used to disambiguate
 certain operators (unary + and -, &) from the start of constants.
@@ -542,6 +555,8 @@ static bool GetToken(const char **position, const QString *leftContext, QString 
 		}
 		else if(IsQuote(**position))
 			*error = GetQuotedLiteralToken(position, token);
+		else if(**position == '@')
+			*error = GetCharacterCodeLiteralToken(position, token);
 		else /* assume a constant was mistyped */
 			*error = BADCONSTANT;
 	}
@@ -601,7 +616,7 @@ void DisposeTokenSequence(struct TokenSequence *tokSeq)
 	if(tokSeq->preconverted != NULL) {
 		unsigned short i;
 		for(i = 0; i < tokSeq->length; i++)
-			RemoveObject(&tokSeq->preconverted[i], FALSE);
+			DisposeIfScalar(&tokSeq->preconverted[i]);
 		Dispose(tokSeq->preconverted);
 	}
 	ClearTokenSequence(tokSeq);
@@ -822,7 +837,8 @@ void PrintTokSeq(const struct TokenSequence *tokSeq)
 			char tokFirst = QsGetFirst(curTok);
 
 			if(isalpha(tokFirst) || IsNumConstFirst(tokFirst)
-			|| IsSimpleOperator(tokFirst) || IsQuote(tokFirst))
+			|| IsSimpleOperator(tokFirst) || IsQuote(tokFirst)
+			|| tokFirst == '@')
 				QsWrite(curTok, stderr);
 			else if(IsSimpleDelimiter(tokFirst)) {
 				if(QsGetLength(curTok) == 1) {

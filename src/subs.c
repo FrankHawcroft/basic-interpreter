@@ -141,11 +141,6 @@ static const char *FindEndSub(const char *startOfSub)
 	return found == NULL ? Proc()->currentPosition : found;
 }
 
-static void DisposeDefinition(void *object)
-{
-	RemoveObject(object, TRUE);
-}
-
 void Sub_(const QString *toks, unsigned nToks)
 {
 	const QString *subprogramName = &toks[0];
@@ -221,7 +216,7 @@ void Sub_(const QString *toks, unsigned nToks)
 		/* Pre-create local environment if static. */
 		
 		if(isStatic) {	
-			stmt->localStatics = HtCreate(5 + numParams / 2 + numParams % 2, DisposeDefinition, NULL);
+			stmt->localStatics = HtCreate(5 + numParams / 2 + numParams % 2, &DisposeObjectContents, NULL);
 			if(numParams > 0) {
 				stmt->predefinedParameter = New(sizeof(struct Variable *) * numParams);
 				memset(stmt->predefinedParameter, 0, sizeof(struct Variable *) * numParams);
@@ -328,4 +323,37 @@ void EndSub_(BObject *arg, unsigned count)
 		ExitSub_(arg, count);
 	else
 		CauseError(error);
+}
+
+extern const char *ScanIfSubprogramOrLabelled(const char *code, struct TokenSequence *tokens);
+
+void ForwardDefineAllSubprograms(void)
+{
+	const char *savedStmt = Proc()->currentStatementStart;
+	const char *savedPosition = Proc()->currentPosition;
+	const char *from = PrimaryBufferBase(Proc()->buffer); /* assume prelude doesn't forward-reference! */
+
+	while(WithinFileBuffer(Proc()->buffer, from)) {
+		struct TokenSequence tokens;
+		const char *startOfNextStmt;
+	
+		Proc()->currentStatementStart = from; /* so SUB works, and error messages point to the right line */
+
+		CreateTokenSequence(&tokens, 0);
+		
+		startOfNextStmt = ScanIfSubprogramOrLabelled(from, &tokens);
+
+		if(startOfNextStmt != NULL && QsEqNoCase(&g_SubKeyword, &tokens.statementName)) {
+			Proc()->currentPosition = startOfNextStmt;
+			Sub_(tokens.rest, tokens.length);
+			from = Proc()->currentPosition;
+		}
+		else
+			from = startOfNextStmt;
+		
+		DisposeTokenSequence(&tokens);
+	}
+	
+	Proc()->currentStatementStart = savedStmt;
+	Proc()->currentPosition = savedPosition;
 }

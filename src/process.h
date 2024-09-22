@@ -87,17 +87,17 @@ struct Process {
 	/* Event handling - */
 	struct Trap *trap;
 	struct CircularQueue *q;
-	/* The active event is the source of information accessed by functions such as ERR, INKEY, etc. */
+	/* The active event is accessed by functions such as ERR, INKEY, etc. */
 	struct Event *activeEvent;
-	bool breakFlag;
+	int firstEventPollIndex;
+	bool breakFlag, abortFlag;
 	
 	/* Tracing and profiling - */
-	bool trace;
+	bool trace, _pad;
 	struct Statistics *stats;
 	
 	/* Caches - */
 	struct Cache *statementCache;
-	struct Cache *emptyStmtCache;
 	struct TokenSequence empty;
 	struct Cache *untakenBranchCache;
 	

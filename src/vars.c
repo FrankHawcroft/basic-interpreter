@@ -352,7 +352,7 @@ void Swap_(BObject *arg, unsigned count)
 	Scalar t, *x = VarData(&arg[0]), *y = VarData(&arg[1]);
 	SetToValue(&t, x);
 	SetDereferencingBoth(x, y);
-	SetDereferencingBoth(x, &t);
+	SetDereferencingBoth(y, &t);
 }
 
 void Dim_(BObject *arg, unsigned count)

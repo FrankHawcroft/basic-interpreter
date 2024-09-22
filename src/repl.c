@@ -35,6 +35,8 @@ void PrintVerboseTracingPrefix(char pass)
 
 Error Prepare(struct TokenSequence *tokSeq)
 {	
+	Error error = SUCCESS;
+	
 	assert(tokSeq != NULL);
 
 	/* Standardise idiosyncratic syntax to make expression parsing easier. */
@@ -42,20 +44,22 @@ Error Prepare(struct TokenSequence *tokSeq)
 	MakeSavoury(tokSeq);
 
 #ifdef DEBUG
-	if(Opts()->verbose) {
+	if(Opts()->verbose > 1) {
 		PrintVerboseTracingPrefix('2');
 		PrintTokSeq(tokSeq);
 	}
 #endif
 
-	/* At this stage (cf the syntax checking pass), a resolved statement is required.
-		MakeSavoury is assumed to have looked it up. */
+	/* Now attempt to resolve the statement. MakeSavoury has attempted to retrieve it after dealing with
+		sugar like two-word forms (END IF --> ENDIF etc.) and synonyms, but if it's a forward-declared
+		subprogram, it won't have been found. GetStatement will forward-declared all subprograms if
+		necessary. */
 
-	if(tokSeq->command == NULL)
-		return GetStatement(&tokSeq->statementName, &tokSeq->command); /* i.e. a positioned UNDEFINED error */
+	if(tokSeq->command == NULL && (error = GetStatement(&tokSeq->statementName, &tokSeq->command)) != SUCCESS)
+		return error; /* i.e. a positioned UNDEFINED error */
 	
-	if(RequiresSyntaxCheck(tokSeq) && CheckStatementSyntax(tokSeq) != SUCCESS)
-		return CheckStatementSyntax(tokSeq);
+	if(RequiresSyntaxCheck(tokSeq) && (error = CheckStatementSyntax(tokSeq)) != SUCCESS)
+		return error;
 
 	/* Convert parameter expressions from infix to prefix form. */
 
@@ -69,7 +73,7 @@ Error Prepare(struct TokenSequence *tokSeq)
 		ReplaceTokens(tokSeq, prefixFormSpace, (unsigned short)prefixFormLength);
 		
 #ifdef DEBUG
-		if(Opts()->verbose) {
+		if(Opts()->verbose > 1) {
 			PrintVerboseTracingPrefix('3');
 			PrintTokSeq(tokSeq);
 		}
@@ -99,7 +103,7 @@ static Error Compile(const char **position, struct TokenSequence *tokSeq)
 	error = Tokenise(position, tokSeq, FALSE);
 
 #ifdef DEBUG
-	if(error == SUCCESS && Opts()->verbose) {
+	if(error == SUCCESS && Opts()->verbose > 1) {
 		PrintVerboseTracingPrefix('1');
 		PrintTokSeq(tokSeq);
 	}
@@ -129,7 +133,7 @@ enum Ops {
 	OP_EVALQ = 0x20,
 	OP_CONFORM = 0x40,
 	OP_CONFORMQ = 0x80,
-	OP_MACRO = 0x100,
+	OP_MACRO = 0x100, /* If this value changes, the empty statement prototype used in the Process structure must also. */
 	OP_SUB = 0x200,
 	OP_EXEC = 0x400,
 	OP_CACHE = 0x800,
@@ -141,7 +145,7 @@ enum Ops {
 
 static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 {
-	unsigned ops = OP_INACTIVE | OP_POLL;
+	unsigned ops = OP_INACTIVE;
 
 	ops |= (EligibleForCaching(ts, callNestLevel) ? OP_CACHE : 0);
 	ops |= (Opts()->optimise && !IsMacro(ts->command) && (ops & OP_CACHE) ? OP_OPTIMISE : 0);
@@ -155,8 +159,12 @@ static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 	else if(IsSubprogram(ts->command)) ops |= (OP_EVAL | OP_CONFORM | OP_SUB | OP_CLEAR);
 	else ops |= (OP_EVAL | OP_CONFORM | OP_EXEC | OP_CLEAR);
 	
+	if(ts->command->method.macro != Resume_ && ts->command->method.macro != IfThenElse_) ops |= OP_POLL;
+	
 	return ops;
 }
+
+extern bool ShouldCheckEvents(const struct TokenSequence *ts);
 
 static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 {
@@ -168,24 +176,27 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 	if(Opts()->optimise) {
 		if(SemanticallyPredictable(ts))
 			ts->ops &= ~OP_CONFORM;
+		
 		if(NoDynamicallyAllocatedMemory(ts))
 			ts->ops &= ~OP_CLEAR, ts->ops |= OP_CLEARQ;
+		
+		if(!ShouldCheckEvents(ts))
+			ts->ops &= ~OP_POLL;
 	}
 		
 	if(ts->length <= 1 && ts->command->formalCount == 0)
 		ts->ops &= ~(OP_EVAL | OP_EVALQ | OP_CONFORM | OP_CLEAR | OP_CLEARQ);
 
-	if(StatementIsEmpty(ts->command))
-		ts->ops = 0;
-
 	if(ts->preconverted != NULL)
 		ts->ops &= ~OP_EVAL, ts->ops |= OP_EVALQ;
 		
-	if((ts->ops & OP_CONFORM) && IsAssignmentStatement(ts->command)) /* TODO can be a bit broader */
+	if((ts->ops & OP_CONFORM) && AmenableToQuickConformance(ts, Opts()->optimise))
 		ts->ops &= ~OP_CONFORM, ts->ops |= OP_CONFORMQ;
 		
 	/*if(ts->preconverted != NULL || !ShouldCachePreconvertedObjects(ts, callNestLevel))
 		ts->ops &= ~(OP_CACHE | OP_OPTIMISE);*/
+	if(StatementIsEmpty(ts->command))
+		ts->ops = OP_MACRO;
 }
 
 /* Prints the statement preceded by its line number. */
@@ -241,7 +252,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	/* Determine if the statement should actually be executed. */
 
 	if((ops & OP_INACTIVE) && (*ts->command->inactive)(proc, FALSE))
-		ops = OP_POLL | (ops & OP_CACHE);
+		ops = (ops & OP_POLL) | (ops & OP_CACHE);
 
 	if(ops & OP_CACHE)
 		StorePreconvertedObjects(ts, initialCallNestLevel);
@@ -257,10 +268,10 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 		if(ops & OP_EVAL)
 			Eval(ts->rest, ts->command->convert, 0, exprStack);
 		else if(ops & OP_EVALQ)
-			EvalPreconverted(ts->preconverted, exprStack);
+			EvalPreconverted(ts->preconverted, exprStack, ts->length - 1);
 
 #ifdef DEBUG
-		if(ops & OP_VERBOSE) {
+		if((ops & OP_VERBOSE) && Opts()->verbose > 1) {
 			PrintVerboseTracingPrefix('4');
 			DumpExprStk(exprStack);
 		}
@@ -276,7 +287,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 			error = ConformQuickly(ts->command->formal, (BObject *)exprStack->base, ts->command->formalCount);
 
 #ifdef DEBUG
-		if((ops & OP_VERBOSE) && (ops & (OP_CONFORM | OP_CONFORMQ)) && error == SUCCESS) {
+		if((ops & OP_VERBOSE) && Opts()->verbose > 1 && (ops & (OP_CONFORM | OP_CONFORMQ)) && error == SUCCESS) {
 			PrintVerboseTracingPrefix('5');
 			DumpExprStk(exprStack);
 		}
@@ -430,7 +441,7 @@ static void Immediate(void)
 }
 
 extern bool ProgramSyntaxCheckPassed(void);
-extern void PrintStackTrace(int maxDepth);
+extern void PrintStackTrace(int maxDepth, bool raw);
 extern void CreateStatementCache(void);
 
 int Loop(void)
@@ -487,7 +498,7 @@ int Loop(void)
 		}
 		
 		/*if(!WithinFileBuffer(proc->buffer, proc->currentStatementStart))
-			fprintf(stderr, "Exiting due to outside buf: %p\n", proc->currentStatementStart);*/
+			fprintf(stderr, "Exiting due to outside buf: ....%hX\n", PointerDisplayValue(proc->currentStatementStart));*/
 		
 		DisposeTokenSequence(&tokSeq);
 		DisposeExprStk(&exprStack);
@@ -504,7 +515,7 @@ int Loop(void)
 	
 			UnwindForErrorReport(&file, &line, &stmt);
 			ReportError(proc->pendingError, file, line, stmt, proc->additionalErrorInfo);
-			PrintStackTrace(5);
+			PrintStackTrace(10, FALSE);
 			
 			proc->pendingError = SUCCESS;
 			proc->returnCode = Opts()->immediate || proc->mode != MODE_HALTED_FOR_EXIT

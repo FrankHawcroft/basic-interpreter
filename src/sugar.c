@@ -40,13 +40,14 @@ const char KW_GOTO[] = "GOTO";
 const char KW_IF[] = "IF";
 const char KW_IFGOTO[] = "IFGOTO~";
 const char KW_IFTHENELSE[] = "IFTHENELSE~";
-const char KW_IFTHENLET[] = "IFTHENLET";
+const char KW_IFTHENLET[] = "IFTHENLET~";
 const char KW_INPUT[] = "INPUT";
 const char KW_INSTR[] = "INSTR";
 const char KW_LEN[] = "LEN";
 const char KW_LET[] = "LET";
 const char KW_LETQ_LOCAL[] = "LETQL~"; /* For cached statements - faster interning. */
 const char KW_LETQ_PREDEF[] = "LETQP~"; /* For cached statements - faster interning. */
+const char KW_LINE[] = "LINE";
 const char KW_MID[] = "MID";
 const char KW_NAME[] = "NAME";
 const char KW_NEXT[] = "NEXT";
@@ -56,6 +57,8 @@ const char KW_ONGOSUB[] = "ONGOSUB~";
 const char KW_ONGOTO[] = "ONGOTO~";
 const char KW_OPEN[] = "OPEN";
 const char KW_PRINT[] = "PRINT";
+const char KW_PX[] = "PX~";
+const char KW_PY[] = "PY~";
 const char KW_RETURN[] = "RETURN";
 const char KW_RETURNTO[] = "RETURNTO~";
 const char KW_SCREEN[] = "SCREEN";
@@ -68,6 +71,9 @@ const QString g_DataKeyword = {(char *)KW_DATA, 4};
 const QString g_ElseKeyword = {(char *)KW_ELSE, 4};
 const QString g_EndKeyword = {(char *)KW_END, 3};
 const QString g_GoToKeyword = {(char *)KW_GOTO, 4};
+const QString g_NextKeyword = {(char *)KW_NEXT, 4};
+const QString g_PX = {(char *)KW_PX, 3};
+const QString g_PY = {(char *)KW_PY, 3};
 
 const QString g_Pipe = {"|", 1};
 const QString g_Semicolon = {";", 1};
@@ -107,13 +113,14 @@ static const QString m_GoSubKeyword = {(char *)KW_GOSUB, 5};
 static const QString m_IfKeyword = {(char *)KW_IF, 2};
 static const QString m_IfGoToKeyword = {(char *)KW_IFGOTO, 7}; /* includes ~ */
 static const QString m_IfThenElseKeyword = {(char *)KW_IFTHENELSE, 11}; /* includes ~ */
-static const QString m_IfThenLetKeyword = {(char *)KW_IFTHENLET, 9};
+static const QString m_IfThenLetKeyword = {(char *)KW_IFTHENLET, 10}; /* includes ~ */
 static const QString m_InputKeyword = {(char *)KW_INPUT, 5};
 static const QString m_InstrKeyword = {(char *)KW_INSTR, 5};
 static const QString m_Instr2Keyword = {"INSTR2", 6};
 static const QString m_LenKeyword = {(char *)KW_LEN, 3};
 static const QString m_LetKeyword = {(char *)KW_LET, 3};
 static const QString m_LetMidKeyword = {"LETMID", 6};
+static const QString m_LineKeyword = {(char *)KW_LINE, 4};
 static const QString m_LSetKeyword = {"LSET", 4};
 static const QString m_MidKeyword = {(char *)KW_MID, 3};
 static const QString m_Mid2Keyword = {"MID2", 4};
@@ -142,6 +149,7 @@ static const QString m_ToKeyword = {"TO", 2};
 static const QString m_WaitKeyword = {"WAIT", 4};
 static const QString m_WindowKeyword = {"WINDOW", 6};
 static const QString m_WindowInfoKeyword = {"WINDOWINFO", 10};
+static const QString m_WPrintKeyword = {"WPRINT", 6};
 static const QString m_QuotedTab = {"\"\t\"", 3};
 static const QString m_QuotedLinefeed = {"\"\n\"", 3};
 static const QString m_QuestionMark = {"?", 1};
@@ -181,7 +189,9 @@ static bool TerminatesStatementParameter(char token)
 
 static bool IsPrint(const QString *stmt)
 {
-	return QsEqNoCase(stmt, &m_PrintKeyword) || QsEqNoCase(stmt, &m_FPrintKeyword);
+	return QsEqNoCase(stmt, &m_PrintKeyword)
+		|| QsEqNoCase(stmt, &m_FPrintKeyword)
+		|| QsEqNoCase(stmt, &m_WPrintKeyword);
 }
 
 static bool IsArrayCreator(const QString *stmt)
@@ -199,7 +209,7 @@ static bool IsSimpleWord(const QString *token)
 	return isalpha(QsGetFirst(token)) && isalpha(QsGetLast(token));
 }
 
-static bool IsTwoWordForm(const QString *stmt, const QString *following)
+bool IsTwoWordForm(const QString *stmt, const QString *following)
 {
 	static const QString *canBeSeparated[][2] = {
 		{ &m_AreaKeyword, &m_FillKeyword },
@@ -209,6 +219,7 @@ static bool IsTwoWordForm(const QString *stmt, const QString *following)
 		{ &g_EndKeyword, &g_SubKeyword },
 		{ &m_ExitKeyword, &g_SubKeyword },
 		{ &m_LetKeyword, &m_MidKeyword },
+		{ &m_LineKeyword, &m_InputKeyword },
 		{ &m_OptionKeyword, &m_BaseKeyword },
 		{ &m_ScreenKeyword, &m_CloseKeyword },
 		{ &m_SoundKeyword, &m_ResumeKeyword },
@@ -508,6 +519,30 @@ static void TranslateEventTrappingControl(struct TokenSequence *ts)
 	}
 }
 
+/* LINE STEP(dx, dy) ... --> LINE PX~(dx), PY~(dy) ...
+	etc. for a variety of graphics functions: CIRCLE, AREA, PAINT, ... */
+static void MakePenRelativeGraphicsExplicit(struct TokenSequence *ts)
+{
+	if(ts->length >= 7 && QsEqNoCase(&ts->rest[0], &m_StepKeyword)) {
+		QString *scan;
+		int relNesting = 0;
+		unsigned short i;
+		
+		QsCopy(&ts->rest[0], &g_PX);
+		
+		for(scan = &ts->rest[1], i = 1;
+		  relNesting >= 0 && i < ts->length && !(QsGetFirst(scan) == ',' && relNesting == 1); scan++, i++)
+			Nest(scan, &relNesting);
+			
+		if(QsGetFirst(scan) == ',' && relNesting == 1) {
+			QsCopy(scan, &g_RParen);
+			ShiftTokens(ts, i, 2);
+			QsCopy(&ts->rest[i + 1], &g_PY);
+			QsCopy(&ts->rest[i + 2], &g_LParen);
+		}
+	}
+}
+
 /* ON <expr> GOTO <label1>[, <label2> ...] --> ONGOTO~ <expr>, <label1>[, <label2> ...]
 ON <expr> GOSUB <label1>[, <label2> ...] --> ONGOSUB~ <expr>, <label1>[, <label2> ...]
 ON <eventspec> GOTO 0 --> DISABLE <eventspec> */
@@ -626,25 +661,41 @@ static void RenameFunction(QString *token, bool functionDefinition, unsigned sho
 	}
 }
 
+/* The count of lexical actual parameter places, whether occupied or not - e.g.
+			
+	WINDOW 2; ; 0; 0; 200; 100
+				
+has 6 places, but only 5 supplied parameters. */
+static int ActualParameterPlaces(const struct TokenSequence *ts)
+{
+	unsigned short tn;
+	int numPlaces = 0;
+	for(tn = 0; ts->length > 1 && tn != ts->length; tn++)
+		numPlaces += TerminatesStatementParameter(QsGetFirst(&ts->rest[tn]));
+	return numPlaces;
+}
+
 /* It's necessary to insert special placeholders for missing parameters because
 parameter separators (semicolons) are removed when converting infix to prefix. 
 The actual default values could be inserted, but that would entail converting to string
-form and back again, and this approach has the virtue of simplicity. */
-static void InsertPlaceholder(struct TokenSequence *ts, int index, int *numActualParams)
+form and back again, and this approach has the virtue of simplicity - the complexity
+is divided between the lexical side here, and the semantic side in semantics.c. */
+static void InsertPlaceholder(struct TokenSequence *ts, unsigned short *idx, bool macro)
 {
-	bool endsParameter = TerminatesStatementParameter(QsGetFirst(&ts->rest[index]));
-
-	*numActualParams += endsParameter;
-	if(endsParameter 
-	  && (index == 0 || (index > 0 && QsGetFirst(&ts->rest[index - 1]) == ';'))) {
-		ShiftTokens(ts, index - 1, 1);
-		QsCopy(&ts->rest[index], &g_Missing);
+	if(!macro && ts->length > 1) {
+		bool endsParameter = TerminatesStatementParameter(QsGetFirst(&ts->rest[*idx]));
+		
+		if(endsParameter && (*idx == 0 || QsGetFirst(&ts->rest[*idx - 1]) == ';')) {
+			ShiftTokens(ts, *idx - 1, 1);
+			QsCopy(&ts->rest[*idx], &g_Missing);
+			++*idx;
+		}
 	}
 }
 
-static void AppendPlaceholders(struct TokenSequence *ts, int numActualParams, int minActuals)
+static void AppendPlaceholders(struct TokenSequence *ts, int numActualPlaces, int desiredActuals)
 {
-	while(numActualParams < minActuals) {
+	while(numActualPlaces < desiredActuals) {
 		ExpandTokenSequence(ts, ts->length + 2);
 		if(ts->length > 1 && QsGetFirst(&ts->rest[ts->length - 2]) != ';') {
 			QsCopy(&ts->rest[ts->length - 1], &g_Semicolon);
@@ -653,22 +704,25 @@ static void AppendPlaceholders(struct TokenSequence *ts, int numActualParams, in
 		QsCopy(&ts->rest[ts->length - 1], &g_Missing);
 		QsCopy(&ts->rest[ts->length], &g_Pipe);
 		++ts->length;
-		numActualParams++;
+		numActualPlaces++;
 	}
 }
 
 /* Cheats ... semantic infection, but better than the alternative complicated ways of dealing with default values.*/
-static int MinActuals(const BObject *cmd)
+static int DesiredActuals(const BObject *cmd)
 {
-	int n = 0;
+	int wanted = 0, numFormals;
 	
-	if(cmd != NULL && cmd->category == STATEMENT && cmd->value.statement->formalCount > 0) {
-		const struct Parameter *p;
-		for(p = cmd->value.statement->formal; p < &cmd->value.statement->formal[cmd->value.statement->formalCount]; p++)
-			n += p->defaultValue == NULL && p->maxCount < MAX_TOKENS ? p->maxCount : 1;
+	if(cmd != NULL && cmd->category == STATEMENT && (numFormals = cmd->value.statement->formalCount) > 0) {
+		int fn;
+		for(fn = 0; fn < numFormals; fn++) {
+			const struct Parameter *p = &cmd->value.statement->formal[fn];
+			wanted += p->maxCount < MAX_TOKENS && (p->defaultValue == NULL || fn + 1 < numFormals)
+				? p->maxCount : 1;
+		}
 	}
 	
-	return n;
+	return wanted;
 }
 
 static bool MacroInvocation(const BObject *cmd)
@@ -735,12 +789,15 @@ void MakeSavoury(struct TokenSequence *ts)
 	
 	TranslateComputedJump(ts);
 	
+	MakePenRelativeGraphicsExplicit(ts);
+	
 	EnsureExistsIfBuiltIn(&ts->statementName);
 	
 	{
 		int nestLevel = 0;
 		unsigned short i;
 		const BObject *cmd = LookUp(&ts->statementName, SCOPE_GLOBAL);
+			/* Don't assume cmd exists - in the syntax-checking pass, subprograms won't be found. */
 		bool usesKeywordSeparators = ts->length > 1 && UsesParameterSeparatingKeywords(&ts->statementName);
 		bool macro = MacroInvocation(cmd);
 		bool sub = QsEqNoCase(&ts->statementName, &g_SubKeyword);
@@ -765,8 +822,10 @@ void MakeSavoury(struct TokenSequence *ts)
 				StandardiseSeparator(tok, nestLevel, usesKeywordSeparators, macro);
 			}
 		
-			/* This may invalidate tokens, so do it last - */
+			/* These may move tokens, so do them last - fortunately, their conditions don't overlap. */
 			InsertDummyFunctionInvocation(ts, i, sub);
+			
+			InsertPlaceholder(ts, &i, macro);
 		}
 
 		/* Standardise the parameter terminator - */
@@ -774,14 +833,11 @@ void MakeSavoury(struct TokenSequence *ts)
 			QsCopy(&ts->rest[ts->length - 1], &g_Pipe);
 		
 		/* Add placeholders for defaults. */
-		if(!macro) {
-			int numActuals = 0;
-			
-			if(ts->length > 1)
-				for(i = 0; i < ts->length; i++)
-					InsertPlaceholder(ts, i, &numActuals);
+		if(!macro && cmd != NULL) {
+			int numActualPlaces = ActualParameterPlaces(ts);
+			int desiredActualPlaces = DesiredActuals(cmd);
 
-			AppendPlaceholders(ts, numActuals, MinActuals(cmd));
+			AppendPlaceholders(ts, numActualPlaces, desiredActualPlaces);
 		}
 	}
 }

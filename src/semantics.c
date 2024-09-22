@@ -213,28 +213,34 @@ can't be taken into consideration. It can only state whether it MIGHT be
 possible to convert a value of this type to another type. */
 static bool TypeMayBeOK(const struct PrimitiveTypeCharacteristics *actualType, enum TypeRule requirement)
 {
-	bool textual, numeric;
-	
 	assert(actualType != NULL);
 	
-	textual = (actualType->properties & T_IS_TEXTUAL) != 0, numeric = (actualType->properties & T_IS_NUMERIC) != 0;
-	
-	/* Some cases not expressed by current TypeRule values aren't covered here. */
-	return (requirement & TD_FLEXIBLE)
-		|| (requirement & actualType->code) /* All strict conversions, and some others. */
-		|| ((requirement & TD_LOOSE) && (requirement & NUMERIC_TYPES)
-			&& !textual)
-		|| ((requirement & TD_LOOSE) && (requirement & TEXTUAL_TYPES)
-			&& textual)
-		|| ((requirement & TD_LOOSE) && (requirement & T_BOOL))
-		|| ((requirement & TD_CHECKED) && (requirement & NUMERIC_TYPES)
-			&& numeric)
-		|| ((requirement & TD_CHECKED) && (requirement & INTEGRAL_TYPES)
-			&& (numeric || actualType->code == T_BOOL))
-		|| ((requirement & TD_CHECKED) && (requirement & TEXTUAL_TYPES)
-			&& textual)
-		|| ((requirement & TD_PRECISE) && (requirement & INTEGRAL_TYPES)
-			&& (actualType->code & INTEGRAL_TYPES));
+	if(requirement & actualType->code) /* All strict conversions, and some others. */
+		return TRUE;
+	else {
+		bool internal = (actualType->properties & T_IS_INTERNAL) != 0,
+			 textual = (actualType->properties & T_IS_TEXTUAL) != 0, 
+			 numeric = (actualType->properties & T_IS_NUMERIC) != 0;
+		
+		if(internal) /* error, missing, or empty is never OK - indicates an earlier problem */
+			return FALSE;
+			
+		/* Some cases not expressed by current TypeRule values aren't covered here. */
+		return (requirement & TD_FLEXIBLE)
+			|| ((requirement & TD_LOOSE) && (requirement & NUMERIC_TYPES)
+				&& !textual)
+			|| ((requirement & TD_LOOSE) && (requirement & TEXTUAL_TYPES)
+				&& textual)
+			|| ((requirement & TD_LOOSE) && (requirement & T_BOOL))
+			|| ((requirement & TD_CHECKED) && (requirement & NUMERIC_TYPES)
+				&& numeric)
+			|| ((requirement & TD_CHECKED) && (requirement & INTEGRAL_TYPES)
+				&& (numeric || actualType->code == T_BOOL))
+			|| ((requirement & TD_CHECKED) && (requirement & TEXTUAL_TYPES)
+				&& textual)
+			|| ((requirement & TD_PRECISE) && (requirement & INTEGRAL_TYPES)
+				&& (actualType->code & INTEGRAL_TYPES));
+	}
 }
 
 /* This function does type checking with a 'contextual' item, typically a
@@ -305,41 +311,38 @@ SimpleType TargetType(enum TypeRule required, SimpleType source)
 /* applied may be a subprogram, function, operator, or array variable */
 const struct Parameter *GetPrototype(const BObject *applied, int *numFormals)
 {
-	const struct Parameter *proto;
-	
 	assert(applied != NULL);
 	assert(numFormals != NULL);
 
 	if(applied->category == OPERATOR) {
-		proto = ParametersForOperator(applied->value.opRef);
 		*numFormals = OperandCount(applied->value.opRef);
+		return ParametersForOperator(applied->value.opRef);
 	}
 	else if(applied->category == FUNCTION) {
-		proto = applied->value.function->parameter;
 		if((*numFormals = applied->value.function->numArgs) == FN_VAR_ARGS) {
-			proto = &m_AnyArgs;
 			*numFormals = 1;
+			return &m_AnyArgs;
 		}
+		else
+			return applied->value.function->parameter;
 	}
 	else if(IsVariable(applied)) {
 		bool array = IsArray(applied);
-		proto = array ? &m_ArrayIndex : NULL;
 		*numFormals = array ? 1 : 0;
+		return array ? &m_ArrayIndex : NULL;
 	}
 	else if(applied->category == STATEMENT) {
-		proto = applied->value.statement->formal;
 		*numFormals = applied->value.statement->formalCount;
 		if(IsMacro(applied->value.statement)) {
-			proto = &m_AnyArgs;
 			*numFormals = 1;
+			return &m_AnyArgs;
 		}
+		else
+			return applied->value.statement->formal;
 	}
-	else {
-		proto = NULL;
-		*numFormals = INT_MIN;
-	}
-
-	return proto;
+	
+	*numFormals = INT_MIN;
+	return NULL;
 }
 
 /* Assumes a C-like convention that a 'varargs' parameter (see statements.c/UNLIMITED),
@@ -444,15 +447,41 @@ Error Conform(const struct Parameter *formal, int formalCount, BObject *actual, 
 	return error;
 }
 
+/* For command invocations _where the command has previously executed successfully with a full Conform_,
+	determines if the quicker version of actual to formal parameter conformance can be used. I.e.
+	- no missing actuals (so no defaults need to be copied in to the actuals), and
+	- no formals which can match more than one actual. */
+bool AmenableToQuickConformance(const struct TokenSequence *ts, bool fullCheck)
+{
+	int fn;
+	unsigned short tn;
+		
+	for(fn = 0; fn < ts->command->formalCount; fn++)
+		if(ts->command->formal[fn].maxCount > 1
+		|| (!fullCheck && ts->command->formal[fn].defaultValue != NULL))
+			return FALSE;
+	
+	if(!fullCheck)
+		return TRUE;
+	
+	for(tn = 0; tn != ts->length; tn++)
+		if(QsEqual(&ts->rest[tn], &g_Missing))
+			return FALSE;
+
+	return TRUE;
+}
+
 Error ConformForApplication(const BObject *applied, BObject *actual, unsigned actualCount)
 {
 	int numFormals;
 	const struct Parameter *proto = GetPrototype(applied, &numFormals);
 	/* Error result here assumes usage in expr rather than command context - */
-	if(proto == NULL)
-		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
-	else if(numFormals == actualCount) /* assumes operator or function parameter conventions! */
+	if(applied->category == OPERATOR
+	  || (applied->category == FUNCTION && applied->value.function->numArgs == (short)actualCount)
+	  || (IsVariable(applied) && actualCount == 1))
 		return ConformQuickly(proto, actual, numFormals);
+	else if(proto == NULL || applied->category == STATEMENT)
+		return IsEmpty(applied) ? UNDEFINEDVARORFUNC : ARRAYEXPECTED;
 	else
 		return Conform(proto, numFormals, actual, actualCount);
 }
@@ -470,12 +499,14 @@ Error ConformQuickly(const struct Parameter *formal, BObject *actual, int count)
 		const struct Parameter *f = &formal[n];
 		BObject *a = &actual[n];
 
-		if(f->kind == LITERAL && (error = DereferenceObject(a)) == SUCCESS) { /* deref propagates errors */
-			SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(&actual[n - 1]);
-			error = ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
+		if(f->kind == LITERAL) {
+			if((error = DereferenceObject(a)) == SUCCESS) { /* deref propagates errors */
+				SimpleType prevType = n == 0 ? T_MISSING : GetSimpleType(a - 1);
+				error = ChangeType(&a->value.scalar, ConcreteConversionFor(a->value.scalar.type, prevType, f->type));
+			}
 		}
-		else if(ObjectIsError(a))
-			error = ObjectAsError(a);
+		else if(!Resolved(a)) /* there is no substitution of defaults in quick conformance */
+			error = ObjectAsError(a) != SUCCESS ? ObjectAsError(a) : UNDEFINEDVARORFUNC;
 	}
 	
 	return error;
@@ -510,7 +541,7 @@ SimpleType TypeOfToken(const QString *t)
 		
 		ConvertToObject(t, &obj, Proc()->callNestLevel);
 		st = GetSimpleType(&obj);
-		RemoveObject(&obj, FALSE);
+		DisposeIfScalar(&obj);
 		return st;
 	}
 }

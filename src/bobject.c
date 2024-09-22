@@ -19,7 +19,6 @@ void InitObject(BObject *obj, enum SymbolType kind)
 	obj->category = kind;
 	if(kind == LITERAL)
 		obj->value.scalar = *g_Empty;
-		/*InitScalar(&obj->value.scalar, T_EMPTY, FALSE);*/
 	else if((kind & IS_VARIABLE) && !(kind & VARIABLE_IS_POINTER))
 		InitVariable(&obj->value.variable, T_EMPTY, FALSE); 
 	else
@@ -31,16 +30,19 @@ bool IsEmpty(const BObject *obj)
 	return obj == NULL  || (obj->category == LITERAL && GetSimpleType(obj) <= T_MISSING);
 }
 
-/* Duplicate an object. Literal values are cloned, but for other types, a simple structure copy is sufficient. */
+/* Duplicate an object. Literal values are cloned, but for other types, a simple structure copy is sufficient.
+	The order of source type checking is optimised for EvalPreconverted. */
 void CopyObject(BObject *dest, const BObject *source)
 {
 	assert(dest != NULL && source != NULL);
 
-	if(source->category == LITERAL) {
+	if(source->category & VARIABLE_IS_POINTER)
+		*dest = *source;
+	else if(source->category == LITERAL) {
 		dest->category = LITERAL;
 		CopyScalar(&dest->value.scalar, &source->value.scalar);
 	}
-	else if((source->category & IS_VARIABLE) && !(source->category & VARIABLE_IS_POINTER)) {
+	else if(IsVariable(source)) { /* embedded variable */
 		dest->category = source->category;
 		CopyScalar(&dest->value.variable.value, &source->value.variable.value);
 	}
@@ -66,23 +68,24 @@ SimpleType GetSimpleType(const BObject *obj)
 		return T_EMPTY;
 }
 
-/* Does not dispose of 'complex' types such as functions, subprograms, etc. unless
-the second parameter is true. 
-	A shallow disposal - obj itself is not disposed of, just its contents. */
-void RemoveObject(BObject *obj, bool definition)
+void DisposeObjectContents(BObject *obj)
 {
 	assert(obj != NULL);
 
+	if(IsVariable(obj))
+		DisposeVariableObject(obj);
+	else if(obj->category == STATEMENT)
+		DisposeStatement(obj->value.statement);
+	else if(obj->category == FUNCTION)
+		DisposeFunction(obj->value.function);
+	else
+		DisposeIfScalar(obj);
+}
+
+void DisposeIfScalar(BObject *obj)
+{
 	if(obj->category == LITERAL)
 		DisposeScalar(&obj->value.scalar);
-	else if(definition) {
-		if(IsVariable(obj))
-			DisposeVariableObject(obj);
-		else if(obj->category == STATEMENT)
-			DisposeStatement(obj->value.statement);
-		else if(obj->category == FUNCTION)
-			DisposeFunction(obj->value.function);
-	}
 }
 
 bool Dynamic(const BObject *obj)
@@ -99,22 +102,24 @@ Error ObjectAsError(const BObject *obj)
 }
 
 /* Sets the object to the given error. The object passed is assumed to be uninitialised. */
-void SetObjectToError(BObject *obj, Error error)
+Error SetObjectToError(BObject *obj, Error error)
 {
 	assert(obj != NULL);
 
 	obj->category = LITERAL;
-	SetError(&obj->value.scalar, error);
-	Proc()->additionalErrorInfo[0] = NUL; /* Try to avoid an old additional message being printed. */
+	if(error != SUCCESS)
+		Proc()->additionalErrorInfo[0] = NUL; /* Try to avoid an old additional message being printed. */
+	return SetError(&obj->value.scalar, error);
 }
 
-void SetObjectToErrorWithAdditionalMessage(BObject *obj, Error error, const char *msgFmt, const QString *contextualObject)
+Error SetObjectToErrorWithAdditionalMessage(BObject *obj, Error error, const char *msgFmt, const QString *contextualObject)
 {
 	assert(obj != NULL);
 	assert(msgFmt != NULL);
 	
 	SetObjectToError(obj, error);
 	SetAdditionalErrorMessage(msgFmt, QsGetData(contextualObject), QsGetLength(contextualObject));
+	return error;
 }
 
 bool IsUserDefined(const BObject *obj)
@@ -123,40 +128,6 @@ bool IsUserDefined(const BObject *obj)
 		|| obj->category == LABEL
 		|| (obj->category == STATEMENT && IsSubprogram(obj->value.statement))
 		|| (obj->category == FUNCTION && IsDefFunction(obj->value.function)); 
-}
-
-/* Converts a token to a BObject. */
-void ConvertToObject(const QString *token, BObject *obj, short callNestLevel)
-{
-	if(IsName(token) || !IsLiteral(token)) {
-		/* A symbol. Look up only here - creation as a side
-		effect of particular kinds of statements must be handled by
-		a specialised function - see AssignConvert etc.
-			Because the named Boolean constants TRUE and FALSE are defined
-		in the prelude, it's safe to assume that something which looks like
-		a name should be looked up, rather than parsed. If TRUE and FALSE
-		were treated as literals, this assumption would need to change. */
-			
-		BObject *definition = LookUpCheckingType(token, callNestLevel);
-		if(definition != NULL) {
-			if(IsVariable(definition))
-				SetSymbolReference(obj, definition->category | VARIABLE_IS_POINTER, VarPtr(definition));
-			else
-				*obj = *definition;
-		}
-		else if(IsTypeSpecifier(QsGetLast(token)) && LookUpIgnoringType(token, callNestLevel) != NULL)
-			SetObjectToErrorWithAdditionalMessage(obj, BADARGTYPE, "Defined type differs for: %.*s", token);
-		else {
-			obj->category = LITERAL;
-			InitScalar(&obj->value.scalar, QsEqNoCase(token, &g_Missing) ? T_MISSING : T_EMPTY, FALSE);
-			if(!QsEqNoCase(token, &g_Missing))
-				SetAdditionalErrorMessage("Not found: %.*s", QsGetData(token), QsGetLength(token));
-		}
-	}
-	else {
-		obj->category = LITERAL;
-		ParseToken(token, &obj->value.scalar);
-	}
 }
 
 /* Only meaningful for symbolic objects (non-literals). */
@@ -183,31 +154,52 @@ void SetSymbolReference(BObject *obj, enum SymbolType kind, void *value)
 	obj->category = kind;
 }
 
+INLINE Error CopyScalarToObject(BObject *obj, const Scalar *src)
+{
+	CopyDereferencingSource(&obj->value.scalar, src);
+	obj->category = LITERAL;
+	return SUCCESS;
+}
+
+/* Split into a separate function because it's a minority case, to keep DereferenceObject
+small - when variables are looked up, a pointer object is created rather than an embedded
+variable. */
+static Error DereferenceScalarVariable(BObject *obj)
+{
+	/* Need to save the scalar out of the embedded variable before copying it into the same object. */
+	Scalar val = obj->value.variable.value;
+	
+	assert(IsVariable(obj));
+	assert(!(obj->category & VARIABLE_IS_ARRAY));
+	
+	return CopyScalarToObject(obj, &val);
+}
+
 /* Yields, where possible, a scalar value from an object.
 	Returns an error if this is not a meaningful operation for the type of object:
 it must be a non-array variable, if not already a literal. Parameterless functions
 are NOT called. An existing error is propagated. */
 Error DereferenceObject(BObject *obj)
 {
-	Error error = SCALAREXPECTED; /* assume an array, unevaluated function, or label, subprogram, etc. */
-	
 	assert(obj != NULL);
 	
-	if(obj->category == LITERAL) /* should be the most common case */
-		error = !ObjectIsError(obj) ? SUCCESS : ObjectAsError(obj);
-	else if(IsVariable(obj)) {
-		struct Variable *v = (obj->category & VARIABLE_IS_POINTER) ? obj->value.varRef : &obj->value.variable; /*VarPtr(obj);*/
-		if(!(obj->category & VARIABLE_IS_ARRAY) && v->dim.few[0] == -1) {
-			Scalar result;
-			CopyDereferencingSource(&result, &v->value);
-			/* obj does not need to be deleted, because it's a variable reference. */
-			obj->category = LITERAL;
-			obj->value.scalar = result;
-			error = SUCCESS;
-		}
+	if(obj->category == LITERAL) /* should be the most common case - the result of an expression */
+		return !ObjectIsError(obj) ? SUCCESS : ObjectAsError(obj);
+	else if((obj->category & VARIABLE_IS_ARRAY) && VarPtr(obj)->dim.few[0] != -1) /* insufficiently subscripted array */
+		return SCALAREXPECTED;
+	else if(obj->category & VARIABLE_IS_POINTER)
+		/* obj does not need to be deleted, because it's just a variable reference. */
+		return CopyScalarToObject(obj, &obj->value.varRef->value);
+	else if(IsVariable(obj))
+		return DereferenceScalarVariable(obj);
+	else {
+#ifdef DEBUG
+		fprintf(stderr, "Oh dear, dereferencing unexpected obj: ");
+		DumpObject(obj);
+		fputc('\n', stderr);
+#endif
+		return SCALAREXPECTED; /* assume an unevaluated function, or label, subprogram, etc. */
 	}
-
-	return error;
 }
 
 #ifdef DEBUG
@@ -217,6 +209,8 @@ short GetCallNestLevel(const BObject *obj)
 	/* TODO */
 	return Proc()->callNestLevel;
 }
+
+DIAGNOSTIC_FN_DECL(unsigned short PointerDisplayValue(const void *));
 
 void DumpObject(const BObject *obj)
 {
@@ -238,7 +232,7 @@ void DumpObject(const BObject *obj)
 			fprintf(stderr, "<label: file %s, line %d>", file, line);
 			break;
 		case OPERATOR:
-			fprintf(stderr, "<op: %p>", (void *)obj->value.opRef);
+			fprintf(stderr, "<op: ....%hX>", PointerDisplayValue(obj->value.opRef));
 			break;
 		case LITERAL:
 			fprintf(stderr, "<lit(%d): ", obj->value.scalar.type);
@@ -252,21 +246,21 @@ void DumpObject(const BObject *obj)
 			if(IsDefFunction(obj->value.function))
 				fprintf(stderr, "<def func: file %s, line %d>", file, line);
 			else
-				fprintf(stderr, "<func: %p>", (void *)obj->value.function);
+				fprintf(stderr, "<func: ....%hX>", PointerDisplayValue(obj->value.function));
 			break;
 		case STATEMENT:
 			if(IsSubprogram(obj->value.statement))
 				fprintf(stderr, "<sub: file %s, line %d>", file, line);
 			else
-				fprintf(stderr, "<cmd: %p>", (void *)obj->value.statement->method.builtIn);
+				fprintf(stderr, "<cmd: ....%hX>", PointerDisplayValue(obj->value.statement->method.builtIn));
 			break;
 		default:
 			if(obj->category & IS_VARIABLE)
-				fprintf(stderr, "<var(%d) cat=%d @ %d: %p>",
+				fprintf(stderr, "<var(%d) cat=%d @ %d: ....%hX>",
 					VarData(obj)->type,
 					obj->category,
 					GetCallNestLevel(obj),
-					VarPtr(obj));
+					PointerDisplayValue(VarPtr(obj)));
 			else
 				fprintf(stderr, "<UNKNOWN CATEGORY!>");
 			break;

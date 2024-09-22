@@ -49,6 +49,8 @@ struct AmigaChannel {
 	struct MsgPort *port;
 	/* TODO is there a more efficient way than having one port per channel? */
 	struct IOAudio *request;
+	WORD allocKey;
+	struct Device *device;
 	struct Waveform playing;
 	struct Waveform pending;
 	bool active;
@@ -277,14 +279,14 @@ static Error AcquireChannel(int channel, int priority)
 			if(y < -128.0) y = -128.0;
 			if(y > 127.0) y = 127.0;
 
-			/*fprintf(stderr, "%d ", (BYTE)y);*/
+			fprintf(stderr, "%d ", (BYTE)y);
 			*waveform++ = (BYTE)y;
 			x += increment;
 		}
 		
 		ch->playing.wave = waveform;
 		ch->playing.length = (ULONG)resolution;
-		/*fprintf(stderr, "\n");*/
+		fprintf(stderr, "\n");
 		
 		/*fprintf(stderr, "created waveform\n");*/
 	}
@@ -352,39 +354,40 @@ void Sound_(BObject *arg, unsigned count)
 	assert(ch->playing.length % 2 == 0);
 	assert(ch->playing.length <= 131072);
 
-	/*fprintf(stderr, "params: len = %lu freq = %f dur = %f\n", ch->playing.length, frequency, duration);*/
+	fprintf(stderr, "params: len = %lu freq = %f dur = %f\n", ch->playing.length, frequency, duration);
 	
 	{
 		double sampleIncrement, seconds, samplePoints;
 		
 		seconds = duration / 18.2;
 		sampleIncrement = 1.0 / m_ClockConstant;
-				
+		
+		/* "The time elapsed between the output of successive sound samples, in units of system clock ticks." */
 		/* period is for _one_ sample, I think. period must be in units of 
 		1/m_ClockConstant s. */
 
 		samplePoints = seconds * frequency * ch->playing.length;
-		period = (seconds / samplePoints) / sampleIncrement;
+		/*period = (seconds / samplePoints) / sampleIncrement;*/
 		
-		period = 30000; /* m_ClockConstant / ((LONG)ch->playing.length * frequency); */
-		/*fprintf(stderr, "period = %d\n", period);*/
+		period = m_ClockConstant / ((LONG)ch->playing.length * (int)frequency);
+		fprintf(stderr, "period = %d\n", period);
 		if(period < 124) period = 124;		/* Sanity checks for h/w */
 		if(period > 65536) period = 65536;
 
 		/* cycles is number of times to repeat the sample data. Work this out
 		from the desired frequency and duration. */
 
-		cycles = 10000; /*frequency * seconds;*//*frequency * duration / 18.2; */
-		/*fprintf(stderr, "cycles = %d\n", cycles);*/
+		cycles = frequency /* * seconds */; /*frequency * duration / 18.2; */
+		fprintf(stderr, "cycles = %d\n", cycles);
 		if(cycles < 1) cycles = 1;		/* Sanity checks for h/w */
 		if(cycles > 65535) cycles = 65535;
 	}
 
-	/* memset(ch->request, '\0', sizeof(struct IOAudio)); */
+	memset(ch->request, '\0', sizeof(struct IOAudio));
 
-	/*ch->request->ioa_Request.io_Message.mn_ReplyPort = ch->port;*/
+	ch->request->ioa_Request.io_Message.mn_ReplyPort = ch->port;
 	/* ch->request->ioa_Request.io_Device = m_Device; */
-	/* ch->request->ioa_Request.io_Unit = AllocRequest.ioa_Request.io_Unit; */
+	ch->request->ioa_Request.io_Unit = 1 << voice;
 	ch->request->ioa_Request.io_Command = CMD_WRITE;
 	ch->request->ioa_Request.io_Flags = ADIOF_PERVOL;
 	/* ch->request->ioa_AllocKey = AllocRequest.ioa_AllocKey; */

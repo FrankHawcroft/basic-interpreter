@@ -12,7 +12,7 @@ area 60,20
 area 60,60
 area 20,60
 PALETTE 1, 0.5, 0.5, 0.5
-color 1
+color 1,2
 areafill
 
 circle 100,100,50

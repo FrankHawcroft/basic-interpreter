@@ -70,8 +70,9 @@ struct Process *Proc(void)
 
 Error CreateNewProcess(const struct Options *options)
 {
+	/* The magic ops number 0x100 must match OP_MACRO in repl.c. */
 	static const struct TokenSequence emptyProto
-		= {NULL, NULL, QS_NULL, QS_NULL, {(QsChar *)KW_EMPTY_STMT, 2}, NULL, 0, 0, 0, NULL, NULL};
+		= {NULL, NULL, QS_NULL, QS_NULL, {(QsChar *)KW_EMPTY_STMT, 2}, NULL, 0, 0, 0x100, NULL, NULL};
 
 	int slot;
 	struct Process *p;
@@ -137,14 +138,14 @@ Error CreateNewProcess(const struct Options *options)
 	
 	InitProfile(&p->stats);
 	
-	p->breakFlag = FALSE;
+	p->breakFlag = p->abortFlag = FALSE;
 	InitEventTraps();
 
 	DefineBuiltIns();
 	
 #ifdef DEBUG
-	/*if(Opts()->verbose)
-		PrintSymTab();*/
+	if(Opts()->verbose >= 3)
+		PrintSymTab();
 		
 	p->maxNestLevel = SCOPE_MAIN;
 	p->definitions = p->hashTableSearches = p->lookUps = 0;
@@ -152,9 +153,8 @@ Error CreateNewProcess(const struct Options *options)
 
 	p->statementCache = NULL;
 	p->untakenBranchCache = NULL;
-	p->emptyStmtCache = NULL;
 	p->empty = emptyProto;
-
+	
 	p->callNestLevel 
 		= p->functionCallNesting
 		= p->staticSubCallNesting = SCOPE_MAIN;
@@ -257,29 +257,24 @@ const struct Options *Opts(void)
 	buffer. */
 struct TokenSequence *GetFromCache(struct Process *proc, const char *position)
 {
-	struct TokenSequence *ts = RetrieveFromCache(proc->statementCache, position);
-	if(ts == NULL) {
-		const char *nextStmt = (const char *)RetrieveFromCache(proc->emptyStmtCache, position);
-		if(nextStmt != NULL) {
-			/* This reuse of a single structure is quick, and saves memory in the empty stmt cache since
-			   only one pointer (the next stmt location) needs to be stored, but care must be taken
-			   with its lifetime during each statement execution round. */
-			proc->empty.start = position;
-			proc->empty.next = nextStmt;
-			ts = &proc->empty;
-		}
+	void *entry = RetrieveFromCache(proc->statementCache, position);
+	if(entry != NULL && WithinFileBuffer(proc->buffer, (const char *)entry)) {
+		/* This reuse of a single structure is quick, and saves memory in the stmt cache since
+		   only one pointer (the next stmt location) needs to be stored, but care must be taken
+		   with its lifetime during each statement execution round. */
+		proc->empty.start = position;
+		proc->empty.next = (const char *)entry;
+		return &proc->empty;
 	}
-	return ts;
+	return (struct TokenSequence *)entry;
 }
 
-static void DisposeEntry(void *ts)
+static void DisposeEntry(void *entry)
 {
-	DisposeTokenSequence(ts);
-	Dispose(ts);
-}
-
-static void NoDisposal(void *addr)
-{
+	if(!WithinFileBuffer(Proc()->buffer, (const char *)entry)) {
+		DisposeTokenSequence((struct TokenSequence *)entry);
+		Dispose(entry);
+	}
 }
 
 void CreateStatementCache(void)
@@ -297,27 +292,23 @@ void CreateStatementCache(void)
 	   life.bas - 1794 chs, 38 cacheable stmts */
 	
 	unsigned expectedCacheableStatements = (FileBufferExtent(p->buffer) - FileBufferBase(p->buffer) - approxPreludeSize) / 40;
-	unsigned expectedEmptyStatements;
 	
-	if(expectedCacheableStatements < 11)
-		expectedCacheableStatements = 11;
+	if(expectedCacheableStatements < 10)
+		expectedCacheableStatements = 10;
 
 	GetStatement(&p->empty.statementName, &p->empty.command);
-	
-	expectedEmptyStatements = expectedCacheableStatements / 5;
 
 	if(p->opts->lowMemory)
-		expectedCacheableStatements = expectedEmptyStatements = 1;
+		expectedCacheableStatements = 1;
 	
-	p->statementCache = CreateCache(expectedCacheableStatements, 0, &DisposeEntry);
-	p->emptyStmtCache = CreateCache(expectedEmptyStatements, 0, &NoDisposal);
+	p->statementCache = CreateCache(expectedCacheableStatements, 9 * expectedCacheableStatements + 1, &DisposeEntry);
 }
 
 void AttemptToCache(const struct TokenSequence *tokSeq)
 {
 	struct Process *p = Proc();
 	if(StatementIsEmpty(tokSeq->command))
-		SetInCache(p->emptyStmtCache, tokSeq->start, (void *)tokSeq->next);
+		SetInCache(p->statementCache, tokSeq->start, (void *)tokSeq->next);
 	else {
 		struct TokenSequence *cached = Duplicate(tokSeq);
 		/* Don't end the program due to failing to alloc a cache entry. */
@@ -331,17 +322,13 @@ static void DeleteStatementCache(void)
 	if(Proc()->statementCache != NULL) {
 		DisposeCache(Proc()->statementCache);
 		Proc()->statementCache = NULL;
-		DisposeCache(Proc()->emptyStmtCache);
-		Proc()->emptyStmtCache = NULL;
 	}
 }
 
 void ClearStatementCache(void)
 {
-	if(Proc()->statementCache != NULL) {
+	if(Proc()->statementCache != NULL)
 		ClearCache(Proc()->statementCache);
-		ClearCache(Proc()->emptyStmtCache);
-	}
 }
 
 #ifdef DEBUG
@@ -360,7 +347,7 @@ static void NoNeedToDisposeValue(void *v) {	}
 void CreateUntakenBranchCache(void)
 {
 	if(Proc()->untakenBranchCache == NULL && !Opts()->lowMemory)
-		Proc()->untakenBranchCache = CreateCache(100, 0, &NoNeedToDisposeValue);
+		Proc()->untakenBranchCache = CreateCache(389, 389, &NoNeedToDisposeValue);
 }
 
 /* Length is passed separately so this can easily be used for QStrings. */

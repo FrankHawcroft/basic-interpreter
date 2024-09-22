@@ -262,7 +262,7 @@ elseif Format = "MSVC"
 	OFE$ = "obj"
 	AFE$ = "asm"
 	Compile$ = "cl"
-	OptimisationOptions$ = "" ' "/O1 /Gr /GL /GS- /MD /DNDEBUG=1" or can use /O2 rather than /O1 to favour speed
+	OptimisationOptions$ = "" ' "/O1 /Oi /Gr /GL /GS- /MD /DNDEBUG=1" or can use /O2 rather than /O1 to favour speed
 	if OptimisationOptions <> "" then
 		DefaultActionOptions$ = "/c $*.c " + OptimisationOptions
 	else

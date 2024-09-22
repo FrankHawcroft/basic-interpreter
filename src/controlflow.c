@@ -86,13 +86,19 @@ struct StackNode {
 
 #define DEFAULT_STACK_SIZE (50 + 1) /* 50 per AmigaBASIC; + 1 for sentinel */
 
+extern void DefaultOutOfMemoryHandler(size_t);
+
 void CreateControlFlowStack(unsigned short height)
 {
 	assert(Proc()->controlFlowStack == NULL);
 	
+	if(height == 0)
+		height = DEFAULT_STACK_SIZE;
+	
 	Proc()->controlFlowStack = New(sizeof(struct Stack));
 	StkInit(Proc()->controlFlowStack);
-	StkCreate(Proc()->controlFlowStack, sizeof(struct StackNode), height == 0 ? DEFAULT_STACK_SIZE : height);
+	if(StkCreate(Proc()->controlFlowStack, sizeof(struct StackNode), height) == NULL)
+		DefaultOutOfMemoryHandler(height * sizeof(struct StackNode));
 	
 	{
 		struct StackNode sentinel;
@@ -664,19 +670,22 @@ void EndIf_(BObject *arg, unsigned count)
 
 static Error EvalCondition(const QString *expr, unsigned len, struct Stack *evalSpace, bool *fired)
 {
-	Error error;
+	Error error = SUCCESS;
+	QString *prefixForm = NULL;
+	BObject *result = NULL;
+	
 	if((error = CheckExpressionSyntax(expr, len, Proc()->currentStatementStart)) == SUCCESS) {
-		QString *prefixForm = InfixToPrefix(expr, len, NULL);
-		if(prefixForm != NULL) {
+		error = BADSYNTAX; /* assume two or more exprs, or some other syntactically seemingly valid mistake */
+		if((prefixForm = InfixToPrefix(expr, len, NULL)) != NULL) {
 			Eval(prefixForm, DefaultConvert, 0, evalSpace);
-			Dispose(prefixForm);
-		
-			*fired = StkHeight(evalSpace) == 1 
-				&& (error = DereferenceObject(PeekExprStk(evalSpace, 0))) == SUCCESS
-				&& GetBoolean(&(PeekExprStk(evalSpace, 0)->value.scalar));
+			Dispose(prefixForm);		
+			if(StkHeight(evalSpace) == 1) {
+				result = PeekExprStk(evalSpace, 0);
+				*fired = (error = DereferenceObject(result)) == SUCCESS
+					&& (error = (Resolved(result) ? SUCCESS : UNDEFINEDVARORFUNC)) == SUCCESS
+					&& GetBoolean(&result->value.scalar);
+			}
 		}
-		else
-			error = BADSYNTAX;
 	}
 	return error;
 }
@@ -692,7 +701,7 @@ static Error CompileAndExecute(const QString *toks, struct Stack *evalSpace)
 	CreateTokenSequence(&ts, 10);
 	ts.start = Proc()->currentStatementStart;
 	
-	hasExplicitStatement = GetStatement(&toks[0], &cmd) == SUCCESS;
+	hasExplicitStatement = GetStatement(&toks[0], &cmd) == SUCCESS || IsTwoWordForm(&toks[0], &toks[1]);
 	if(hasExplicitStatement)
 		QsCopy(&ts.statementName, &toks[0]);
 
@@ -1129,19 +1138,22 @@ static void PrintNodeInfo(int offset)
 	fprintf(stderr, "\n");
 }
 
-void PrintStackTrace(int maxDepth)
+void PrintStackTrace(int maxDepth, bool raw)
 {
 	int stackHeight = ControlFlowStackHeight(Proc()), offset;
 
-	if(maxDepth > stackHeight)
-		maxDepth = stackHeight;
+	if(!raw && stackHeight <= 1)
+		return; /* avoid clutter in error message */
+	
+	if(maxDepth > stackHeight - 1) /* - 1 to avoid BOS sentinel */
+		maxDepth = stackHeight - 1;
 
-	fprintf(stderr, "---- Stack trace: ----\n");
+	fprintf(stderr, "Stack trace:\n");
 	fprintf(stderr, "---- top of stack ----\n");
 	for(offset = 0; offset < maxDepth; offset++)
 		PrintNodeInfo(offset);
 
-	if(maxDepth == stackHeight)
+	if(maxDepth == stackHeight - 1)
 		fprintf(stderr, "---- bottom of stack ----\n");
 	else
 		fprintf(stderr, "---- %d item(s) below ----\n", stackHeight - maxDepth);
@@ -1166,8 +1178,6 @@ void XFree_(BObject *arg, unsigned count)
 	fprintf(stderr, "-- Statement cache --\n");
 	PrintCacheInfo(Proc()->statementCache);
 	/*DumpCache(Proc()->statementCache);*/
-	fprintf(stderr, "-- Empty statement cache --\n");
-	PrintCacheInfo(Proc()->emptyStmtCache);
 	fprintf(stderr, "-- Untaken branch cache --\n");
 	PrintCacheInfo(Proc()->untakenBranchCache);
 	/*DumpCache(Proc()->untakenBranchCache);*/
@@ -1176,7 +1186,7 @@ void XFree_(BObject *arg, unsigned count)
 
 void XStack_(BObject *arg, unsigned count)
 {
-	PrintStackTrace(arg[0].value.scalar.value.number.s);
+	PrintStackTrace(arg[0].value.scalar.value.number.s, TRUE);
 }
 
 void XCache_(BObject *arg, unsigned count)
