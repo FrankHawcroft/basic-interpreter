@@ -39,6 +39,7 @@
 nb
 # FH added - BASIC interpreter executable name on the Amiga
 nba
+nba-opt
 
 # Debug files
 *.dSYM/
