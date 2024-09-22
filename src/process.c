@@ -184,7 +184,7 @@ void DisposeProcess(void)
 	if(Opts()->profileDest != NULL) {
 		FILE *profileDump = fopen(p->opts->profileDest, "w");
 		if(profileDump == NULL) {
-			sprintf(p->additionalErrorInfo, "File: %.200s", p->opts->profileDest);
+			sprintf(p->additionalErrorInfo, "File: %.100s", p->opts->profileDest);
 			ReportError(CANTOPENPROFILE, NULL, -1, NULL, p->additionalErrorInfo);
 		}
 		else {

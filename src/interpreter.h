@@ -622,6 +622,7 @@ extern void Do(struct Process *proc, struct TokenSequence *tokSeq, struct Stack 
 
 extern bool EligibleForCaching(const struct TokenSequence *, short callNestLevelWhenExecuted);
 extern bool NoDynamicallyAllocatedMemory(const struct TokenSequence *);
+extern bool ShouldCheckEvents(const struct TokenSequence *ts);
 extern void StorePreconvertedObjects(struct TokenSequence *, short callNestLevelWhenExecuted);
 extern const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel);
 extern void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted);

@@ -101,6 +101,11 @@ bool NoDynamicallyAllocatedMemory(const struct TokenSequence *ts)
 	return noMalloc;
 }
 
+bool ShouldCheckEvents(const struct TokenSequence *ts)
+{
+	return ts->command->method.macro != Resume_ && ts->command->method.macro != IfThenElse_;
+}
+
 /* Covers CONST as well because it's just Let_ with extra parameter checking in its converter. */
 static bool IsAssignmentStatement(const struct Statement *command)
 {

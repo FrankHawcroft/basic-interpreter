@@ -159,12 +159,11 @@ static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 	else if(IsSubprogram(ts->command)) ops |= (OP_EVAL | OP_CONFORM | OP_SUB | OP_CLEAR);
 	else ops |= (OP_EVAL | OP_CONFORM | OP_EXEC | OP_CLEAR);
 	
-	if(ts->command->method.macro != Resume_ && ts->command->method.macro != IfThenElse_) ops |= OP_POLL;
+	if(ts->command->method.macro != Resume_ && ts->command->method.macro != IfThenElse_)
+		ops |= OP_POLL;
 	
 	return ops;
 }
-
-extern bool ShouldCheckEvents(const struct TokenSequence *ts);
 
 static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 {
