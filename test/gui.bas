@@ -1,7 +1,7 @@
 screen 1, "screen", 640, 512, 3, -1
 window 1, "x", 20, 20, 300, 200, 1, "y", 0
 
-linepat% = 0xCCCC
+linepat% = 0xFFFF
 dim areapat%(2)
 areapat%(0) = 0x5555 | areapat%(1) = 0xAAAA  '| areapat%(2) = 0x1111 | areapat%(3) = 0xAAAA
 
@@ -12,12 +12,12 @@ area 60,20
 area 60,60
 area 20,60
 PALETTE 1, 0.5, 0.5, 0.5
-color 1
+color 1,2
 areafill
 
 circle 100,100,50
 
-paint 100,100,1
+paint 100,100,0
 
 color 3
 line 20,20,60,60

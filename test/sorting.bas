@@ -1,9 +1,11 @@
 '' Various simple sorting algorithms.
 
+'' ---- Bubble sort
+
 sub BubbleSort(A&())	
 	repeat
 		Sorted? = true
-		for i = lbound(A, 1) to ubound(A, 1) - 1 '' TODO found I can put more 'to' parts and they're ignored
+		for i = lbound(A, 1) to ubound(A, 1) - 1
 			if A(i) < A(i + 1)
 				Sorted = false
 				swap A(i), A(i + 1)
@@ -12,26 +14,32 @@ sub BubbleSort(A&())
 	until Sorted
 end sub
 
+'' ---- Selection sort
+
 sub SelectionSort(A&())
 	for i = lbound(A, 1) to ubound(A, 1) - 1
 		MaxValIdx% = i
 		for j = i + 1 to ubound(A, 1)
-			if A(j) > A(MaxValIdx) then MaxValIdx = j '' TODO shouldn't IFTHENLET if assignment contains side effects
+			if A(j) > A(MaxValIdx) then MaxValIdx = j
 		next
 		swap A(i), A(MaxValIdx)
 	next
 end sub
+
+'' ---- Insertion sort
 
 sub InsertionSort(A&())
 	for i = lbound(A, 1) + 1 to ubound(A, 1)
 		j% = i
 		Finished? = false
 		repeat
-			if A(j - 1) < A(j) then | swap A(j), A(j - 1) | else | Finished = true | endif '' TODO same as the if ... then exit sub problem
+			if A(j - 1) < A(j) then | swap A(j), A(j - 1) | else | Finished = true | endif
 			j = j - 1
 		until j <= lbound(A, 1) or Finished
 	next
 end sub
+
+'' --- Quicksort
 
 sub Partition(A&(), (Low%), (High%), P%)
 	Pivot& = A((Low + High) \ 2)
@@ -50,12 +58,14 @@ sub Partition(A&(), (Low%), (High%), P%)
 end sub
 
 sub QuickSort(A&(), (Low%), (High%))
-	if Low >= High then exitsub '' done! '' TODO 'exit sub' with a space causes strange cf stack or jumping behaviour
+	if Low >= High then exitsub '' done!
 	P% = -1
 	Partition A, Low, High, P
 	QuickSort A, Low, P
 	QuickSort A, P + 1, High
 end sub
+
+'' ---- Merge sort
 
 sub MergeSubarrays(A&(), (Low%), (Middle%), (High%))
 	dim T&(High - Low + lbound(A, 1))
@@ -88,12 +98,14 @@ sub MergeSubarrays(A&(), (Low%), (Middle%), (High%))
 end sub
 
 sub MergeSort(A&(), (Low%), (High%))
-	if Low >= High then exitsub '' done! '' TODO 'exit sub' with a space causes strange cf stack or jumping behaviour
+	if Low >= High then exitsub '' done!
 	Middle% = (Low + High) \ 2
 	MergeSort A, Low, Middle
 	MergeSort A, Middle + 1, High
 	MergeSubarrays A, Low, Middle, High
 end sub
+
+'' ---- Test set up
 
 sub MakeRandom(A&())
 	for i = lbound(A, 1) to ubound(A, 1)
