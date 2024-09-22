@@ -16,10 +16,7 @@
 #include <clib/alib_protos.h>
 #include <exec/libraries.h>
 #include <graphics/gfxbase.h>
-
-/*
 #include <graphics/gfxmacros.h>
-*/
 
 extern struct GfxBase *GfxBase;
 
@@ -558,6 +555,10 @@ static void SetPixelNative(PfWindowHandle win, const BasicPoint *p, short penOrD
 	SetAPen(rp, (int)savedFgPen);
 }
 
+static void MoveRegionNative(PfWindowHandle win, const BasicRectangle *region, short dx, short dy)
+{
+}
+
 static void DrawLineNative(PfWindowHandle win, const BasicPoint *p1, const BasicPoint *p2)
 {
 	struct RastPort *rp = win->RPort;
@@ -567,23 +568,25 @@ static void DrawLineNative(PfWindowHandle win, const BasicPoint *p1, const Basic
 
 static struct TmpRas *EnsureTmpRas(struct Window *win)
 {
-	struct TmpRas *newTmpRas = (struct TmpRas *)TolerantNew(sizeof(struct TmpRas));
-	APTR tmpRasMemory;
-	UWORD width = win->WScreen->Width; /*win->MaxWidth == 0 ? win->WScreen->Width : win->MaxWidth;*/
-	UWORD height = win->WScreen->Height; /*win->MaxHeight == 0 ? win->WScreen->Height : win->MaxHeight;*/
-	
-	if(newTmpRas == NULL)
-		return NULL;
+	if(win->RPort->TmpRas == NULL) {
+		struct TmpRas *newTmpRas = (struct TmpRas *)TolerantNew(sizeof(struct TmpRas));
+		APTR tmpRasMemory;
+		UWORD width = win->WScreen->Width; /*win->MaxWidth == 0 ? win->WScreen->Width : win->MaxWidth;*/
+		UWORD height = win->WScreen->Height; /*win->MaxHeight == 0 ? win->WScreen->Height : win->MaxHeight;*/
+		
+		if(newTmpRas == NULL)
+			return NULL;
 
-	tmpRasMemory = (APTR)AllocRaster(width, height);
-	if(tmpRasMemory == NULL) {
-		Dispose(newTmpRas);
-		return NULL;
+		tmpRasMemory = (APTR)AllocRaster(width, height);
+		if(tmpRasMemory == NULL) {
+			Dispose(newTmpRas);
+			return NULL;
+		}
+		
+		InitTmpRas(newTmpRas, tmpRasMemory, RASSIZE(width, height));
+		win->RPort->TmpRas = newTmpRas;
 	}
-	
-	InitTmpRas(newTmpRas, tmpRasMemory, RASSIZE(width, height));
-	win->RPort->TmpRas = newTmpRas;
-	return newTmpRas;
+	return win->RPort->TmpRas;
 }
 
 static bool AddVertexToPolygonNative(PfWindowHandle win, const BasicPoint *p)
@@ -644,9 +647,25 @@ static bool FloodFillNative(PfWindowHandle win, const BasicPoint *p, short penOr
 	    Mode 0: not the same color as AOLPen
 	    Mode 1: the same color as the pixel at (x,y) */
 	succeeded = EnsureTmpRas(win) != NULL
-		&& Flood(rp, 1, p->x + win->BorderLeft, p->y + win->BorderTop) == 0;
+		&& Flood(rp, 1, p->x + win->BorderLeft, p->y + win->BorderTop);
 	SetBPen(rp, (int)savedBgPen);
 	return succeeded;
+}
+
+static void SetWindowLinePatternNative(PfWindowHandle win, short pattern)
+{
+	struct RastPort *rp = win->RPort;
+	SetDrPt(rp, pattern);
+	SetDrMd(rp, JAM2);
+}
+
+static void SetWindowAreaPatternNative(PfWindowHandle win, short *pattern, size_t nWords)
+{
+	struct RastPort *rp = win->RPort;
+	int powerOf2 = 1;
+	while(powerOf2 < nWords / 2) powerOf2 <<= 1;
+	SetAfPt(rp, pattern, powerOf2);
+	SetDrMd(rp, JAM2);
 }
 
 static void DrawEllipseNative(PfWindowHandle win, const BasicRectangle *bounds)

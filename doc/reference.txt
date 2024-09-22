@@ -222,6 +222,8 @@ OTHERWISE			optional at the end of a SELECT block: the default case - if no case
 PAINT x%, y%		(gfx) 'flood fill' the graphics drawing area with the current pen colour
 PALETTE cid%, r!, g!, b!
 					(gfx) define or change a colour palette entry. r, g, b should be [0, 1]. See also: COLOUR
+PATTERN [lp%][,AP%()]
+					(gfx) define the line and/or area pattern mask for drawing/filling
 PEEK(a&)			only allowed in --unsafe mode! The byte at address a
 PEEKL(a&)			only allowed in --unsafe mode! The long integer at address a
 PEEKW(a&)			only allowed in --unsafe mode! The short integer at address a
@@ -253,6 +255,8 @@ SCREEN GET x1%, y1%, x2%, y2%, A()
 					(gfx) copy a block of pixel colours from the drawing area to the array
 SCREEN PUT x1%, y1%, x2%, y2%, A()
 					(gfx) copy a block of pixel colours from the array to the drawing area
+SCROLL x1%, y1%, x2%, y2%, dx%, dy%
+					(gfx) move a rectangular part of the drawing area horizontally by dx and vertically by dy pixels
 SELECT expr			begins a SELECT block statement using the expression value
 SGN(a)				the sign of a numeric value
 SHARED var-list		in a subprogram, allows variables from the main program to be used
