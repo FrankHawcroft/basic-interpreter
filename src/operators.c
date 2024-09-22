@@ -11,6 +11,12 @@
 #include "interpreter.h"
 #include "sign.h"
 
+/* The AmigaBASIC manual describes functions as working in single precision when the parameters are s.p.,
+	double-precision if they're d.p. In C, mathematical functions tend to operate in d.p., so we usually
+	convert to d.p., then back. We may however want more tolerant behaviour, based on the magnitude of the
+	result. */
+#define AMIGABASIC_COMPATIBLE_FP_PROMOTION TRUE
+
 static void Exponentiation_(Scalar *, const Scalar *, const Scalar *);
 static void UnaryPlus_(Scalar *, const Scalar *);
 static void UnaryNegation_(Scalar *, const Scalar *);
@@ -221,11 +227,17 @@ INLINE void SetIntResult(Scalar *result, long val, bool overflow, SimpleType t1,
 
 /* Floating point overflow detection is avoided on the Amiga because a bit slow. */
 #if defined(FP_NORMAL) && !defined(VBCC) && !defined(AMIGA)
-#define DetectFloatOverflow(val) ((fpclassify(val) != FP_NORMAL && fpclassify(val) != FP_ZERO))
+#define DetectFloatOverflow(val) (fpclassify(val) != FP_NORMAL && fpclassify(val) != FP_ZERO)
 #else
 #define DetectFloatOverflow(val) FALSE
 #endif
 
+#if AMIGABASIC_COMPATIBLE_FP_PROMOTION
+#define ResultTypeIsDouble(t1, t2, val) (NonPointer(t1) == T_DOUBLE || NonPointer(t2) == T_DOUBLE)
+#else
+#define ResultTypeIsDouble(t1, t2, val) (NonPointer(t1) == T_DOUBLE || NonPointer(t2) == T_DOUBLE || fabs(val) > FLT_MAX)
+#endif
+ 
 INLINE void SetFPResult(Scalar *result, double val, SimpleType t1, SimpleType t2)
 {
 #if defined(FP_NORMAL) && !defined(VBCC)
@@ -235,8 +247,7 @@ INLINE void SetFPResult(Scalar *result, double val, SimpleType t1, SimpleType t2
 		SetError(result, OVERFLOWERR);
 	else
 #endif
-		SetFromDouble(result, val,
-			NonPointer(t1) == T_DOUBLE || NonPointer(t2) == T_DOUBLE || fabs(val) > FLT_MAX ? T_DOUBLE : T_SINGLE);
+		SetFromDouble(result, val, ResultTypeIsDouble(t1, t2, val) ? T_DOUBLE : T_SINGLE);
 }
 
 static void Exponentiation_(Scalar *result, const Scalar *a, const Scalar *b)
@@ -296,18 +307,8 @@ static void Division_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void Addition_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	if(TypeIsTextual(NonPointer(a->type)) || TypeIsTextual(NonPointer(b->type))) {
-		Concatenation_(result, a, b); /*
-		Scalar op1str, op2str;
-		CopyScalar(&op1str, a);
-		CopyScalar(&op2str, b);
-		if(ChangeType(&op1str, TR_CHAR_TO_STRING) == SUCCESS && ChangeType(&op2str, TR_CHAR_TO_STRING) == SUCCESS)
-			Concatenation_(result, &op1str, &op2str);
-		else
-			SetError(result, BADARGTYPE);
-		DisposeScalar(&op1str);
-		DisposeScalar(&op2str);*/
-	}
+	if(TypeIsTextual(NonPointer(a->type)) || TypeIsTextual(NonPointer(b->type)))
+		Concatenation_(result, a, b);
 	else {
 		bool overflow = TRUE; /* assume f.p. unless both integral */
 
