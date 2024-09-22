@@ -4,8 +4,8 @@ Type specifiers for variables, parameters, and functions
 
 !	single precision floating point (32 bits)
 #	double precision floating point (64 bits)
-%	'short' signed integer (typically 16 bits)
-&	'long' signed integer (typically 32 bits)
+%	'short' signed integer (typically 16 bits, and limited by the interpreter to that range of values)
+&	'long' signed integer (typically 32 bits, and limited by the interpreter to that range of values)
 $	string
 @	character
 ?	Boolean (true or false). Constants TRUE and FALSE are defined as 1 and 0 in prelude.bas.
@@ -37,7 +37,7 @@ Subprogram syntax
 	
 Parameters are passed by reference unless enclosed by ( ) in the parameter list. Arrays can only be passed by reference.
 
-The STATIC option means only one instance of the subprogram's variables will be created, and reused each time it is called. Subprograms do not have to be STATIC. Recursive subprogram calls are allowed. Avoid making a STATIC subprogram involved in recursive calls - doing this will almost certainly cause strange hard-to-debug problems.
+The STATIC option means only one instance of the subprogram's variables will be created, and reused each time it is called. Subprograms do not have to be STATIC. Recursive subprogram calls are allowed. Avoid making a STATIC subprogram involved in recursive calls unless you are sure it is a 'leaf' subprogram - a subprogram which never calls another subprogram - and have a strong need to improve performance. Involving STATIC subprograms in a recursive call change otherwise will almost certainly cause strange hard-to-debug problems, because the variables in a previous activation will be overwritten by later calls.
 
 
 Function syntax
@@ -64,9 +64,9 @@ Events in order of priority, highest to lowest
 
 ERROR		recoverable errors
 BREAK		signal break (Ctrl-C etc.)
-MENU		from the GUI - only available on the Amiga
-INKEY		from the GUI - only available on the Amiga
-MOUSE		from the GUI - only available on the Amiga
+MENU		menu selection - only available on the Amiga
+INKEY		a key press in a window - only available on the Amiga
+MOUSE		a mouse click in a window - only available on the Amiga
 FILE		not yet implemented! For file events
 COLLISION	not yet implemented! For animated object collisions
 TIMER(<n>)	occurs every <n> seconds

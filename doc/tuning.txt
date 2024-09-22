@@ -12,7 +12,7 @@ Minimising memory use or startup time
 If you have a very small program which executes quickly, and you just want to minimise the startup time of the interpreter or use as little memory as possible, there are several options you could consider:
 
 	--low-memory	means that built in commands and functions are only defined when needed, rather than all being defined at start up.
-		With this option, you can typically run the interpreter with several less KB of memory preallocated (see --heap). This option also means the interpreter doesn't cache statements, which isn't necessary if your program has only short loops and no recursion, and again, will save some memory - but will result in slower execution for long-running programs.
+		With this option, you can typically run the interpreter with several less KB of memory preallocated (see --heap). This option also means the interpreter doesn't cache statements (technically, it only caches a single statement ...), which isn't necessary if your program has only short loops and no recursion, and again, will save some memory - but will result in slower execution for long-running programs.
 	
 	--heap <size>	you can use a small, fixed-size heap to save memory. This may also reduce time taken to allocate memory from the system at start up. The FRE function, and XFREE statement in a debug build of the interpreter, are helpful to find out the memory use of your program.
 	
@@ -34,7 +34,7 @@ Chances are though that your program is long-running, and spends most of its tim
 
 3. Use the --optimise option. This is especially effective if your program spends a lot of time in loops and mostly does numeric computations. It will make much less difference if your program does a lot of recursive subprogram or function calls, file I/O, or string processing.
 
-4. Do not use --low-memory though - this makes the precompiled statement cache much smaller.
+4. Do not use --low-memory though - re-compiling commands each time they're executed is slow.
 
 5. Check your program for specific slow features:
 

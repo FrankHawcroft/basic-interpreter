@@ -8,7 +8,7 @@ Interpreter usage
 -----------------
 
 - You should define a BAS_MODULE_PATH environment variable with the path to the 'module' folder. See 'usage.txt' for more information about this.
-- Program files must be in plain text 'ASCII' format. Tokenised binary formats used by AmigaBASIC and other interpreters aren't supported. You can save programs in this format using AmigaBASIC with the "A" parameter to the SAVE command.
+- Program files must be in plain text (often known at the time as 'ASCII') format. Tokenised binary formats used by AmigaBASIC and other interpreters aren't supported. You can save programs in 'ASCII' format using AmigaBASIC with the "A" parameter to the SAVE command.
 - The interpreter must be run from the command line. See 'usage.txt' for a description of all the command line options.
 - Immediate mode does not yet include many useful debugging functions, beyond being able to print and set the values of variables, and evaluate expressions.
 
@@ -27,7 +27,7 @@ Variable, label, subprogram, and function names
 -----------------------------------------------
 
 - All names are in the same namespace: e.g. a variable cannot have the same name as a label. Names within functions and subprograms are local, of course, so having the same label, parameter, or variable name in different subprograms/functions is OK.
-- Type specifiers don't form part of a variable's name. E.g. this program will cause an error: x! = 5 | x$ = "Hello"
+- Type specifiers don't form part of a variable's name. This program will cause an error: x! = 5 | x$ = "Hello"
 - Spaces aren't allowed between alphanumeric labels and the following ':', and between variable names and type specifiers.
 - User-defined functions do not have to have names starting with 'FN'.
 
@@ -53,7 +53,6 @@ Subprograms
 -----------
 
 - Subprograms may be recursive.
-- Subprograms may not be forward-referenced.
 - Subprogram variables aren't STATIC by default. STATIC is an optional modifier for a subprogram, rather than required.
 - Scalar subprogram parameters may be passed by value, rather than by reference.
 - Type checking of subprogram parameters is stricter than in some BASICs, but looser than AmigaBASIC ...
@@ -65,7 +64,6 @@ Event and error handling
 ------------------------
 
 - ON <event> CALL <subprogram> is allowed as well as ON <event> GOTO <label> and ON <event> GOSUB <label>.
-- RESUME NEXT is not supported.
 - Error numbers for specific errors will differ from other BASICs. See errors.bas for all error codes. 
 
 
@@ -93,7 +91,7 @@ Other differences in specific statements and functions
 	- CALLing of machine code routines.
 	- Statements for calling external library functions: LIBRARY, DECLARE FUNCTION, etc.
 	- CHAIN and COMMON.
-	- The statement form of MID, LET MID(s$, n, m) = t  - use the LETMID subprogram instead (see prelude.bas).
+	- The statement form of MID, 'LET MID(s$, n, m) = t' in AmigaBASIC, should be written 'LET MID s$ = n%, m%, t$' - it is really just syntactic sugar, and relies on a subprogram in prelude.bas
 - Some statements and functions have differences in their parameters or how they work:
 	- The single-line form of IF ... THEN ... [ELSE ...] does not handle nested IF statements very well if they have ELSE parts. You should rewrite such statements using the block IF syntax, which is much clearer anyway.
 	- Also, in 'IF cond THEN stmt1 | stmt2', only stmt1 is part of the IF clause. stmt2 is treated as a following statement which will be executed regardless of whether the condition is true or not. If you want stmt2 to be treated as part of the IF statement, as it is by some interpreters, including AmigaBASIC, use block IF: 'IF cond THEN | stmt1 | stmt2 | ENDIF'.
