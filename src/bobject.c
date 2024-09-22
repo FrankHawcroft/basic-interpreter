@@ -130,40 +130,6 @@ bool IsUserDefined(const BObject *obj)
 		|| (obj->category == FUNCTION && IsDefFunction(obj->value.function)); 
 }
 
-/* Converts a token to a BObject. */
-void ConvertToObject(const QString *token, BObject *obj, short callNestLevel)
-{
-	if(IsName(token) || !IsLiteral(token)) {
-		/* A symbol. Look up only here - creation as a side
-		effect of particular kinds of statements must be handled by
-		a specialised function - see AssignConvert etc.
-			Because the named Boolean constants TRUE and FALSE are defined
-		in the prelude, it's safe to assume that something which looks like
-		a name should be looked up, rather than parsed. If TRUE and FALSE
-		were treated as literals, this assumption would need to change. */
-			
-		BObject *definition = LookUpCheckingType(token, callNestLevel);
-		if(definition != NULL) {
-			if(IsVariable(definition))
-				SetSymbolReference(obj, definition->category | VARIABLE_IS_POINTER, VarPtr(definition));
-			else
-				*obj = *definition;
-		}
-		else if(IsTypeSpecifier(QsGetLast(token)) && LookUpIgnoringType(token, callNestLevel) != NULL)
-			SetObjectToErrorWithAdditionalMessage(obj, BADARGTYPE, "Defined type differs for: %.*s", token);
-		else {
-			obj->category = LITERAL;
-			InitScalar(&obj->value.scalar, QsEqNoCase(token, &g_Missing) ? T_MISSING : T_EMPTY, FALSE);
-			if(!QsEqNoCase(token, &g_Missing)) /* avoid (most) misleading reporting. TODO error handling overhaul! Contextual msg needs to belong to the error. */
-				SetAdditionalErrorMessage("Not found: %.*s", QsGetData(token), QsGetLength(token));
-		}
-	}
-	else {
-		obj->category = LITERAL;
-		ParseToken(token, &obj->value.scalar);
-	}
-}
-
 /* Only meaningful for symbolic objects (non-literals). */
 void SetSymbolReference(BObject *obj, enum SymbolType kind, void *value)
 {
