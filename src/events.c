@@ -793,7 +793,7 @@ void Sleep_(BObject *arg, unsigned count)
 			GetAudioEventNotificationHandle());
 	
 		do
-			PfSleepUntilEvent(handle);
+			PfSleep(100 * 1000); /* 100 milliseconds */ /*PfSleepUntilEvent(handle);*/
 		while(!CheckForEvents(proc));
 	}
 }
@@ -801,18 +801,22 @@ void Sleep_(BObject *arg, unsigned count)
 void Wait_(BObject *arg, unsigned count)
 {
 	double remaining = GetDouble(&arg[0].value.scalar); /* Avoid VBCC conversion bug. */
-
+	struct Process *proc = Proc();
+	
 	if(remaining < 0) {
 		CauseError(OUTSIDEDOMAIN);
 		return;
 	}
 
-	while(remaining > 0) {
+	do {
 		const double oneMillion = 1000000.0;
-		unsigned slice = (unsigned)((remaining > 1.0 ? 1.0 : remaining) * oneMillion); /* in micros */
+		unsigned slice = (unsigned)((remaining > 0.25 ? 0.25 : remaining) * oneMillion); /* in micros */
 		PfSleep(slice);
 		remaining -= slice / oneMillion;
+		PollBreak(&proc->trap[EVT_BREAK]);
+		PollAbort(&proc->trap[EVT_ABORT]);
 	}
+	while(remaining > 0 && !EventAvailable(proc, EVT_BREAK) && !EventAvailable(proc, EVT_ABORT));
 }
 
 void Error_(BObject *arg, unsigned count)

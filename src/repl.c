@@ -145,7 +145,7 @@ enum Ops {
 
 static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 {
-	unsigned ops = OP_INACTIVE | OP_POLL;
+	unsigned ops = OP_INACTIVE;
 
 	ops |= (EligibleForCaching(ts, callNestLevel) ? OP_CACHE : 0);
 	ops |= (Opts()->optimise && !IsMacro(ts->command) && (ops & OP_CACHE) ? OP_OPTIMISE : 0);
@@ -159,8 +159,12 @@ static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 	else if(IsSubprogram(ts->command)) ops |= (OP_EVAL | OP_CONFORM | OP_SUB | OP_CLEAR);
 	else ops |= (OP_EVAL | OP_CONFORM | OP_EXEC | OP_CLEAR);
 	
+	if(ts->command->method.macro != Resume_ && ts->command->method.macro != IfThenElse_) ops |= OP_POLL;
+	
 	return ops;
 }
+
+extern bool ShouldCheckEvents(const struct TokenSequence *ts);
 
 static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 {
@@ -172,8 +176,12 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 	if(Opts()->optimise) {
 		if(SemanticallyPredictable(ts))
 			ts->ops &= ~OP_CONFORM;
+		
 		if(NoDynamicallyAllocatedMemory(ts))
 			ts->ops &= ~OP_CLEAR, ts->ops |= OP_CLEARQ;
+		
+		if(!ShouldCheckEvents(ts))
+			ts->ops &= ~OP_POLL;
 	}
 		
 	if(ts->length <= 1 && ts->command->formalCount == 0)
@@ -244,7 +252,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	/* Determine if the statement should actually be executed. */
 
 	if((ops & OP_INACTIVE) && (*ts->command->inactive)(proc, FALSE))
-		ops = OP_POLL | (ops & OP_CACHE);
+		ops = (ops & OP_POLL) | (ops & OP_CACHE);
 
 	if(ops & OP_CACHE)
 		StorePreconvertedObjects(ts, initialCallNestLevel);
