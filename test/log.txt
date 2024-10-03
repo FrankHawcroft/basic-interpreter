@@ -11,8 +11,8 @@
 -- QString self-tests finished.
 -- Hash table self-tests running ...
 -- Hash table dump - num bins = 1087
- 356: key one => <....3558>.
- 633: key three => <....3588>.
+ 356: key one => <....9A88>.
+ 633: key three => <....9B60>.
 -- End of hash table dump
 -- Hash table self-tests finished.
 -- Cache self-tests running ...
@@ -353,8 +353,8 @@ DEFined function tests completed OK
 ***** "c_deftype.bas"  
 hi there!	also a string	 1	x
 ***** "c_events.bas"  
-Timer handler called:	 0	at timer = 	 76298
-Timer handler called:	 1	at timer = 	 76299
+Timer handler called:	 0	at timer = 	 76148
+Timer handler called:	 1	at timer = 	 76149
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred
