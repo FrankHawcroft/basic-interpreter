@@ -252,9 +252,10 @@ INLINE void SetFPResult(Scalar *result, double val, SimpleType t1, SimpleType t2
 
 static void Exponentiation_(Scalar *result, const Scalar *a, const Scalar *b)
 {
+	const double MaxAllowedExponent = SHRT_MAX, MinAllowedExponent = (double)SHRT_MIN + 1;
 	double base = GetDouble(a), exponent = GetDouble(b);
 
-	if(exponent > SHRT_MAX || exponent < SHRT_MIN + 1)
+	if(exponent > MaxAllowedExponent || exponent < MinAllowedExponent)
 		SetError(result, OVERFLOWERR);
 	else if((base == 0.0 && exponent <= 0.0) || (base < 0.0 && floor(exponent) != exponent))
 		SetError(result, BADEXPONENT);

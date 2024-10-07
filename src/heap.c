@@ -276,7 +276,9 @@ In: size -- in bytes.
 
 void CreateHeap(size_t size, bool fixedSize)
 {
-	assert(PF_REENTRANT || m_FirstRegion == NULL);
+#if !PF_REENTRANT
+	assert(m_FirstRegion == NULL);
+#endif
 	assert(size != 0);
 
 	if(size > MAX_REGION_SIZE) {
@@ -287,10 +289,14 @@ void CreateHeap(size_t size, bool fixedSize)
 	if(size < MIN_REGION_SIZE)
 		size = MIN_REGION_SIZE;
 
-	if(!PF_REENTRANT || m_FirstRegion == NULL) {
+	if(m_FirstRegion == NULL) {
 		SetOutOfMemoryHandler(&DefaultOutOfMemoryHandler);
-		
-		m_FixedSizeHeap = !PF_REENTRANT && fixedSize;
+
+#if PF_REENTRANT
+		m_FixedSizeHeap = FALSE;
+#else
+		m_FixedSizeHeap = fixedSize;
+#endif
 		
 		PfInitialiseMutex(&m_RegionListLock);
 	}
@@ -312,7 +318,9 @@ static struct HeapRegion *AddRegion(size_t size)
 {
 	struct HeapRegion *newRegion;
 
-	assert(PF_REENTRANT || m_FirstRegion == NULL || !m_FixedSizeHeap);
+#if !PF_REENTRANT
+	assert(m_FirstRegion == NULL || !m_FixedSizeHeap);
+#endif
 
 	/* Convert size to a number of blocks which is also a multiple of BV_BITS_PER_WORD. */
 
@@ -542,7 +550,7 @@ static long IndexOf(const struct HeapRegion *region, const union Header *h)
 
 static union Header *AllocateFromRegion(struct HeapRegion *region, unsigned long nBlocks)
 {
-	long beginning = 0;
+	long beginning = -1;
 
 	/* Fail quickly if not the region used by this task, or definitely not enough space. */
 
@@ -557,7 +565,7 @@ static union Header *AllocateFromRegion(struct HeapRegion *region, unsigned long
 		
 		beginning = -1;
 	
-		while(attempts-- > 0 && beginning == -1) {
+		while(attempts-- > 0 && beginning < 0) {
 			long p = rand() % region->size, contiguous = 0;
 			
 #ifdef DEBUG
@@ -581,7 +589,7 @@ static union Header *AllocateFromRegion(struct HeapRegion *region, unsigned long
 
 	/* Check for a failed search. */
 	
-	if(beginning == -1)
+	if(beginning < 0)
 		return NULL;
 	
 	//fprintf(stderr, "++ Allocated at %ld, %lu blocks\n", beginning, nBlocks);
@@ -594,7 +602,7 @@ static union Header *AllocateFromRegion(struct HeapRegion *region, unsigned long
 		(1) if allocated starting at (or before!) the current low water mark; or
 		(2) if a single-block allocation. */
 
-	if(beginning <= region->start + 1 || (!RANDOM_PROBE && nBlocks == 1))
+	if((unsigned long)beginning <= region->start + 1 || (!RANDOM_PROBE && nBlocks == 1))
 		region->start = beginning + nBlocks;
 
 	/* Deduct from free blocks. */
@@ -665,14 +673,20 @@ void Dispose(void *addr)
 	PfBeginExclusiveExecution(&m_RegionListLock);
 	for(region = m_FirstRegion;
 		region != NULL
-			&& (addr < (void *)region->memory || addr > (void *)AddressOf(region, region->size)
+			&& (addr < (void *)region->memory || addr >= (void *)AddressOf(region, region->size)
 				|| region->owner != PfGetCurrentTaskIdentifier());
 		region = region->nextRegion)
 		;
 	PfEndExclusiveExecution(&m_RegionListLock);
 
 	SANITY_CHECK(region != NULL,
-		"[Heap] Dispose - attempt to free memory not allocated from heap.\n");
+		"[Heap] Dispose - attempt to free memory not allocated from heap, or freed twice.\n");
+
+	/* If not found, and sanity checking suppressed, avoid crashing - */
+	if(region == NULL) {
+		fprintf(stderr, "[Heap] Dispose - ignoring attempt to free memory not allocated from heap, or freed twice.\n");
+		return;
+	}
 
 	header = (union Header *)addr - 1;
 	length = &header->h.size;
@@ -733,7 +747,7 @@ void Dispose(void *addr)
 
 	/* Move 'start' back to this address if before current value. */
 
-	if(beginning < region->start)
+	if(beginning >= 0 && (unsigned long)beginning < region->start)
 		region->start = beginning;
 	
 #if HEAP_SANITY_CHECK_LEVEL > 0
@@ -742,13 +756,14 @@ void Dispose(void *addr)
 
 	/* Delete the region if it's now all free, and safe to do so. */
 
-	if(!PF_REENTRANT
-	&& region->freeBlocks == region->size
+#if !PF_REENTRANT
+	if(region->freeBlocks == region->size
 #if HEAP_SANITY_CHECK_LEVEL > 0
 	&& region->unmatchedAllocations == 0
-#endif
+#endif /* HEAP_SANITY_CHECK_LEVEL */
 	&& (region != m_FirstRegion || region->nextRegion != NULL))
 		RemoveRegion(region);
+#endif /* !PF_REENTRANT */
 }
 
 #if HEAP_SANITY_CHECK_LEVEL >= 3
@@ -928,8 +943,10 @@ void RunHeapTests(void)
 
 	/* fprintf(stderr, "-- Heap self-tests running ...\n"); */
 	
-	if(PF_REENTRANT && m_FirstRegion != NULL)
+#if PF_REENTRANT
+	if(m_FirstRegion != NULL)
 		return;
+#endif
 
 	/* 1. Create a small fixed-size heap. */
 	
@@ -1051,8 +1068,9 @@ static void PrintHistogram(void)
 	size_t val = 1;
 
 	fprintf(stderr, "Histogram:\n");
-	if(PF_REENTRANT)
-		fprintf(stderr, "(Global for all tasks!)\n");
+#if PF_REENTRANT
+	fprintf(stderr, "(Global for all tasks!)\n");
+#endif
 	for(tableIndex = 0; tableIndex <= MAX_POWER_OF_2; tableIndex++, val <<= 1)
 		fprintf(stderr, "<= %ld: %ld\n", val, m_CountOfSize[tableIndex]);
 	fprintf(stderr, "> %d: %ld\n", 1 << MAX_POWER_OF_2, m_BiggerCount);

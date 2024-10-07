@@ -128,7 +128,7 @@ void DisposeControlFlowStack(void)
 	}
 }
 
-#define ControlFlowStackHeight(proc) StkHeight((proc)->controlFlowStack)
+#define ControlFlowStackHeight(proc) ((int)StkHeight((proc)->controlFlowStack))
 #define PeekAt(proc, offset) ((struct StackNode *)StkPeek((proc)->controlFlowStack, (offset)))
 #define Peek(proc, offset) PeekAt((proc), (offset))
 #define PeekTop(proc) Peek((proc), 0)
@@ -185,10 +185,10 @@ long StackSpaceNeverUsed(void)
 
 INLINE const struct Statement *SubprogramContext(const struct Process *proc)
 {
-	int offset;
-	for(offset = 0; offset < StkHeight(proc->controlFlowStack) && PeekAt(proc, offset)->kind != CALL_POSITION; offset++)
-		;
-	return offset == StkHeight(proc->controlFlowStack) ? NULL : PeekAt(proc, offset)->extension.subprogram;
+	int offset, limit = ControlFlowStackHeight(proc);
+	for(offset = 0; offset < limit; offset++)
+		if(PeekAt(proc, offset)->kind == CALL_POSITION) return PeekAt(proc, offset)->extension.subprogram;
+	return NULL;
 }
 
 const char *StartOfCurrentSubprogram(void)
@@ -215,11 +215,11 @@ Error CheckForUnbalancedBlocks(bool inSubprogram)
 {
 	struct Process *proc = Proc();
 	const char *position = NULL;
-	int offset;
+	int offset, limit = ControlFlowStackHeight(proc);
 	Error errorFound = SUCCESS;
 	bool aborted = FALSE;
 
-	for(offset = 0; offset < ControlFlowStackHeight(proc) && !aborted && errorFound == SUCCESS; offset++) {
+	for(offset = 0; offset < limit && !aborted && errorFound == SUCCESS; offset++) {
 		const struct StackNode *sn = Peek(proc, offset);
 		enum ControlFlow kind = sn->kind;
 
@@ -320,12 +320,12 @@ fashioned using GOTO - so be it. */
 bool InPotentiallyHotPath(void)
 {
 	struct Process *proc = Proc();
-	int offset;
+	int offset, limit = ControlFlowStackHeight(proc);
 	
 	if(proc->callNestLevel > SCOPE_MAIN + 1 || InStaticContext(proc))
 		return TRUE;
 	
-	for(offset = 0; offset < ControlFlowStackHeight(proc); offset++)
+	for(offset = 0; offset < limit; offset++)
 		if(IndicatesLoop(proc, offset))
 			return TRUE;
 		

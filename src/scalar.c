@@ -24,6 +24,12 @@
 #define SHORT_BITS (sizeof(short) * CHAR_BIT)
 #endif
 
+/* Declared as consts rather than macros to avoid MSVC code analysis warnings - */
+static const double ShortMinAsDouble = (double)SHRT_MIN;
+static const double ShortMaxAsDouble = (double)SHRT_MAX;
+static const double LongMinAsDouble = (double)LONG_MIN;
+static const double LongMaxAsDouble = (double)LONG_MAX;
+
 /* Size of sufficiently capacious fixed-length buffer to convert any numeric value to a string - */
 #define NUM_STR_BUF_LEN 64
 
@@ -92,7 +98,7 @@ static bool ScalarIsSane(const Scalar *v)
 
 #endif /* DEBUG */
 
-/* Set an error in the destination (to) - from the source if it's already one;
+/* Set an error in the destination (to) - from the source (from) if it's already one;
 if no error in either place, don't set it.
 	Unlike SetError, assumes the destination has been initialised. */
 INLINE Error PropagateError(Scalar *to, const Scalar *from, Error newError)
@@ -137,6 +143,7 @@ void InitConstants(void)
 		InitScalar(&m_NulChar, T_CHAR, FALSE);
 		SetBoolean(&m_TrueBoolean, TRUE);
 		SetBoolean(&m_FalseBoolean, FALSE);
+
 		m_ConstantsInitialised = TRUE;
 	}
 }
@@ -299,7 +306,7 @@ void SetFromLong(Scalar *dest, long value, SimpleType type)
 {
 	dest->type = type;
 	if(type == T_INT) {
-		if(value > SHRT_MAX || value < SHRT_MIN) 
+		if(value < SHRT_MIN || SHRT_MAX < value) 
 			SetError(dest, OVERFLOWERR);
 		else
 			dest->value.number.s = (short)value;
@@ -336,22 +343,22 @@ void SetFromShort(Scalar *dest, short value, SimpleType type)
 void SetFromDouble(Scalar *dest, double value, SimpleType type)
 {
 	dest->type = type;
-	if(type == T_SINGLE) {
+	if(type == T_DOUBLE)
+		dest->value.number.d = value;
+	else if(type == T_SINGLE) {
 		if(fabs(value) > FLT_MAX)
 			SetError(dest, OVERFLOWERR);
 		else
 			dest->value.number.f = (float)value;
 	}
-	else if(type == T_DOUBLE)
-		dest->value.number.d = value;
 	else if(type == T_INT) {
-		if(value > SHRT_MAX || value < SHRT_MIN) 
+		if(value < ShortMinAsDouble || ShortMaxAsDouble < value) 
 			SetError(dest, OVERFLOWERR);
 		else
 			dest->value.number.s = (short)value; /* TODO should round */
 	}
 	else if(type == T_LONG) {
-		if(value > LONG_MAX || value < LONG_MIN) 
+		if(value < LongMinAsDouble || LongMaxAsDouble < value)
 			SetError(dest, OVERFLOWERR);
 		else
 			dest->value.number.l = (long)value; /* TODO should round */
@@ -467,9 +474,13 @@ long GetLong(const Scalar *v)
 		return IsPointer(v) ? *v->value.pointer.lp : v->value.number.l;
 	else if(type == T_SINGLE || type == T_DOUBLE) {
 		double realValue = GetDouble(v);
-		if(realValue < LONG_MIN || realValue > LONG_MAX) {
+		if(realValue < LongMinAsDouble) {
 			CauseError(OVERFLOWERR);
-			realValue = 0.0;
+			return LONG_MIN;
+		}
+		else if(realValue > LongMaxAsDouble) {
+			CauseError(OVERFLOWERR);
+			return LONG_MAX;
 		}
 		return (long)realValue;
 	}
@@ -710,7 +721,6 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 	SimpleType newType = T_MISSING;
 	
 	assert(value != NULL);
-	/*assert(!IsPointer(value));*/ /* TODO not necessarily ... */
 	assert(!Contextual(rule));
 	
 	newType = TargetType(rule, value->type);
@@ -753,7 +763,7 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 				break;
 			}
 			case T_CHAR: {
-				char code = NUL;
+				int code = NUL;
 				if(value->type == T_STRING) {
 					if((rule & (TD_CHECKED | TD_PRECISE)) && QsGetLength(&value->value.string) > 1)
 						result = OVERFLOWERR;
@@ -765,14 +775,15 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 				else if(value->type == T_BOOL)
 					code = GetBoolean(value) ? '1' : '0';
 				else if(TypeIsNumeric(value->type))
-					/* If this value overflows a long, GetLong will cause an overflow error. */
-					code = (char)GetLong(value);
+					/* If it's a f.p. value which overflows a long, GetLong will cause an overflow error. 
+					Otherwise, truncate and rely on optional domain checking. */
+					code = (int)GetLong(value);
 				
-				if((rule & (TD_CHECKED | TD_PRECISE)) && (code < CHAR_MIN || code > CHAR_MAX))
+				if((rule & (TD_CHECKED | TD_PRECISE)) && (code < CHAR_MIN || CHAR_MAX < code))
 					result = OVERFLOWERR;
 			
 				if(result == SUCCESS)
-					SetCharacter(value, code);
+					SetCharacter(value, (char)code);
 			}
 			default:
 				if((newType & NUMERIC_TYPES) && value->type == T_STRING) {

@@ -155,6 +155,18 @@ with a trivial, i.e. O(1), comparison. */
 #define QsTriviallyUnequal(s1, s2) (QsGetLength(s1) != QsGetLength(s2))
 #endif
 
+/*** QsGetLengthIntern ***/
+
+/* When we know we only need to deal with an actual QsInternalLength -
+this avoids abs(), and casting to size_t (as returned by QsGetLength), then narrowing back down. */
+
+INLINE QsInternalLength QsGetLengthIntern(const QString *s)
+{
+	assert(s != NULL);
+
+	return s->length >= 0 ? s->length : -s->length;
+}
+
 /*** QsInitIntern ***/
 
 INLINE void QsInitIntern(QString *s, struct QStrData *qsd, size_t len)
@@ -515,7 +527,7 @@ int QsTokenise(const QString *source, QString *token, size_t maxTokens, const QS
 	int curToken = 0;
 	const QsChar *first = NULL, *end = NULL;
 	const QsChar *start = QsGetData(source);
-	QsInternalLength length = (QsInternalLength)QsGetLength(source);
+	QsInternalLength length = QsGetLengthIntern(source);
 
 	assert(source != NULL && token != NULL && separator != NULL);
 	assert(maxTokens != 0);
@@ -529,7 +541,7 @@ int QsTokenise(const QString *source, QString *token, size_t maxTokens, const QS
 		if(first < end) {
 			QsInitStaticPtrs(&token[curToken], first, end - 1);
 			start = end;
-			length -= (QsInternalLength)QsGetLength(&token[curToken]);
+			length -= QsGetLengthIntern(&token[curToken]);
 			++curToken;
 		}
 		else {
@@ -664,7 +676,7 @@ recalculating the hash of the key.
 	QsInternalLength name(const QString *text, const QString *key, size_t startPosition) \
 	{ \
 		size_t keyLength = QsGetLength(key); \
-		QsInternalLength limit = (QsInternalLength)QsGetLength(text) - keyLength, i; \
+		QsInternalLength limit = QsGetLengthIntern(text) - QsGetLengthIntern(key), i; \
 		\
 		assert(startPosition < QS_MAX_LENGTH); \
 		\
@@ -692,7 +704,7 @@ SearchImpl(QsSearchNoCase, QsEqNoCase)
 	QsInternalLength name(const QString *text, const QString *key, size_t startPosition) \
 	{ \
 		size_t keyLength = QsGetLength(key); \
-		QsInternalLength limit = (QsInternalLength)QsGetLength(text) - keyLength, i; \
+		QsInternalLength limit = QsGetLengthIntern(text) - QsGetLengthIntern(key), i; \
 		const QsChar *t = QsGetData(text), *kp = QsGetData(key); \
 		QsInternalLength j = 0; \
 		\
@@ -748,7 +760,7 @@ int QsCompareToNTS(const QString *qs, const QsChar *cs)
 
 const QsChar *QsSearchForChar(const QString *s, QsChar ch)
 {
-	return QsIsNull(s) ? NULL : FindChar(QsGetData(s), (QsInternalLength)QsGetLength(s), ch);
+	return QsIsNull(s) ? NULL : FindChar(QsGetData(s), QsGetLengthIntern(s), ch);
 }
 
 /*** QsSearchForAny ***/
@@ -757,7 +769,7 @@ const QsChar *QsSearchForChar(const QString *s, QsChar ch)
 
 const QsChar *QsSearchForAny(const QString *s, const QString *find)
 {
-	return QsIsNull(s) ? NULL : FindOneOf(QsGetData(s), (QsInternalLength)QsGetLength(s), find);
+	return QsIsNull(s) ? NULL : FindOneOf(QsGetData(s), QsGetLengthIntern(s), find);
 }
 
 /*** QsHash ***/

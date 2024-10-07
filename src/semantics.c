@@ -163,7 +163,8 @@ void SetDefaultType(char initialLetter, SimpleType t)
 	assert((t & T_POINTER) == 0);
 	assert(!TypeIsInternal(t));
 	
-	Proc()->defaultTypeForLetter[initialLetter - 'A'] = t;
+	if('A' <= initialLetter && initialLetter <= 'Z')
+		Proc()->defaultTypeForLetter[initialLetter - 'A'] = t;
 }
 
 static SimpleType DefaultType(const struct Process *proc, const QString *forName)

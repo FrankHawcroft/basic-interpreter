@@ -1036,38 +1036,48 @@ static void DefineBuiltInFunction(const struct BuiltInFunction *fcn)
 	/* TODO support defaults for function parameters - would be useful for MID etc. */
 	static const struct Parameter ordinaryFunctionParam = { LITERAL, TR_ANY, NULL, NO_NAME, 1, FALSE };
 
-	QString name;
-	struct Function *newFunc = New(sizeof(struct Function));
-	struct Parameter *param = fcn->numArgs <= 0 ? NULL : New(sizeof(struct Parameter) * fcn->numArgs);
+	struct Parameter *param = NULL;
 
-	assert((fcn->numArgs <= 0) == (fcn->argumentTypeReqs == NULL)
-		|| fcn->method == LBound_ || fcn->method == UBound_ || fcn->method == VarPtr_);
+	if(fcn->numArgs > 0) {
+		param = New(sizeof(struct Parameter) * fcn->numArgs);
+		if(fcn->method == LBound_ || fcn->method == UBound_) {
+			assert(fcn->numArgs == 2);
+			param[0] = m_ArgsForLBound[0], param[1] = m_ArgsForLBound[1];
+		}
+		else if(fcn->method == VarPtr_) {
+			assert(fcn->numArgs == 1);
+			param[0] = m_ArgForVarPtr[0];
+		}
+		else {
+			short i;
 
-	if(fcn->method == LBound_ || fcn->method == UBound_)
-		param[0] = m_ArgsForLBound[0], param[1] = m_ArgsForLBound[1];
-	else if(fcn->method == VarPtr_)
-		param[0] = m_ArgForVarPtr[0];
-	else {
-		short i;
+			/* Guard against inconsistency in parameter count, and definitions of formals - */
+			assert((fcn->numArgs <= 0) == (fcn->argumentTypeReqs == NULL));
 
-		for(i = 0; i < fcn->numArgs; i++) {
-			param[i] = ordinaryFunctionParam;
-			param[i].type = fcn->argumentTypeReqs[i];
+			for(i = 0; i < fcn->numArgs; i++) {
+				param[i] = ordinaryFunctionParam;
+				param[i].type = fcn->argumentTypeReqs[i];
+			}
 		}
 	}
 
-	QsInitStaticNTS(&name, fcn->name);
+	{
+		QString name;
+		struct Function *newFunc = New(sizeof(struct Function));
 
-	newFunc->method = fcn->method;
-	newFunc->type = fcn->type;
-	newFunc->def = NULL;
-	newFunc->parameter = param;
-	newFunc->numArgs = fcn->numArgs;
-	newFunc->workSpaceSize = 0;
-	newFunc->predefinedParameter = NULL;
-	newFunc->staticFunction = FALSE;
+		QsInitStaticNTS(&name, fcn->name);
 
-	RequireSuccess(DefineFunction(&name, newFunc, SCOPE_BUILTIN));
+		newFunc->method = fcn->method;
+		newFunc->type = fcn->type;
+		newFunc->def = NULL;
+		newFunc->parameter = param;
+		newFunc->numArgs = fcn->numArgs;
+		newFunc->workSpaceSize = 0;
+		newFunc->predefinedParameter = NULL;
+		newFunc->staticFunction = FALSE;
+
+		RequireSuccess(DefineFunction(&name, newFunc, SCOPE_BUILTIN));
+	}
 }
 
 void DefineBuiltInFunctions(void)

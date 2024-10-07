@@ -1476,7 +1476,7 @@ void Collision_(Scalar *result, const BObject *arg, unsigned count)
 
 static void GetObjectProperty(Scalar *result, const BObject *objectId, int wanted)
 {
-	short id = objectId->value.scalar.value.number.s, val;
+	short id = objectId->value.scalar.value.number.s, val = -1;
 	
 	if(!FunctionAvailable(Collision_)) {
 		SetError(result, NOTIMPLEMENTED);

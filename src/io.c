@@ -337,17 +337,18 @@ void FRead_(Scalar *result, const BObject *arg, unsigned count)
 static void InputFrom(FILE *stream, unsigned nItems, BObject *args)
 {
 	struct Stream *basicStream = GetStreamFromHandle(stream);
-	int position;
+	int position, limit;
 	Error error = SUCCESS;
 	QString line;
 	unsigned varIndex;
 
 	/* Read a line: */
 	error = ReadLine(stream, &line);
+	limit = QsGetLength(&line);
 
 	/* This is a bit unpleasant - update the current location, if it's a BASIC stream. */
 	if(basicStream != NULL)
-		UpdatePositionPostSequentialRead(basicStream, QsGetLength(&line) + basicStream->lineTerminatorLength, -1);
+		UpdatePositionPostSequentialRead(basicStream, limit + basicStream->lineTerminatorLength, -1);
 
 	/* Parse string, converting comma-separated substrings into scalars.
 	If an error occurs, stop looping immediately, so the values
@@ -362,7 +363,7 @@ static void InputFrom(FILE *stream, unsigned nItems, BObject *args)
 		ad-hoc and inconsistent with the way parsing of tokens is done
 		by the interpreter itself. */
 		finish = start = position;
-		while(finish < QsGetLength(&line) && QsGetCharAt(&line, finish) != ',')
+		while(finish < limit && QsGetCharAt(&line, finish) != ',')
 			++finish;
 		position = finish;
 		/* Save ptr to just past end of token. */
@@ -391,11 +392,11 @@ static void InputFrom(FILE *stream, unsigned nItems, BObject *args)
 		}
 
 		/* Advance to next field. */
-		if(position < QsGetLength(&line))
+		if(position < limit)
 			++position;
 	} /* for each variable */
 
-	if(position < QsGetLength(&line))
+	if(position < limit)
 		error = INPUTFORMAT;
 
 	QsDispose(&line);
@@ -851,8 +852,9 @@ void Field_(BObject *arg, unsigned count)
 void Get_(BObject *arg, unsigned count)
 {
 	struct Stream *stream = GetStream(arg[0].value.scalar.value.number.s, 'R');
-	long record = arg[1].value.scalar.value.number.l, result;
-	Error error;
+	long record = arg[1].value.scalar.value.number.l;
+	size_t result = 0;
+	Error error = SUCCESS;
 
 	if(stream->r.buffer == NULL) {
 		CauseError(BADFILEMODE);
@@ -886,7 +888,7 @@ void Get_(BObject *arg, unsigned count)
 	}
 	
 	stream->loc = record;
-	result = fread(stream->r.buffer, sizeof(char), (size_t)stream->r.bufSize, stream->fp);
+	result = fread(stream->r.buffer, sizeof(char), stream->r.bufSize, stream->fp);
 	if(result < stream->r.bufSize) {
 		stream->loc = -1L;
 		stream->atEOF |= result == 0;
@@ -905,8 +907,9 @@ void Get_(BObject *arg, unsigned count)
 void Put_(BObject *arg, unsigned count)
 {
 	struct Stream *stream = GetStream(arg[0].value.scalar.value.number.s, 'R');
-	long record = arg[1].value.scalar.value.number.l, result;
-	Error error;
+	long record = arg[1].value.scalar.value.number.l;
+	size_t result = 0;
+	Error error = SUCCESS;
 	
 	if(stream->r.buffer == NULL) {
 		CauseError(BADFILEMODE);
@@ -938,8 +941,7 @@ void Put_(BObject *arg, unsigned count)
 	}
 
 	stream->loc = record;	
-	result = fwrite(stream->r.buffer, sizeof(char), (size_t)stream->r.bufSize, stream->fp);
-	
+	result = fwrite(stream->r.buffer, sizeof(char), stream->r.bufSize, stream->fp);
 	if(result < stream->r.bufSize) {
 		/* If, as is common, the system line-buffers interactive streams, 'R' file
 		access will not be reliable for such streams. */

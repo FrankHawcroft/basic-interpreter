@@ -328,7 +328,7 @@ bool PfTimeHasElapsed(
 	double dummy;
 	return difftime(end->secs, start->secs) >= interval
 		|| (difftime(end->secs, start->secs) >= floor(interval)
-			&& (double)(end->clocks - start->clocks) / CLOCKS_PER_SEC >= modf(interval, &dummy));
+			&& ((double)end->clocks - start->clocks) / CLOCKS_PER_SEC >= modf(interval, &dummy));
 }
 
 time_t PfConvertToTimeTTickCount(const struct PfSystemTimeStamp *timeStamp)
