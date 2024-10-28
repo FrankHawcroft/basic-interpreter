@@ -583,7 +583,7 @@ static union Header *AllocateFromRegion(struct HeapRegion *region, unsigned long
 #else
 	beginning = FindContiguousOnes(region->map, region->size, region->start, nBlocks);
 #ifdef DEBUG
-	++region->searches;
+	region->searches += beginning != (long)region->start;
 #endif
 #endif /* !RANDOM_PROBE */
 
