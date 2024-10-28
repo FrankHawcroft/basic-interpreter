@@ -218,7 +218,6 @@ static short EffectiveCallNestLevel(const struct Process *proc) { return InStati
 void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 {
 	unsigned ops;
-	const char *endOfStmt = NULL;
 	const BObject *vdef = NULL;
 	PfHighResolutionTimeStamp startTime;
 	short initialCallNestLevel = SCOPE_NONEXISTENT;
@@ -232,10 +231,8 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 		ops = GetOps(ts, initialCallNestLevel);
 	}
 
-	if(ops & OP_PROFILE) {
+	if(ops & OP_PROFILE)
 		PfRecordTime(&startTime);
-		endOfStmt = proc->currentPosition - 1;
-	}
 	
 	if(ops & OP_OPTIMISE) {
 		Improve(ts);
@@ -363,9 +360,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	/* If profiling, update execution count for this statement. */
 
 	if(ops & OP_PROFILE)
-		IncrExecutionCount(&proc->stats, proc->buffer, proc->currentStatementStart, endOfStmt,
-			PfGetElapsedTimeSince(&startTime));
-		/* proc->currentPosition - 1 is the end of this statement's text */
+		RecordExecution(proc->profile, proc->buffer, proc->currentStatementStart, PfGetElapsedTimeSince(&startTime));
 
 	/* Move to the next statement. */
 

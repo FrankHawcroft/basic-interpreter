@@ -811,14 +811,13 @@ extern bool ValidEventName(const QString *name);
 
 /*** Profiling -- profile.c ***/
 
-struct Statistics;
+struct Profile;
 struct Buffer;
 
-extern void InitProfile(struct Statistics **);
-extern void DisposeProfilingData(struct Statistics **);
-extern void IncrExecutionCount(struct Statistics **, const struct Buffer *, const char *stmtStart, const char *stmtEnd, float seconds);
-extern void PrintProfile(struct Statistics *, const struct Buffer *, FILE *);
-DIAGNOSTIC_FN_DECL(void PrintProfilerStatisticsList(struct Statistics *, const struct Buffer *));
+extern struct Profile *CreateProfile(void);
+extern void DisposeProfile(struct Profile *);
+extern void RecordExecution(struct Profile *, const struct Buffer *, const char *stmtStart, float t);
+extern void PrintProfile(struct Profile *, const struct Buffer *, FILE *);
 
 /*** Dead-end error handling -- main.c ***/
 

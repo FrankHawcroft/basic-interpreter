@@ -144,8 +144,8 @@ extern void ClearControlFlowStack(void);
 
 void ResetProgram(void)
 {
-	DisposeProfilingData(&Proc()->stats);
-	InitProfile(&Proc()->stats);
+	DisposeProfile(Proc()->profile);
+	Proc()->profile = CreateProfile();
 	
 	ResetDataReadPointer();
 

@@ -20,7 +20,7 @@ struct Cache;
 struct Stream;
 struct Trap;
 struct Event;
-struct Statistics;
+struct Profile;
 struct UserInterface;
 struct Audio;
 
@@ -94,7 +94,7 @@ struct Process {
 	
 	/* Tracing and profiling - */
 	bool trace, _pad;
-	struct Statistics *stats;
+	struct Profile *profile;
 	
 	/* Caches - */
 	struct Cache *statementCache;

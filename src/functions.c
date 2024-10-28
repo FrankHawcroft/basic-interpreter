@@ -380,8 +380,7 @@ static void CompleteProfileEntry(
 	const PfHighResolutionTimeStamp *startTime)
 {
 	if(Profiling(proc) && piece != NULL)
-		IncrExecutionCount(&proc->stats, proc->buffer, piece->defStart, piece->defFinish,
-			PfGetElapsedTimeSince(startTime));
+		RecordExecution(proc->profile, proc->buffer, piece->defStart, PfGetElapsedTimeSince(startTime));
 }
 
 static Error CreateArguments(struct Process *proc, bool tailCall, const struct Function *f, BObject *arg)

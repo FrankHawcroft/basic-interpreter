@@ -13,6 +13,7 @@
 #include "platform.h"
 #include "heap.h"
 #include "buffer.h"
+#include "hashtable.h"
 
 /* Controls whether counts are displayed for prelude. */
 #define PROFILE_PRELUDE TRUE
@@ -20,170 +21,82 @@
 /* Controls whether timing is displayed. */
 #define PROFILE_SHOWS_TIMING TRUE
 
-/* Statistics for a range of statements. */
-struct Statistics {
-	struct Statistics *next;
-	unsigned long executionCount;
-	float seconds;
-	const char *low, *high;
-		/* Bounds of the range of statements (inclusive) for these statistics - 
-		the beginning of the first statement, and the end of the last statement,
-		to which these stats apply. */
+/* Hash table size. */
+#define PROFILE_HT_BINS 227
+
+struct Profile {
+	struct HashTable *table;
 };
 
-void InitProfile(struct Statistics **stats)
+/* Statistics for a statement. */
+struct Statistics {
+	unsigned long executionCount;
+	float totalTime; /* Of indeterminate unit. */
+};
+
+struct Profile *CreateProfile()
 {
-	assert(stats != NULL);
-	
-	*stats = NULL;
+	struct Profile *profile = New(sizeof(struct Profile));
+	profile->table = NULL;
+	return profile;
 }
 
-void DisposeProfilingData(struct Statistics **stats)
+void DisposeProfile(struct Profile *profile)
 {
-	struct Statistics *current, *savedNext;
-
-	assert(stats != NULL);
+	assert(profile != NULL);
 	
-	for(current = *stats; current != NULL; current = savedNext) {
-		savedNext = current->next;
-		Dispose(current);
-	}
-	
-	InitProfile(stats);
+	if(profile->table != NULL)
+		HtDispose(profile->table);
+	Dispose(profile);
 }
 
-static struct Statistics *CreateStats(
-	const char *low,
-	const char *high, 
-	unsigned long count,
-	float secs,
-	struct Statistics *next,
-	struct Statistics **link)
+static void CreateKey(QString *actualKey, const void *rawKey)
 {
-	struct Statistics *st = New(sizeof(*st));
-	st->low = low;
-	st->high = high;
-	st->executionCount = count;
-	st->seconds = secs;
-	st->next = next;
-	if(link != NULL)
-		*link = st;
-	return st;
+	/* Initialise the string from the pointer's raw bytes, rather than printing it
+		into a string (commented out below) - this avoids a memory allocation. */
+	unsigned intKey = (unsigned)((intptr_t)rawKey & UINT_MAX);
+	QsCopyData(actualKey, (const QsChar *)&intKey, sizeof(intKey) / sizeof(QsChar));
+	
+	/* Better quality key creation, but entails a memory allocation - */
+	/*char ptrBuf[32];
+	sprintf(ptrBuf, "%p", rawKey);
+	QsCopyNTS(actualKey, ptrBuf);*/
 }
 
-/* Increment the count of the number of times the given statement has been executed. */
-void IncrExecutionCount(struct Statistics **stats, const struct Buffer *buffer,
-	const char *stmt, const char *end, float seconds)
+/* Increment the execution count for the statement, and time spent. */
+void RecordExecution(struct Profile *profile, const struct Buffer *buffer, const char *stmt, float timeTaken)
 {
-	struct Statistics *before, *containing, *after;
-	
-	assert(stats != NULL);
+	struct Statistics *stats;
+	const char *base = FileBufferBase(buffer);
+	QString key;
 	
 #if !PROFILE_SHOWS_TIMING
-	seconds = 0;
+	timeTaken = 0;
 #endif
 
-	/* Create sentinel list members if this is the first call: */
-
-	if(*stats == NULL) {
-		struct Statistics *highest
-			= CreateStats(FileBufferExtent(buffer) + 1, FileBufferExtent(buffer) + 1, 0, 0, NULL, NULL);
-		CreateStats(FileBufferBase(buffer) - 1, FileBufferBase(buffer) - 1, 0, 0, highest, stats); /* 'lowest' */
-	}
-
-	/* Find the range in which the given stmt lies ('containing'), or, if 
-	none, the two ranges which are closest on either side ('before' and
-	'after'). The list is maintained in ascending order of stmt addr. */
-
-	before = *stats;
-	containing = NULL;
-	after = before->next;
-
-	while(stmt >= after->low) {
-		if(stmt <= after->high)
-			containing = after;
-		else
-			before = after;
-		after = after->next;
-	}
-
-	/* Update/add the execution count.
-	There are two main cases:
-		1. stmt fell into an existing range (containing != NULL).
-		2. stmt wasn't in an existing range (containing == NULL). */
-
-	if(containing != NULL) {
-		/* Two subcases are handled:
-			1. Might be able to 'give the statement away' to
-		an adjacent range. This might leave the containing range empty,
-		if it was only 1 stmt wide. (This case will tend to apply when
-		executing WHILE loops, tail-recursive subprograms, etc.)
-			2. The containing range needs to be split. (This tends
-		to be caused by GOTOs and (less often) GOSUBs.) */
-
-		if(stmt - 1 == before->high
-		&& before->executionCount > 0
-		&& (before->seconds == 0 || seconds == 0)
-		&& containing->executionCount == before->executionCount - 1) {
-			/* Give to preceding range. */
-
-			before->high = end;
-			before->seconds += seconds;
-			containing->low = end + 1;
-		}
-		else if(end + 1 == after->low
-		&& after->executionCount > 0
-		&& (after->seconds == 0 || seconds == 0)
-		&& containing->executionCount == after->executionCount - 1) {
-			/* Give to following range. This subcase is actually
-			much less commmon than the above one, due to the 
-			forward flow of program control. It might occasionally
-			be caused by a direct jump though. */
-
-			after->low = stmt;
-			after->seconds += seconds;
-			containing->high = stmt - 1;
-		}
-		else {
-			/* Split the containing range into two or three new ranges: */
-
-			if(stmt > containing->low) {
-				CreateStats(containing->low, stmt - 1, containing->executionCount, containing->seconds, containing, &before->next);
-				containing->seconds = 0;
-			}
-			
-			if(end < containing->high) {
-				CreateStats(end + 1, containing->high, containing->executionCount, containing->seconds, after, &containing->next);
-				containing->seconds = 0;
-			}
+	/* Find the start of the line - multi-statement lines are aggregated, to make displaying them easier. */
+	while(stmt > base && stmt[-1] != '\n')
+		--stmt;
 	
-			containing->low = stmt;
-			containing->high = end;
-			++containing->executionCount;
-			containing->seconds += seconds;
-		} /* if must split range */
-
-		/* If the line was given away (and therefore containing->low
-		increased or containing->high decreased), may be able to 
-		'garbage collect' the containing range: */
-
-		if(containing->low > containing->high) {
-			before->next = after;
-			Dispose(containing);
-		}
+	if(profile->table == NULL)
+		profile->table = HtCreate(PROFILE_HT_BINS, &Dispose, NULL);
+	
+	CreateKey(&key, stmt);
+	
+	stats = HtLookUp(profile->table, &key);
+	
+	if(stats != NULL) {
+		++stats->executionCount;
+		stats->totalTime += timeTaken;
 	}
-	else { /* containing == NULL */
-		/* Need to create a new range, unless can integrate the line
-		into the preceding or following range (rare except near the
-		beginning of a program). */
-
-		if(before->high == stmt - 1 && before->executionCount == 1 && before->seconds == 0 && seconds == 0)
-			before->high = end;
-		else if(after->low == end + 1 && after->executionCount == 1 && after->seconds == 0 && seconds == 0)
-			after->low = stmt;
-		else 
-			CreateStats(stmt, end, 1, seconds, after, &before->next);
-	} /* if no containing range */
+	else {
+		stats = New(sizeof(struct Statistics));
+		stats->executionCount = 1;
+		stats->totalTime = timeTaken;
+		HtAdd(profile->table, &key, stats);
+	}
+	
+	QsDispose(&key);
 }
 
 /* Print a statement line for a profiling report.
@@ -193,7 +106,7 @@ This keeps a 1-1 correspondence of source and program lines in the profiling
 report. It also makes this function very simple: it prints all characters until
 a newline or NUL is encountered. 
 
-The reallyPrint parameter controls whether the code is actually printed, or this 
+The reallyPrint parameter controls whether the text is actually printed, or this 
 function is just used to skip over the statement. This is desirable for hidden 
 modules (i.e. the prelude). */
 static void PrintStatementLine(FILE *f, const char **sp, bool reallyPrint)
@@ -207,24 +120,14 @@ static void PrintStatementLine(FILE *f, const char **sp, bool reallyPrint)
 		fputc('\n', f);
 }
 
-/* Finds the range for the position in code supplied, using a linear search.
-	If not profiling, will always return NULL. */
-static struct Statistics *StatsFor(struct Statistics *stats, const char *stmt)
-{
-	struct Statistics *st;
-	for(st = stats; st != NULL && stmt > st->high; st = st->next)
-		;
-	return st == NULL || stmt < st->low ? NULL : st;
-}
-
 #ifdef DEBUG
 extern void PrintStatementCacheStatus(FILE *, const char *);
 extern void PrintUntakenBranchCacheInfo(FILE *, const char *);
 #endif
 
-/* Prints a profiling report, consisting of the program text with execution 
-counts prepended to each statement. */
-void PrintProfile(struct Statistics *stats, const struct Buffer *buffer, FILE *f)
+/* Prints a profiling report, which is the program text with execution count and total
+time prepended to each line. */
+void PrintProfile(struct Profile *profile, const struct Buffer *buffer, FILE *f)
 {
 	const char *stmt = FileBufferBase(buffer), *module = PrimaryBufferFileName(buffer);
 	
@@ -242,15 +145,21 @@ void PrintProfile(struct Statistics *stats, const struct Buffer *buffer, FILE *f
 
 		if(displayIt && module != thisModule) {
 			module = thisModule;
-			fprintf(f, "---- Merged module %s ----\n", module);
+			fprintf(f, "---- Module %s ----\n", module);
 		}
 
 		/* Write the execution count and time: */
 		
-		if(displayIt) {
-			const struct Statistics *st = StatsFor(stats, stmt);
-			fprintf(f, "[%10lu %8.6f] ", st == NULL ? 0 : st->executionCount,
-				st == NULL ? 0 : st->seconds);
+		if(displayIt) { 
+			QString key;
+			const struct Statistics *st; 
+			
+			CreateKey(&key, stmt);	
+			st = profile->table != NULL ? HtLookUp(profile->table, &key) : NULL;
+			QsDispose(&key);
+			
+			fprintf(f, "[%10lu %16.6f] ", st == NULL ? 0 : st->executionCount,
+				st == NULL ? 0 : st->totalTime);
 
 #ifdef DEBUG
 			PrintStatementCacheStatus(f, stmt);
@@ -268,33 +177,3 @@ void PrintProfile(struct Statistics *stats, const struct Buffer *buffer, FILE *f
 	
 	fprintf(f, "----\n");
 }
-
-#ifdef DEBUG
-
-/* Debugging help - print out the list of statistics. */
-
-#define NUM_RANGES_PER_LINE 4
-
-void PrintProfilerStatisticsList(struct Statistics *stats, const struct Buffer *buffer)
-{
-	const struct Statistics *st;
-
-	fprintf(stderr, "---- Profiler statistics entries:\n");
-	for(st = stats; st != NULL; st = st->next) {
-		const char *file;
-		int numOnLine = 0, lowLine, highLine;
-
-		GetLocationInfo(buffer, st->low, &lowLine, &file);
-		GetLocationInfo(buffer, st->high - 1, &highLine, &file);
-
-		fprintf(stderr, "[%d,%d] : %lu, %f; ", lowLine, highLine, st->executionCount, st->seconds);
-
-		if(++numOnLine == NUM_RANGES_PER_LINE) {
-			fprintf(stderr, "\n");
-			numOnLine = 0;
-		}
-	}
-	fprintf(stderr, "***\n");
-}
-
-#endif /* DEBUG */

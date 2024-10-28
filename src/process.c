@@ -136,7 +136,7 @@ Error CreateNewProcess(const struct Options *options)
 	
 	CreateControlFlowStack(0);
 	
-	InitProfile(&p->stats);
+	p->profile = CreateProfile();
 	
 	p->breakFlag = p->abortFlag = FALSE;
 	InitEventTraps();
@@ -188,12 +188,12 @@ void DisposeProcess(void)
 			ReportError(CANTOPENPROFILE, NULL, -1, NULL, p->additionalErrorInfo);
 		}
 		else {
-			PrintProfile(p->stats, p->buffer, profileDump);
+			PrintProfile(p->profile, p->buffer, profileDump);
 			fclose(profileDump);
 		}
 	}
-	
-	DisposeProfilingData(&p->stats);
+	DisposeProfile(p->profile);
+	p->profile = NULL;
 	
 	DeleteStatementCache();
 	
