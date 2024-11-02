@@ -429,7 +429,7 @@ void Clear_(BObject *arg, unsigned count)
 			/* Size is provided to CLEAR in bytes. */
 
 	ResetStaticFunctionParams();
-	ClearStatementCache();
+	ClearStatementCaches();
 
 	if(controlSize > 0) {
 		DisposeControlFlowStack();
@@ -668,86 +668,146 @@ void EndIf_(BObject *arg, unsigned count)
 		CauseError(ENDIFWITHOUTIF);
 }
 
-static Error EvalCondition(const QString *expr, unsigned len, struct Stack *evalSpace, bool *fired)
+/* Support for traditional single-line IF statements is somewhat involved - because the statement cache only
+	caches single statements, a special cache is used to store the three parts in precompiled form. */
+struct Tripartite {
+	QString *cond;
+	unsigned condLen;
+	struct TokenSequence *positive;
+	struct TokenSequence *negative;
+	struct Stack evalSpace; /* cached too, to avoid re-allocating it every time */
+};
+
+static void DisposeTripartite(void *cacheEntry)
 {
-	Error error = SUCCESS;
-	QString *prefixForm = NULL;
-	BObject *result = NULL;
-	
-	if((error = CheckExpressionSyntax(expr, len, Proc()->currentStatementStart)) == SUCCESS) {
-		error = BADSYNTAX; /* assume two or more exprs, or some other syntactically seemingly valid mistake */
-		if((prefixForm = InfixToPrefix(expr, len, NULL)) != NULL) {
-			Eval(prefixForm, DefaultConvert, 0, evalSpace);
-			Dispose(prefixForm);		
-			if(StkHeight(evalSpace) == 1) {
-				result = PeekExprStk(evalSpace, 0);
-				*fired = (error = DereferenceObject(result)) == SUCCESS
-					&& (error = (Resolved(result) ? SUCCESS : UNDEFINEDVARORFUNC)) == SUCCESS
-					&& GetBoolean(&result->value.scalar);
-			}
-		}
+	struct Tripartite *t = cacheEntry
+	if(t == NULL) return;
+	DisposeExprStk(&t->evalSpace);
+	if(t->positive != NULL) { DisposeTokenSequence(t->positive); Dispose(t->positive); }
+	if(t->negative != NULL) { DisposeTokenSequence(t->negative); Dispose(t->negative); }
+	if(t->cond != NULL) {
+		unsigned ti;
+		for(ti = 0; ti != t->condLen; ti++) QsDispose(&t->cond[ti]);
+		Dispose(t->cond);
 	}
-	return error;
+	Dispose(t);
 }
 
-static Error CompileAndExecute(const QString *toks, struct Stack *evalSpace)
+static QString *CompileCondition(const QString *expr, int len, unsigned *outLen, Error *error)
 {
-	Error error = SUCCESS;
+	QString *prefixForm = NULL;
+	
+	assert(len >= 0);
+	
+	*outLen = 0;
+	
+	if((*error = CheckExpressionSyntax(expr, len, Proc()->currentStatementStart)) == SUCCESS) {
+		if((prefixForm = InfixToPrefix(expr, len, outLen)) != NULL)
+			*error = SUCCESS;
+		else
+			*error = BADSYNTAX;
+	}
+	return prefixForm;
+}
+
+static bool EvalCondition(const QString *prefixForm, struct Stack *evalSpace, Error *error)
+{
+	bool fired = FALSE;
+	
+	*error = BADSYNTAX; /* assume two or more exprs, as in 'IF x, y THEN ...', or some other mistake not detected
+							by syntax checking or prefix conversion */
+	Eval(prefixForm, DefaultConvert, 0, evalSpace);		
+	if(StkHeight(evalSpace) == 1) { /* assume a fresh stack */
+		BObject *result = PeekExprStk(evalSpace, 0);
+		fired = (*error = DereferenceObject(result)) == SUCCESS
+			&& (*error = (Resolved(result) ? SUCCESS : UNDEFINEDVARORFUNC)) == SUCCESS
+			&& GetBoolean(&result->value.scalar);
+		ClearExprStk(evalSpace); /* clear for reuse */
+	}
+	return fired; /* error will be set anyway */
+}
+
+static struct TokenSequence *CompileCommand(const QString *toks, Error *error)
+{
 	const QString *t;
-	struct TokenSequence ts;
+	struct TokenSequence *ts = New(sizeof(*ts));
 	const struct Statement *cmd;
 	bool hasExplicitStatement;
 	
-	CreateTokenSequence(&ts, 10);
-	ts.start = Proc()->currentStatementStart;
+	CreateTokenSequence(ts, 5);
+	ts->start = Proc()->currentStatementStart;
 	
 	hasExplicitStatement = GetStatement(&toks[0], &cmd) == SUCCESS || IsTwoWordForm(&toks[0], &toks[1]);
 	if(hasExplicitStatement)
-		QsCopy(&ts.statementName, &toks[0]);
+		QsCopy(&ts->statementName, &toks[0]);
 
 	for(t = toks + hasExplicitStatement; !IsTerminator(t) && !QsEqNoCase(t, &g_ElseKeyword); t++) {
-		ExpandTokenSequence(&ts, ts.length + 1);
-		QsCopy(&ts.rest[ts.length++], t);
+		ExpandTokenSequence(ts, ts->length + 1);
+		QsCopy(&ts->rest[ts->length++], t);
 	}
-	ExpandTokenSequence(&ts, ts.length + 1);
-	QsCopy(&ts.rest[ts.length++], &g_Pipe);
+	ExpandTokenSequence(ts, ts->length + 1);
+	QsCopy(&ts->rest[ts->length++], &g_Pipe);
 	
-	if((error = Prepare(&ts)) == SUCCESS)
-		Do(Proc(), &ts, evalSpace);
+	*error = Prepare(ts);
+	/* TODO set ordinary ops but without all 'instrumentation' */
+	/* Don't bother disposing of it on failure - this is done by DisposeTripartite */
+	
+	return ts;
+}
 
-	DisposeTokenSequence(&ts);
-	
-	return error;
+static void ExecCommand(struct TokenSequence *ts, struct Stack *evalSpace)
+{
+	Do(Proc(), ts, evalSpace);
 }
 
 void IfThenElse_(const QString *toks, unsigned nToks)
 {
-	unsigned thenPosition = 0, elsePosition = 0, scan;
+	struct Tripartite *cacheEntry;
 	Error error = SUCCESS;
 	
-	for(scan = 0; scan != nToks; scan++) {
-		if(thenPosition == 0 && QsEqNoCase(&toks[scan], &g_ThenKeyword))
-			thenPosition = scan;
-		else if(elsePosition == 0 && QsEqNoCase(&toks[scan], &g_ElseKeyword))
-			elsePosition = scan;
+	if(Proc()->ifThenElseCache == NULL)
+		Proc()->ifThenElseCache = CreateCache(5, 5, &DisposeTripartite);
+	
+	cacheEntry = RetrieveFromCache(Proc()->ifThenElseCache, Proc()->currentStatementStart);
+	
+	/* Compile - */
+	if(cacheEntry == NULL) {
+		int thenPosition = 0, elsePosition = 0, scan;
+	
+		for(scan = 0; scan != (int)nToks; scan++) {
+			if(thenPosition == 0 && QsEqNoCase(&toks[scan], &g_ThenKeyword))
+				thenPosition = scan;
+			else if(elsePosition == 0 && QsEqNoCase(&toks[scan], &g_ElseKeyword))
+				elsePosition = scan;
+		}
+		
+		if(thenPosition == 0 || (elsePosition != 0 && elsePosition < thenPosition))
+			error = BADSYNTAX;
+		else {
+			cacheEntry = New(sizeof(*cacheEntry));
+			StkInit(&cacheEntry->evalSpace);
+			cacheEntry->cond = CompileCondition(toks, thenPosition, &cacheEntry->condLen, &error);
+			cacheEntry->positive = error == SUCCESS ? CompileCommand(toks + thenPosition + 1, &error) : NULL;
+			cacheEntry->negative = error == SUCCESS && elsePosition != 0 ? CompileCommand(toks + elsePosition + 1, &error) : NULL;
+
+			if(error == SUCCESS)
+				CreateExprStk(&cacheEntry->evalSpace, 2);
+			
+			if(error == SUCCESS)
+				SetInCache(Proc()->ifThenElseCache, Proc()->currentStatementStart, cacheEntry);
+			else {
+				DisposeTripartite(cacheEntry);
+				cacheEntry = NULL;
+			}
+		}
 	}
 	
-	if(thenPosition == 0 || (elsePosition != 0 && elsePosition < thenPosition))
-		error = BADSYNTAX;
-	else {
-		struct Stack exprEvalSpace;
-		bool fired = FALSE;
-	
-		CreateExprStk(&exprEvalSpace, thenPosition);
-		if((error = EvalCondition(toks, thenPosition, &exprEvalSpace, &fired)) == SUCCESS) {
-			const QString *branch = toks + thenPosition + 1;
-			ClearExprStk(&exprEvalSpace);
-			if(!fired)
-				branch = elsePosition != 0 ? toks + elsePosition + 1 : NULL;
-			if(branch != NULL)		
-				error = CompileAndExecute(branch, &exprEvalSpace);
-		}
-		DisposeExprStk(&exprEvalSpace);
+	/* Execute - */
+	if(error == SUCCESS && cacheEntry != NULL) {
+		bool fired = EvalCondition(cacheEntry->cond, &cacheEntry->evalSpace, &error);
+		if(error == SUCCESS && (fired || cacheEntry->negative != NULL))
+			ExecCommand(fired ? cacheEntry->positive : cacheEntry->negative, &cacheEntry->evalSpace);
+		ClearExprStk(&cacheEntry->evalSpace);
 	}
 	
 	if(error != SUCCESS)
@@ -956,13 +1016,13 @@ void WEnd_(BObject *arg, unsigned count)
 void TrOn_(BObject *arg, unsigned count)
 {
 	/* Statement cache must be cleared because trace mode does not work with some optimisations. */
-	ClearStatementCache();
+	ClearStatementCaches();
 	Proc()->trace = TRUE;
 }
 
 void TrOff_(BObject *arg, unsigned count)	
 {
-	ClearStatementCache();
+	ClearStatementCaches();
 	Proc()->trace = FALSE;
 }
 
@@ -1178,6 +1238,9 @@ void XFree_(BObject *arg, unsigned count)
 	fprintf(stderr, "-- Statement cache --\n");
 	PrintCacheInfo(Proc()->statementCache);
 	/*DumpCache(Proc()->statementCache);*/
+	fprintf(stderr, "-- Single-line IF cache --\n");
+	PrintCacheInfo(Proc()->ifThenElseCache);
+	/*DumpCache(Proc()->statementCache);*/
 	fprintf(stderr, "-- Untaken branch cache --\n");
 	PrintCacheInfo(Proc()->untakenBranchCache);
 	/*DumpCache(Proc()->untakenBranchCache);*/
@@ -1194,6 +1257,9 @@ void XCache_(BObject *arg, unsigned count)
 	fprintf(stderr, "-- Statement cache --\n");
 	PrintCacheInfo(Proc()->statementCache);
 	DumpCache(Proc()->statementCache);
+	fprintf(stderr, "-- Single-line IF cache --\n");
+	PrintCacheInfo(Proc()->ifThenElseCache);
+	DumpCache(Proc()->ifThenElseCache);
 	fprintf(stderr, "-- Untaken branch cache --\n");
 	PrintCacheInfo(Proc()->untakenBranchCache);
 	DumpCache(Proc()->untakenBranchCache);

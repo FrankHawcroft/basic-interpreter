@@ -149,9 +149,7 @@ void ResetProgram(void)
 	
 	ResetDataReadPointer();
 
-	ClearStatementCache();
-	if(Proc()->untakenBranchCache != NULL)
-		ClearCache(Proc()->untakenBranchCache);
+	ClearStatementCaches();
 	
 	Proc()->callNestLevel
 		= Proc()->staticSubCallNesting

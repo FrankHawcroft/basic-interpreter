@@ -19,7 +19,7 @@
 extern void CleanUpUI(void);
 extern void CleanUpAudio(void);
 
-static void DeleteStatementCache(void);
+static void DeleteCache(struct Cache **);
 
 #if PF_REENTRANT
 #define MAX_PROCESSES 20
@@ -152,6 +152,7 @@ Error CreateNewProcess(const struct Options *options)
 #endif
 
 	p->statementCache = NULL;
+	p->ifThenElseCache = NULL;
 	p->untakenBranchCache = NULL;
 	p->empty = emptyProto;
 	
@@ -195,12 +196,9 @@ void DisposeProcess(void)
 	DisposeProfile(p->profile);
 	p->profile = NULL;
 	
-	DeleteStatementCache();
-	
-	if(p->untakenBranchCache != NULL) {
-		DisposeCache(p->untakenBranchCache);
-		p->untakenBranchCache = NULL;
-	}
+	DeleteCache(&p->statementCache);
+	DeleteCache(&p->ifThenElseCache);
+	DeleteCache(&p->untakenBranchCache);
 
 	DisposeControlFlowStack();
 
@@ -317,18 +315,22 @@ void AttemptToCache(const struct TokenSequence *tokSeq)
 	}
 }
 
-static void DeleteStatementCache(void)
+static void DeleteCache(struct Cache **cache)
 {
-	if(Proc()->statementCache != NULL) {
-		DisposeCache(Proc()->statementCache);
-		Proc()->statementCache = NULL;
+	if(*cache != NULL) {
+		DisposeCache(*cache);
+		*cache = NULL;
 	}
 }
 
-void ClearStatementCache(void)
+void ClearStatementCaches(void)
 {
 	if(Proc()->statementCache != NULL)
 		ClearCache(Proc()->statementCache);
+	if(Proc()->ifThenElseCache != NULL)
+		ClearCache(Proc()->ifThenElseCache);
+	if(Proc()->untakenBranchCache != NULL)
+		ClearCache(Proc()->untakenBranchCache);
 }
 
 #ifdef DEBUG

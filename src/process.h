@@ -98,6 +98,7 @@ struct Process {
 	
 	/* Caches - */
 	struct Cache *statementCache;
+	struct Cache *ifThenElseCache;
 	struct TokenSequence empty;
 	struct Cache *untakenBranchCache;
 	
@@ -129,7 +130,7 @@ extern const struct Options *Opts(void);
 /* Cache management - */
 extern struct TokenSequence *GetFromCache(struct Process *, const char *position);
 extern void AttemptToCache(const struct TokenSequence *);
-extern void ClearStatementCache(void);
+extern void ClearStatementCaches(void);
 DIAGNOSTIC_FN_DECL(void PrintStatementCacheStatus(FILE *f, const char *stmt));
 extern void CreateUntakenBranchCache(void);
 

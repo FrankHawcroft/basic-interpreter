@@ -499,7 +499,7 @@ int Loop(void)
 #ifdef DEBUG
 		if(proc->opts->profileDest == NULL) /* need it to display cache info if profiling */
 #endif
-			ClearStatementCache();
+			ClearStatementCaches();
 		
 		/* Handle any error which stopped execution: */
 		
