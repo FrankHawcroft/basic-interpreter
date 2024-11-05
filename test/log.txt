@@ -353,8 +353,8 @@ DEFined function tests completed OK
 ***** "c_deftype.bas"  
 hi there!	also a string	 1	x
 ***** "c_events.bas"  
-Timer handler called:	 0	at timer = 	 44106
-Timer handler called:	 1	at timer = 	 44107
+Timer handler called:	 0	at timer = 	 75755
+Timer handler called:	 1	at timer = 	 75756
 Break handler called:	 2
 Error handler called:	 3	ERR:	 234	ERLAB: 	ErrorLabel	ERL: 	 0
 Break event was correctly deferred

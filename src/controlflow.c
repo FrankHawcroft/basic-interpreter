@@ -680,7 +680,7 @@ struct Tripartite {
 
 static void DisposeTripartite(void *cacheEntry)
 {
-	struct Tripartite *t = cacheEntry
+	struct Tripartite *t = cacheEntry;
 	if(t == NULL) return;
 	DisposeExprStk(&t->evalSpace);
 	if(t->positive != NULL) { DisposeTokenSequence(t->positive); Dispose(t->positive); }
