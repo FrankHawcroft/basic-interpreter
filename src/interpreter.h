@@ -565,6 +565,7 @@ extern void ClearOutOfContextItems(short minimumCallNestLevel, short maximumCall
 extern void EnsureExistsIfBuiltIn(const QString *);
 /* Is the symbol guaranteed to be defined by the interpreter as part of the language'n'runtime, rather than programmatically? */
 #define LexicallyGuaranteedBuiltIn(name) !isalnum(QsGetFirst(name))
+#define BOBJECT_DISPOSAL (void (*)(void *))&DisposeObjectContents
 DIAGNOSTIC_FN_DECL(void PrintSymTabStatus(void));
 DIAGNOSTIC_FN_DECL(void PrintSymTab(void));
 
