@@ -244,7 +244,7 @@ static Error DefineQuickly(struct Definition *defn, short callNestLevel)
 	/* TODO make HtCreate (optionally?) tolerant of mem alloc failure - */
 	if(relevantTable == NULL)
 		relevantTable = proc->environment[EnvironmentIndex(callNestLevel)]
-			= HtCreate(NumBins(proc->opts->lowMemory, callNestLevel), &DisposeObjectContents, NULL);
+			= HtCreate(NumBins(proc->opts->lowMemory, callNestLevel), BOBJECT_DISPOSAL, NULL);
 
 	HtAddPreallocated(relevantTable, defn);
 	
