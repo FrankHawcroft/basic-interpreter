@@ -355,7 +355,7 @@ static void InputFrom(FILE *stream, unsigned nItems, BObject *args)
 	of the variables can't be treated as significant by the program. */
 	position = 0;
 	for(varIndex = 0; varIndex != nItems && error == SUCCESS; varIndex++) {
-		Scalar *variable = VarData(&args[varIndex]);
+		Scalar *variable = MutableVarData(&args[varIndex]);
 		int start, finish; /* extent of token */
 		Scalar value;
 
@@ -516,7 +516,7 @@ void Print_(BObject *arg, unsigned count)
 static void LineInputFrom(FILE *stream, unsigned nItems, BObject *args)
 {
 	struct Stream *basicStream = GetStreamFromHandle(stream);
-	Scalar *var = VarData(&args[0]);
+	Scalar *var = MutableVarData(&args[0]);
 	Error error = SUCCESS;
 	Scalar holder;
 
@@ -814,7 +814,7 @@ void Field_(BObject *arg, unsigned count)
 
 	fieldDefn = stream->r.fields;
 	for(field = 1; field != count; field++) {
-		Scalar *var = VarData(&arg[field]);
+		Scalar *var = MutableVarData(&arg[field]);
 		QString *str = (QString *)GetPointer(var);
 		
 		if(NonPointer(var->type) != T_STRING || QsIsNull(str)) {

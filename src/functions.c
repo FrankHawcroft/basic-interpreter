@@ -187,7 +187,7 @@ static void FunctionExpressionConvert(unsigned index, const QString *token, BObj
 		BObject *global = LookUpCheckingType(token, SCOPE_MAIN);
 		if(global != NULL) {
 			if(IsVariable(global))
-				SetSymbolReference(result, global->category | VARIABLE_IS_POINTER, VarPtr(global));
+				SetSymbolReference(result, global->category | VARIABLE_IS_POINTER, MutableVarPtr(global));
 			else
 				*result = *global;
 		}
@@ -341,7 +341,7 @@ static void TailCall(
 		else
 			for(argIdx = 0; argIdx < function->numArgs; argIdx++, arg++)
 				CopyDereferencingBoth(
-					VarData(LookUpIgnoringType(&function->parameter[argIdx].name, proc->callNestLevel)),
+					MutableVarData(LookUpIgnoringType(&function->parameter[argIdx].name, proc->callNestLevel)),
 					&arg->value.scalar);
 	}
 	

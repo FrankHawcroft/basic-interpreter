@@ -206,7 +206,7 @@ void ConvertToObject(const QString *token, BObject *obj, short callNestLevel)
 		BObject *definition = LookUpCheckingType(token, callNestLevel);
 		if(definition != NULL) {
 			if(IsVariable(definition))
-				SetSymbolReference(obj, definition->category | VARIABLE_IS_POINTER, VarPtr(definition));
+				SetSymbolReference(obj, definition->category | VARIABLE_IS_POINTER, MutableVarPtr(definition));
 			else
 				*obj = *definition;
 		}

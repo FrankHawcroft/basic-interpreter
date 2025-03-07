@@ -80,7 +80,7 @@ static void CreateOptionallyTypedVariable(const struct Process *proc,
 		SetObjectToError(obj, NOMEMORY);
 	else {
 		var->category |= flags;
-		SetSymbolReference(obj, var->category | VARIABLE_IS_POINTER, VarPtr(var));
+		SetSymbolReference(obj, var->category | VARIABLE_IS_POINTER, MutableVarPtr(var));
 	}
 }
 
@@ -116,20 +116,20 @@ Error CreateArgumentVariable(const struct Parameter *formal, const BObject *argu
 	BObject *local = DefineVariable(&formal->name, TypeUsuallyProducedBy(formal->type),
 		Proc()->callNestLevel, IsVarParam(formal));
 	local->category |= (IsVarParam(formal) ? VARIABLE_IS_REF : 0);
-	return local == NULL ? NOMEMORY : AssignToActual(VarPtr(local), argument, formal->kind);
+	return local == NULL ? NOMEMORY : AssignToActual(MutableVarPtr(local), argument, formal->kind);
 }
 
 Error AssignToStaticParameter(const struct Parameter *formal, struct Variable *local, const BObject *argument)
 {
 	if(local == NULL) {
 		BObject *defn = LookUp(&formal->name, SCOPE_STATIC);	
-		local = defn != NULL && IsVariable(defn) ? VarPtr(defn) : NULL;
+		local = defn != NULL && IsVariable(defn) ? MutableVarPtr(defn) : NULL;
 		if(local == NULL) {
 			defn = DefineVariable(&formal->name, TypeUsuallyProducedBy(formal->type), SCOPE_STATIC, IsVarParam(formal));
 			if(defn == NULL)
 				return NOMEMORY;
 			defn->category |= (IsVarParam(formal) ? VARIABLE_IS_REF : 0);
-			local = VarPtr(defn);
+			local = MutableVarPtr(defn);
 		}
 	}
 	else if(!IsPointer(&local->value) && local->value.type == T_STRING)
@@ -145,23 +145,27 @@ Error ShareVariable(const QString *name, const BObject *global)
 		return NOMEMORY;
 	else {
 		local->category = (IsArray(global) ? SHARED_ARRAY : SHARED_VAR) | VARIABLE_IS_REF;
-		return AssignToActual(VarPtr(local), global, local->category);
+		return AssignToActual(MutableVarPtr(local), global, local->category);
 	}
 }
 
-/*bool IsVariable(const BObject *obj)
-{
-	assert(obj != NULL);
-	return (obj->category & IS_VARIABLE) != 0;
-}*/
-
-struct Variable *VarPtr(const BObject *obj)
+struct Variable *MutableVarPtr(BObject *obj)
 {
 	assert(IsVariable(obj));
 	return (obj->category & VARIABLE_IS_POINTER) ? obj->value.varRef : &obj->value.variable;
 }
 
-Scalar *VarData(const BObject *obj)
+const struct Variable *VarPtr(const BObject *obj)
+{
+  return MutableVarPtr((BObject *)obj);
+}
+
+Scalar *MutableVarData(BObject *obj)
+{
+	return &(MutableVarPtr(obj)->value);
+}
+
+const Scalar *VarData(const BObject *obj)
 {
 	return &(VarPtr(obj)->value);
 }
@@ -189,7 +193,7 @@ static size_t ArraySize(const ArraySubscript *dimension, SimpleType type)
 
 static void DisposeArray(BObject *var)
 {
-	void *memToFree = GetPointer(VarData(var));
+	void *memToFree = GetPointer(MutableVarData(var));
 	
 	assert(IsArray(var));
 	
@@ -214,7 +218,7 @@ void DisposeVariableObject(BObject *var)
 		if(IsArray(var) && !(var->category & VARIABLE_IS_REF))
 			DisposeArray(var);
 		else
-			DisposeScalar(VarData(var)); /* Doesn't free memory through pointers. */
+			DisposeScalar(MutableVarData(var)); /* Doesn't free memory through pointers. */
 	}
 }
 
@@ -344,12 +348,12 @@ const char *ArraySizeDescription(void)
 
 void Let_(BObject *arg, unsigned count)
 {
-	CopyDereferencingBoth(VarData(&arg[0]), &arg[1].value.scalar);
+	CopyDereferencingBoth(MutableVarData(&arg[0]), &arg[1].value.scalar);
 }
 
 void Swap_(BObject *arg, unsigned count)
 {
-	Scalar t, *x = VarData(&arg[0]), *y = VarData(&arg[1]);
+	Scalar t, *x = MutableVarData(&arg[0]), *y = MutableVarData(&arg[1]);
 	SetToValue(&t, x);
 	SetDereferencingBoth(x, y);
 	SetDereferencingBoth(y, &t);
@@ -357,7 +361,7 @@ void Swap_(BObject *arg, unsigned count)
 
 void Dim_(BObject *arg, unsigned count)
 {
-	struct Variable *newArray = VarPtr(&arg[0]);
+	struct Variable *newArray = MutableVarPtr(&arg[0]);
 	ArraySubscript dimension[MAX_DIMENSIONS + 1];
 	unsigned argIdx, dimIdx;
 
@@ -403,7 +407,7 @@ void Erase_(BObject *arg, unsigned count)
 		}
 		else {
 			DisposeArray(&arg[n]);
-			InitVariable(VarPtr(&arg[n]), NonPointer(VarData(&arg[n])->type), TRUE);
+			InitVariable(MutableVarPtr(&arg[n]), NonPointer(VarData(&arg[n])->type), TRUE);
 		}
 	}
 }
@@ -516,7 +520,7 @@ void Read_(BObject *arg, unsigned count)
 				}
 
 				/* Assign it to the variable. */
-				CopyDereferencingBoth(VarData(&arg[varIdx]), &nextLiteral);
+				CopyDereferencingBoth(MutableVarData(&arg[varIdx]), &nextLiteral);
 			}
 
 			/* Move to next statement if all tokens processed from this one. */
@@ -637,7 +641,7 @@ void VarPtr_(Scalar *result, const BObject *arg, unsigned count)
 	if(!Opts()->unsafe)
 		SetError(result, ER_UNSAFE);
 	else
-		SetFromLong(result, (long)GetPointer(VarData(&arg[0])), T_LONG);
+	  SetFromLong(result, (long)GetPointer(MutableVarData((BObject *)&arg[0])), T_LONG);
 }
 
 void ConstConvert(unsigned index, const QString *token, BObject *result)
@@ -662,13 +666,13 @@ void ConvertWithArrayVarCreation(unsigned index, const QString *token, BObject *
 		if(CanDefineVariable(token, callNestLevel))
 			CreateOptionallyTypedVariable(Proc(), result, token, VARIABLE_IS_ARRAY | (shared ? VARIABLE_IS_SHARED : 0), TRUE);
 		else {
-			const BObject *existing = LookUpIgnoringType(token, shared ? SCOPE_MAIN : callNestLevel);
+			BObject *existing = LookUpIgnoringType(token, shared ? SCOPE_MAIN : callNestLevel);
 			if(!IsVariable(existing)
 			|| (IsTypeSpecifier(QsGetLast(token)) && NonPointer(VarData(existing)->type) != TypeForName(Proc(), token))
 			|| !IsPointer(VarData(existing)))
 				SetObjectToError(result, REDEFINE);
 			else
-				SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, VarPtr(existing));
+				SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, MutableVarPtr(existing));
 		}
 	}
 	else
@@ -694,7 +698,7 @@ void AssignConvert(unsigned index, const QString *token, BObject *result)
 		if(CanDefineVariable(token, proc->callNestLevel))
 			CreateOptionallyTypedVariable(proc, result, token, isArray ? VARIABLE_IS_ARRAY : 0, FALSE);
 		else {
-			const BObject *existing = LookUpIgnoringType(token, proc->callNestLevel);
+			BObject *existing = LookUpIgnoringType(token, proc->callNestLevel);
 			if(!IsVariable(existing)
 			|| (IsTypeSpecifier(QsGetLast(token)) && NonPointer(VarData(existing)->type) != TypeForName(proc, token)))
 				SetObjectToError(result, REDEFINE);
@@ -705,7 +709,7 @@ void AssignConvert(unsigned index, const QString *token, BObject *result)
 			else if(isArray && !IsArray(existing))
 				SetObjectToError(result, SCALAREXPECTED);
 			else
-				SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, VarPtr(existing));
+				SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, MutableVarPtr(existing));
 		}
 	}
 	else
@@ -718,11 +722,11 @@ void LocalScalarAssignConvert(unsigned index, const QString *token, BObject *res
 {
 	if(index == 0) {
 		const struct Process *proc = Proc();
-		const BObject *existing = LookUpLocal(token, proc->callNestLevel);
+		BObject *existing = LookUpLocal(token, proc->callNestLevel);
 		if(existing == NULL)
 			CreateOptionallyTypedVariable(proc, result, token, 0, FALSE);
 		else
-			SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, VarPtr(existing));
+			SetSymbolReference(result, existing->category | VARIABLE_IS_POINTER, MutableVarPtr(existing));
 	}
 	else
 		ConvertToObject(token, result, SCOPE_CURRENT);

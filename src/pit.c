@@ -374,7 +374,7 @@ static bool CreateNamedConstant(QString *tok, bool inFunction)
 		
 		if((c = DefineVariable(&name, n.type, SCOPE_GLOBAL, FALSE)) != NULL) {
 			c->category = NAMED_CONST;
-			CopyScalar(VarData(c), &n);
+			CopyScalar(MutableVarData(c), &n);
 			
 			QsCopy(tok, &name);
 			
