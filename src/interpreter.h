@@ -580,8 +580,10 @@ extern Error ShareVariable(const QString *name, const BObject *global);
 extern void DisposeVariableObject(BObject *);
 #define IsVariable(obj) (((obj)->category & IS_VARIABLE) != 0)
 extern bool IsArray(const BObject *);
-extern struct Variable *VarPtr(const BObject *);
-extern Scalar *VarData(const BObject *);
+extern const struct Variable *VarPtr(const BObject *);
+struct Variable *MutableVarPtr(BObject *);
+extern const Scalar *VarData(const BObject *);
+extern Scalar *MutableVarData(BObject *);
 extern Error IndexArray(struct Variable *indexer, const struct Variable *array, const BObject *subscript, unsigned count);
 extern void ResetDataReadPointer(void);
 

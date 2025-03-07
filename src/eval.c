@@ -150,7 +150,8 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			fputc(' ', stderr);
 			QsWrite(toks + i, stderr);
 		}
-		fprintf(stderr, "%s]\n", firstCh != '|' && firstCh != ')' ? "..." : "");
+		if(firstCh != '|' && firstCh != ')') fprintf(stderr, "...]\n");
+		else fprintf(stderr, "%c]\n", firstCh);
 	}*/
 
 	for(ct = toks; (firstCh = QsGetFirst(ct)) != '|' && firstCh != ')'; ct++, tokIndex++) {	
@@ -181,14 +182,14 @@ const QString *Eval(const QString *toks, Interner intern, unsigned tokIndex, str
 			}
 			
 			intern(tokIndex, ct, (BObject *)exprStack->top);
-			
+
 			if(((BObject *)exprStack->top)->category == FUNCTION)
 				EvalParameterlessFunction(((BObject *)exprStack->top)->value.function, exprStack);
 			else
 				AdjustStackPointersFollowingDirectPush(exprStack);
 			
 			/*fprintf(stderr, "[Eval-->: ");
-			DumpObject((BObject *)exprStack->top);
+			DumpObject((BObject *)exprStack->top - 1);
 			fprintf(stderr, "]\n");*/
 		}
 	}

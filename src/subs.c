@@ -35,7 +35,7 @@ void CallSubprogram(const struct Statement *statement, const BObject *actual, un
 		for(an = 0; an < statement->formalCount && error == SUCCESS; an++, actual++) {
 			error = AssignToStaticParameter(&statement->formal[an], statement->predefinedParameter[an], actual);
 			if(statement->predefinedParameter[an] == NULL)
-				statement->predefinedParameter[an] = VarPtr(LookUp(&statement->formal[an].name, SCOPE_STATIC));
+				statement->predefinedParameter[an] = MutableVarPtr(LookUp(&statement->formal[an].name, SCOPE_STATIC));
 		}
 	else
 		for(an = 0; an < statement->formalCount && error == SUCCESS; an++, actual++)

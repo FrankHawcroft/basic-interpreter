@@ -505,7 +505,7 @@ void For_(BObject *arg, unsigned count)
 	union NumericalValue *startValue, *endValue, *stepSize;
 	struct StackNode node;
 
-	counter = GetPointer(VarData(&arg[0]));
+	counter = GetPointer(MutableVarData(&arg[0]));
 	startValue = &arg[1].value.scalar.value.number;
 	endValue = &arg[2].value.scalar.value.number;
 	stepSize = &arg[3].value.scalar.value.number;
@@ -596,7 +596,7 @@ void NextVar_(BObject *arg, unsigned count)
 	for(i = 0; i != count && error == SUCCESS; i++)
 		if(!(CurrentContext(proc) & STMT_FOR))
 			error = NEXTWITHOUTFOR;
-		else if(GetPointer(VarData(&arg[i])) != (void *)loopControl->counter.sp)
+		else if(GetPointer(MutableVarData(&arg[i])) != (void *)loopControl->counter.sp)
 			error = ER_BAD_NEXT_VARIABLE;
 		else
 			Next_(NULL, 0);
@@ -818,7 +818,7 @@ void IfThenLet_(BObject *arg, unsigned count)
 {
 	bool fired = arg[0].value.scalar.value.boolean;
 	if(fired)
-		CopyDereferencingBoth(VarData(&arg[1]), &arg[2].value.scalar);
+		CopyDereferencingBoth(MutableVarData(&arg[1]), &arg[2].value.scalar);
 }
 
 void Merge_(BObject *arg, unsigned count)
