@@ -386,7 +386,7 @@ void PrintSymTab(void)
 }
 
 /* Traverses every definition in every environment, so use with care. */
-void VisitAllDefinitions(short minimumCallNestLevel, HtVisitor visitor)
+void VisitAllDefinitions(short minimumCallNestLevel, HtVisitor visitor, void *param)
 {
 	struct Process *proc = Proc();
 	short i;
@@ -394,7 +394,7 @@ void VisitAllDefinitions(short minimumCallNestLevel, HtVisitor visitor)
 	for (i = proc->maxNestLevel; i >= minimumCallNestLevel; i--) {
 		struct HashTable *relevantTable = ProbeEnvironment(proc, i);
 		if (relevantTable != NULL)
-			HtVisit(relevantTable, visitor, NULL);
+			HtVisit(relevantTable, visitor, param);
 	}
 }
 

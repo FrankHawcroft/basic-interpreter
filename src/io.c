@@ -972,7 +972,7 @@ void Put_(BObject *arg, unsigned count)
 
 MkXImpl(Mkb_, boolean, bool)
 MkXImpl(Mki_, number.s, short)
-MkXImpl(Mkl_, number.l, long)
+MkXImpl(Mkl_, number.l, int32_t)
 MkXImpl(Mks_, number.f, float)
 MkXImpl(Mkd_, number.d, double)
 
@@ -991,7 +991,7 @@ MkXImpl(Mkd_, number.d, double)
 
 CvXImpl(Cvb_, SetFromLong, bool, T_BOOL)
 CvXImpl(Cvi_, SetFromLong, short, T_INT)
-CvXImpl(Cvl_, SetFromLong, long, T_LONG)
+CvXImpl(Cvl_, SetFromLong, int32_t, T_LONG)
 CvXImpl(Cvs_, SetFromDouble, float, T_SINGLE)
 CvXImpl(Cvd_, SetFromDouble, double, T_DOUBLE)
 

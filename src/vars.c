@@ -616,12 +616,12 @@ void DefStr_(const QString *toks, unsigned nToks) { DefTypeImpl(T_STRING, toks, 
 		if(!Opts()->unsafe) \
 			SetError(result, ER_UNSAFE); \
 		else \
-			SetFromLong(result, *(type *)arg[0].value.scalar.value.number.l, typecode); \
+		  SetFromLong(result, *(type *)(intptr_t)arg[0].value.scalar.value.number.l, typecode); \
 	}
 
 PeekImpl(Peek_, char, T_INT)
 PeekImpl(PeekW_, short, T_INT)
-PeekImpl(PeekL_, long, T_LONG)
+PeekImpl(PeekL_, int32_t, T_LONG)
 
 #define PokeImpl(name, type, member) \
 	void name(BObject *arg, unsigned count) \
@@ -629,19 +629,19 @@ PeekImpl(PeekL_, long, T_LONG)
 		if(!Opts()->unsafe) \
 			CauseError(ER_UNSAFE); \
 		else \
-			*((type *)arg[0].value.scalar.value.number.l) = (type)arg[1].value.scalar.value.number.member; \
+		  *((type *)(intptr_t)arg[0].value.scalar.value.number.l) = (type)arg[1].value.scalar.value.number.member; \
 	}
 
 PokeImpl(Poke_, char, s)
 PokeImpl(PokeW_, short, s)
-PokeImpl(PokeL_, long, l)
+PokeImpl(PokeL_, int32_t, l)
 
 void VarPtr_(Scalar *result, const BObject *arg, unsigned count)
 {
 	if(!Opts()->unsafe)
 		SetError(result, ER_UNSAFE);
 	else
-	  SetFromLong(result, (long)GetPointer(MutableVarData((BObject *)&arg[0])), T_LONG);
+		SetFromLong(result, (intptr_t)GetPointer(MutableVarData((BObject *)&arg[0])), T_LONG);
 }
 
 void ConstConvert(unsigned index, const QString *token, BObject *result)

@@ -550,7 +550,7 @@ static void OperateOnRectangularRegion(BObject *arg, void (*act)(PfWindowHandle,
 	/* Check array size is OK by attempting to subscript it: */
 	
 	{
-		long size = (y2 - y1 + 1) * (x2 - x1 + 1);
+		int32_t size = (y2 - y1 + 1) * (x2 - x1 + 1);
 		BObject subscript;
 		struct Variable indexer;
 		

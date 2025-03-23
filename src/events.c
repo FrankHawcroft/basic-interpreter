@@ -38,7 +38,7 @@ struct Event {
 		For ERROR: the error number.
 		For POINTER: kind of action, and location. 
 		For COLLISION: encoded collision information - id(s) of object(s), window, border. */
-	long lngInfo;
+	int32_t lngInfo;
 	
 	/* For ERROR: name of closest label appearing before where error occurred at the same call nest level. 
 		For INKEY: keypress information. 
@@ -61,7 +61,7 @@ struct Trap {
 	/* Relative priority of events of this type. */
 	int priority;
 		
-	/* Used to schedule events which have the same priority, on	a round-robin basis. */
+	/* Used to schedule events which have the same priority, on a round-robin basis. */
 	unsigned long sequencing;
 	
 	/* "ERROR" etc. Used to find the relevant trap by name.
@@ -581,7 +581,7 @@ void CauseError(Error code)
 		assert(Proc()->currentStatementStart != NULL);
 		
 		InitEvent(&e);
-		e.lngInfo = (long)code;
+		e.lngInfo = (int32_t)code;
 		e.position = Proc()->currentStatementStart;
 		EnqueueOnCQ(&Proc()->q[EVT_ERROR], &e, FALSE);
 	}
@@ -827,7 +827,7 @@ void Error_(BObject *arg, unsigned count)
 void Err_(Scalar *result, const BObject *arg, unsigned count)
 {
 	short trapCallNestLevel = Proc()->trap[EVT_ERROR].suspendedAt;
-	long errNum = trapCallNestLevel >= SCOPE_MAIN && trapCallNestLevel <= Proc()->callNestLevel
+	int32_t errNum = trapCallNestLevel >= SCOPE_MAIN && trapCallNestLevel <= Proc()->callNestLevel
 		? ErrorCode((Error)Proc()->activeEvent[EVT_ERROR].lngInfo) : 0;
 	SetFromLong(result, errNum, T_INT);
 }

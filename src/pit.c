@@ -310,14 +310,14 @@ static bool MakeQuotedToken(const Scalar *v, QString *t)
 		else if(v->type == T_BOOL)
 			sprintf(convBuffer, "%d", (int)GetBoolean(v));
 		else if(v->type == T_INT) {
-			long n = GetLong(v);
+			int32_t n = GetLong(v);
 			if(0 <= n && n <= 9)
-				sprintf(convBuffer, "%ld", n);
+				sprintf(convBuffer, "%d", n);
 			else
 				sprintf(convBuffer, "&h%hX", (short)n);
 		}
 		else if(v->type == T_LONG)
-			sprintf(convBuffer, "&h%lX&", GetLong(v));
+			sprintf(convBuffer, "&h%X&", GetLong(v));
 		else if(v->type == T_SINGLE || v->type == T_DOUBLE)
 			sprintf(convBuffer, "%.*g%c", v->type == T_SINGLE ? 8 : 16, GetDouble(v), SpecifierFromType(v->type));
 		else

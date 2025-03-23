@@ -49,6 +49,30 @@ and means a slightly larger executable. */
 /* The standard assert() macro - */
 #include <assert.h>
 
+/*** Sized integer types ***/
+
+#if REASONABLY_C99_COMPLIANT
+#include <stdint.h>
+#else
+#include <limits.h>
+
+#if INT_MAX > 32767 /* assume 32-bit ints */
+typedef int int32_t;
+
+#define INT32_MIN INT_MIN
+#define INT32_MAX INT_MAX
+#else /* assume 32-bit longs */
+typedef long int32_t;
+
+#define INT32_MIN LONG_MIN
+#define INT32_MAX LONG_MAX
+#endif /* INT_MAX <= 32767 */
+
+typedef short int16_t;
+
+typedef unsigned long intptr_t;
+#endif /* !REASONABLY_C99_COMPLIANT */
+
 /*** The size_t type ***/
 
 #include <stddef.h>

@@ -27,8 +27,8 @@
 /* Declared as consts rather than macros to avoid MSVC code analysis warnings - */
 static const double ShortMinAsDouble = (double)SHRT_MIN;
 static const double ShortMaxAsDouble = (double)SHRT_MAX;
-static const double LongMinAsDouble = (double)LONG_MIN;
-static const double LongMaxAsDouble = (double)LONG_MAX;
+static const double LongMinAsDouble = (double)INT32_MIN;
+static const double LongMaxAsDouble = (double)INT32_MAX;
 
 /* Size of sufficiently capacious fixed-length buffer to convert any numeric value to a string - */
 #define NUM_STR_BUF_LEN 64
@@ -128,13 +128,13 @@ void InitConstants(void)
 
 		InitScalar(&m_Empty, T_EMPTY, FALSE);
 		InitScalar(&m_ZeroInt, T_INT, FALSE);
-		SetFromLong(&m_OneInt, 1L, T_INT);
-		SetFromLong(&m_NegOneInt, -1L, T_INT);
+		SetFromLong(&m_OneInt, 1, T_INT);
+		SetFromLong(&m_NegOneInt, -1, T_INT);
 		SetFromLong(&m_MinimumInt, SHRT_MIN, T_INT);
 		SetFromLong(&m_MaximumInt, SHRT_MAX, T_INT);
 		InitScalar(&m_ZeroLongInt, T_LONG, FALSE);	
-		SetFromLong(&m_OneLongInt, 1L, T_LONG);
-		SetFromLong(&m_NegOneLongInt, -1L, T_LONG);
+		SetFromLong(&m_OneLongInt, 1, T_LONG);
+		SetFromLong(&m_NegOneLongInt, -1, T_LONG);
 		InitScalar(&m_NullString, T_STRING, FALSE);
 		InitScalar(&m_EmptyString, T_STRING, FALSE);
 		QsInitStatic(&m_EmptyString.value.string, "", 1);
@@ -256,7 +256,7 @@ void SetPointerTo(Scalar *v, void *ptr, SimpleType type)
 	if(type == T_INT)
 		v->value.pointer.sp = (short *)ptr;
 	else if(type == T_LONG)
-		v->value.pointer.lp = (long *)ptr;
+		v->value.pointer.lp = (int32_t *)ptr;
 	else if(type == T_STRING)
 		v->value.pointer.tp = (QString *)ptr;
 	else if(type == T_SINGLE)
@@ -301,8 +301,8 @@ void SetPointerToElement(Scalar *indexer, const Scalar *vector, long offset)
 	assert(ScalarIsSane(indexer));
 }
 
-/* Sets the scalar from a long, but converting to a given type. */
-void SetFromLong(Scalar *dest, long value, SimpleType type)
+/* Sets the scalar from a 32 bit or in BASIC terms 'long' int, but converting to a given type. */
+void SetFromLong(Scalar *dest, int32_t value, SimpleType type)
 {
 	dest->type = type;
 	if(type == T_INT) {
@@ -361,7 +361,7 @@ void SetFromDouble(Scalar *dest, double value, SimpleType type)
 		if(value < LongMinAsDouble || LongMaxAsDouble < value)
 			SetError(dest, OVERFLOWERR);
 		else
-			dest->value.number.l = (long)value; /* TODO should round */
+			dest->value.number.l = (int32_t)value; /* TODO should round */
 	}
 	else 
 		SetError(dest, BADARGTYPE);
@@ -462,30 +462,30 @@ void DisposeScalar(Scalar *v)
 }
 
 /* Converts any numeric type or Boolean; dereferences pointers. */
-long GetLong(const Scalar *v)
+int32_t GetLong(const Scalar *v)
 {
 	SimpleType type = NonPointer(v->type);
 	
 	assert(ScalarIsSane(v));
 
 	if(type == T_INT)
-		return (long)(IsPointer(v) ? *v->value.pointer.sp : v->value.number.s);
+		return (int32_t)(IsPointer(v) ? *v->value.pointer.sp : v->value.number.s);
 	else if(type == T_LONG)
 		return IsPointer(v) ? *v->value.pointer.lp : v->value.number.l;
 	else if(type == T_SINGLE || type == T_DOUBLE) {
 		double realValue = GetDouble(v);
 		if(realValue < LongMinAsDouble) {
 			CauseError(OVERFLOWERR);
-			return LONG_MIN;
+			return INT32_MIN;
 		}
 		else if(realValue > LongMaxAsDouble) {
 			CauseError(OVERFLOWERR);
-			return LONG_MAX;
+			return INT32_MAX;
 		}
-		return (long)realValue;
+		return (int32_t)realValue;
 	}
 	else if(type == T_BOOL)
-		return (long)(IsPointer(v) ? *v->value.pointer.bp : v->value.boolean);
+		return (int32_t)(IsPointer(v) ? *v->value.pointer.bp : v->value.boolean);
 	else
 		CauseError(BADARGTYPE);
 	
@@ -537,7 +537,7 @@ bool GetBoolean(const Scalar *v)
 	else if(type == T_STRING)
 		return !QsIsNull((const QString *)GetPointer((Scalar *)v));
 	else if(type == T_INT || type == T_LONG)
-		return GetLong(v) != 0L;
+		return GetLong(v) != 0;
 	else if(type == T_SINGLE || type == T_DOUBLE)
 		return GetDouble(v) != 0.0;
 	else if(type == T_CHAR)
@@ -576,8 +576,7 @@ static Error WriteBoolean(FILE *stream, bool value)
 		? SUCCESS : LastIOError();
 }
 
-/* Writes an integer, longint, or float, depending on the type.
-Positive values are preceded by a single space. */
+/* Positive values are preceded by a single space. */
 static Error WriteNumber(FILE *stream, const union NumericalValue *value, SimpleType type)
 {
 	char buffer[NUM_STR_BUF_LEN];
@@ -637,7 +636,7 @@ void NumberToCString(const union NumericalValue *value, SimpleType type, char *b
 	if(type == T_INT)
 		sprintf(buffer, padPositive ? "% hd" : "%hd", value->s);
 	else if(type == T_LONG)
-		sprintf(buffer, padPositive ? "% ld" : "%ld", value->l);
+		sprintf(buffer, padPositive ? "% d" : "%d", value->l);
 	else if(type == T_SINGLE)
 		sprintf(buffer, padPositive ? "% G" : "%G", value->f);
 	else if(type == T_DOUBLE)
@@ -775,7 +774,7 @@ Error ChangeType(Scalar *value, enum TypeRule rule)
 				else if(value->type == T_BOOL)
 					code = GetBoolean(value) ? '1' : '0';
 				else if(TypeIsNumeric(value->type))
-					/* If it's a f.p. value which overflows a long, GetLong will cause an overflow error. 
+					/* If it's a f.p. value which overflows, GetLong will cause an overflow error. 
 					Otherwise, truncate and rely on optional domain checking. */
 					code = (int)GetLong(value);
 				
@@ -850,7 +849,7 @@ INLINE int ChrToHexDigit(char x)
 }
 
 INLINE SimpleType SetCorrectlySizedInteger(union NumericalValue *num, 
-	long val, char typeSpec, bool isShortInteger, bool overflowsShortInteger)
+	int32_t val, char typeSpec, bool isShortInteger, bool overflowsShortInteger)
 {
 	if(TypeFromSpecifier(typeSpec) == T_LONG 
 	|| (TypeFromSpecifier(typeSpec) != T_INT 
@@ -890,7 +889,7 @@ e.g.	123			-->		short 123
 */
 static SimpleType DecQsToIntegral(const QString *s, union NumericalValue *num)
 {
-	long value = 0;
+	int32_t value = 0;
 	int result = EOF;
 	char last = QsGetLast(s);
 	
@@ -902,7 +901,7 @@ static SimpleType DecQsToIntegral(const QString *s, union NumericalValue *num)
 		/* scanf doesn't understand BASIC type specifiers - */
 		if(IsIntegralTypeSpecifier(last))
 			buffer[strlen(buffer) - 1] = '\0';
-		result = sscanf(buffer, "%ld", &value);
+		result = sscanf(buffer, "%d", &value);
 	}
 	
 	return result <= 0 || result == EOF ? T_ERROR 
@@ -933,7 +932,7 @@ static SimpleType HexQsToIntegral(const QString *s, union NumericalValue *num)
 	if(convStart > convEnd)
 		return T_ERROR;
 	else {
-		long value = 0;
+		int32_t value = 0;
 		int i;
 	
 		for(i = convStart; i <= convEnd; i++) {
@@ -965,7 +964,7 @@ static SimpleType OctQsToIntegral(const QString *s, union NumericalValue *num)
 	if(convStart > convEnd)
 		return T_ERROR;
 	else {
-		long value = 0;
+		int32_t value = 0;
 		int i;
 
 		for(i = convStart; i <= convEnd; i++) {
@@ -1038,7 +1037,7 @@ static SimpleType QsToFloating(const QString *s, union NumericalValue *num)
 	}
 	else {
 		/* TODO dodgy - should decide based on magnitude - digit count? */
-		if(type == T_SINGLE	&& fabs(value) > FLT_MAX)
+		if(type == T_SINGLE && fabs(value) > FLT_MAX)
 			type = T_DOUBLE;
 		
 		if(type == T_SINGLE)

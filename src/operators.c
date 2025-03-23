@@ -217,8 +217,8 @@ const struct Operator *ResolveOperator(const QString *token)
 	}
 }
 
-/* Assume that if the result can't be stored as an int or long, will then attempt floating point. */
-INLINE void SetIntResult(Scalar *result, long val, bool overflow, SimpleType t1, SimpleType t2)
+/* Assume that if the result can't be stored as an int, will then attempt floating point. */
+INLINE void SetIntResult(Scalar *result, int32_t val, bool overflow, SimpleType t1, SimpleType t2)
 {
 	if(!overflow)
 		SetFromLong(result, val, 
@@ -270,8 +270,8 @@ static void UnaryPlus_(Scalar *result, const Scalar *a)
 
 static void UnaryNegation_(Scalar *result, const Scalar *a)
 {
-	long la;
-	if(TypeIsExact(a->type) && (la = GetLong(a)) != LONG_MIN)
+	int32_t la;
+	if(TypeIsExact(a->type) && (la = GetLong(a)) != INT32_MIN)
 		SetIntResult(result, -la, FALSE, a->type, a->type);
 	else if(a->type == T_SINGLE) {
 		result->type = T_SINGLE;
@@ -288,8 +288,8 @@ static void Multiplication_(Scalar *result, const Scalar *a, const Scalar *b)
 	bool overflow = TRUE; /* assume f.p. unless both integral */
 	
 	if(TypeIsExact(a->type) && TypeIsExact(b->type)) {
-		long la = GetLong(a), lb = GetLong(b); 
-		long product = la * lb;
+		int32_t la = GetLong(a), lb = GetLong(b); 
+		int32_t product = la * lb;
 		overflow = Sign(la) * Sign(lb) != Sign(product);
 		SetIntResult(result, product, overflow, a->type, b->type);	
 	}
@@ -314,8 +314,8 @@ static void Addition_(Scalar *result, const Scalar *a, const Scalar *b)
 		bool overflow = TRUE; /* assume f.p. unless both integral */
 
 		if(TypeIsExact(a->type) && TypeIsExact(b->type)) {
-			long la = GetLong(a), lb = GetLong(b);
-			long sum = la + lb;
+			int32_t la = GetLong(a), lb = GetLong(b);
+			int32_t sum = la + lb;
 			overflow = (lb > 0 && sum < la) || (lb < 0 && sum > la);
 			SetIntResult(result, sum, overflow, a->type, b->type);	
 		}
@@ -335,8 +335,8 @@ static void Subtraction_(Scalar *result, const Scalar *a, const Scalar *b)
 	bool overflow = TRUE; /* assume f.p. unless both integral */
 
 	if(TypeIsExact(NonPointer(a->type)) && TypeIsExact(NonPointer(b->type))) {
-		long la = GetLong(a), lb = GetLong(b);
-		long diff = la - lb;
+		int32_t la = GetLong(a), lb = GetLong(b);
+		int32_t diff = la - lb;
 		overflow = (lb > 0 && diff > la) || (lb < 0 && diff < la);
 		SetIntResult(result, diff, overflow, a->type, b->type);	
 	}
@@ -384,7 +384,7 @@ static void LogicalNegation_(Scalar *result, const Scalar *a)
 'largest' of the two types provided. The magnitude of the value is not
 considered. If it is too large to fit in the result type, it will be 
 truncated, rather than an error being set. */
-INLINE void SetTruncated(Scalar *dest, long v, SimpleType t1, SimpleType t2)
+INLINE void SetTruncated(Scalar *dest, int32_t v, SimpleType t1, SimpleType t2)
 {
 	assert(TypeIsNumeric(t1) && TypeIsNumeric(t2) && TypeIsExact(t1) && TypeIsExact(t2));
 
@@ -448,7 +448,7 @@ static void CharSetMembership_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void Modulo_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	long modulus = GetLong(b);
+	int32_t modulus = GetLong(b);
 	if(modulus == 0 && TypeIsNumeric(NonPointer(b->type)))
 		SetError(result, ZERODIVISOR);
 	else if(a->type == T_INT && b->type == T_INT)
@@ -459,7 +459,7 @@ static void Modulo_(Scalar *result, const Scalar *a, const Scalar *b)
 
 static void WholeDivision_(Scalar *result, const Scalar *a, const Scalar *b)
 {
-	long divisor = GetLong(b);
+	int32_t divisor = GetLong(b);
 	if(divisor == 0 && TypeIsNumeric(NonPointer(b->type)))
 		SetError(result, ZERODIVISOR);
 	else if(a->type == T_INT && b->type == T_INT)
