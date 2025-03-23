@@ -409,21 +409,21 @@ void ReturnTo_(BObject *arg, unsigned count)
 
 void OnGoTo_(BObject *arg, unsigned count)
 {
-	long value = GetLong(&arg[0].value.scalar);
-	if(value > 0 && value < (long)count)
+	int32_t value = GetLong(&arg[0].value.scalar);
+	if(value > 0 && value < (int32_t)count)
 		GoTo_(arg + value, 1);
 }
 
 void OnGoSub_(BObject *arg, unsigned count)
 {
-	long value = GetLong(&arg[0].value.scalar);
-	if(value > 0 && value < (long)count)
+	int32_t value = GetLong(&arg[0].value.scalar);
+	if(value > 0 && value < (int32_t)count)
 		GoSub_(arg + value, 1);
 }
 
 void Clear_(BObject *arg, unsigned count)
 {
-	long controlSize = arg[0].value.scalar.value.number.l, heapSize = arg[1].value.scalar.value.number.l;
+	int32_t controlSize = arg[0].value.scalar.value.number.l, heapSize = arg[1].value.scalar.value.number.l;
 	unsigned short height = controlSize > USHRT_MAX * sizeof(struct StackNode)
 		? USHRT_MAX : (unsigned short)((controlSize + sizeof(struct StackNode) - 1) / sizeof(struct StackNode));
 			/* Size is provided to CLEAR in bytes. */
@@ -490,8 +490,8 @@ void System_(BObject *arg, unsigned count)
 #define ForLoopIsFinishedFP(newTotal, end, step) (((step) > 0 && (newTotal) > (end)) || ((step) < 0 && (newTotal) < (end)))
 
 #define ForLoopIsFinishedLong(newTotal, oldTotal, end, step) \
-	(((step) > 0 && ((newTotal) > (end) || LONG_MAX - (step) < (oldTotal))) \
-  || ((step) < 0 && ((newTotal) < (end) || LONG_MIN - (step) > (oldTotal))))
+	(((step) > 0 && ((newTotal) > (end) || INT32_MAX - (step) < (oldTotal))) \
+  || ((step) < 0 && ((newTotal) < (end) || INT32_MIN - (step) > (oldTotal))))
   
 static enum ControlFlow ForLoopState(double start, double end, double step, enum ControlFlow pushIfEntered)
 {
@@ -521,7 +521,7 @@ void For_(BObject *arg, unsigned count)
 			node.kind = ForLoopState(startValue->s, endValue->s, stepSize->s, FOR_INT);
 			break;
 		case T_LONG:
-			*(long *)counter = startValue->l;
+			*(int32_t *)counter = startValue->l;
 			node.kind = ForLoopState(startValue->l, endValue->l, stepSize->l, FOR_LONG);
 			break;
 		case T_SINGLE:
@@ -1285,7 +1285,7 @@ void XObj_(const QString *tok, unsigned nTok)
 		fprintf(stderr, "Not found.\n");
 }
 
-extern void VisitAllDefinitions(short, HtVisitor);
+extern void VisitAllDefinitions(short, HtVisitor, void *);
 
 static bool PrintObjectSignature(unsigned binIndex, const QString *key, const void *val, void *unusedExtraParam)
 {
@@ -1352,7 +1352,7 @@ static bool PrintObjectSignature(unsigned binIndex, const QString *key, const vo
 
 void XDoc_(BObject *arg, unsigned count)
 {
-	VisitAllDefinitions(SCOPE_BUILTIN, &PrintObjectSignature);
+  VisitAllDefinitions(SCOPE_BUILTIN, &PrintObjectSignature, NULL);
 }
 
 #endif /* DEBUG */

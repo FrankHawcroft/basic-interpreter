@@ -499,7 +499,7 @@ static void DefineBuiltInStatement(const struct BuiltInStatement *command)
 		
 		/* 2. Specialised defaults - */
 		SetFromLong(&m_DefDim1, 10, T_INT);
-		SetFromLong(&m_DefError1, (long)ER_UNDEFINED, T_INT);
+		SetFromLong(&m_DefError1, ER_UNDEFINED, T_INT);
 		InitScalarAsString(&m_DefInputAndLineInput1);
 		QsInitStaticNTS(&m_DefInputAndLineInput1.value.string, "?");
 		InitScalarAsString(&m_DefScreen2);

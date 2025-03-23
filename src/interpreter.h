@@ -19,7 +19,7 @@
 /* Maximum tokens allowed per line, not including line number, label or statement name. */
 #define MAX_TOKENS 255
 
-/* Support large arrays by using 'long' as the subscript type. Otherwise, 'short' is used. */
+/* Support large arrays by using 'int32_t' as the subscript type. Otherwise, 'short' is used. */
 #define BIG_ARRAYS TRUE
 
 /* Maximum dimensionality of an array. */
@@ -36,8 +36,8 @@ typedef enum SimpleType_enum {
 	T_EMPTY = 0, /* An uninitialised value. */
 	T_MISSING = 1, /* An unsupplied parameter. */
 	T_ERROR = 2, /* An error code. */
-	T_INT = 4, /* % Short signed integer. */
-	T_LONG = 8, /* & Long signed integer. */
+	T_INT = 4, /* % Short (16 bit) signed integer. */
+	T_LONG = 8, /* & Long (32 bit) signed integer. */
 	T_SINGLE = 16, /* ! Single-precision floating point. */
 	T_DOUBLE = 32, /* # Double-precision floating point. */
 	T_STRING = 64, /* $ String of characters. */
@@ -114,10 +114,10 @@ enum TypeRule {
 /*** NumericalValue ***/
 
 union NumericalValue {
-	short	s;	/* % */
-	long	l;	/* & */
+	int16_t	s;	/* % */
+	int32_t	l;	/* & */
 	float	f;	/* ! */
-	double	d;  /* # */
+	double	d;	/* # */
 };
 
 /*** Pointer ***/
@@ -126,7 +126,7 @@ union NumericalValue {
 
 union Pointer {
 	short	*sp;
-	long	*lp;
+	int32_t	*lp;
 	float	*fp;
 	double	*dp;
 	QString	*tp;
@@ -159,7 +159,7 @@ typedef struct Scalar_struct {
 /*** ArraySubscript ***/
 
 #if BIG_ARRAYS
-typedef long ArraySubscript;
+typedef int32_t ArraySubscript;
 #else
 typedef short ArraySubscript;
 #endif
@@ -476,7 +476,7 @@ extern void SetDereferencingBoth(Scalar *d, const Scalar *s);
 extern void SetAsPointer(Scalar *d, const Scalar *s);
 extern void SetPointerTo(Scalar *v, void *p, SimpleType t);
 extern void SetPointerToElement(Scalar *indexer, const Scalar *vector, long offset);
-extern void SetFromLong(Scalar *v, long val, SimpleType t);
+extern void SetFromLong(Scalar *v, int32_t val, SimpleType t);
 extern void SetFromShort(Scalar *v, short val, SimpleType t);
 extern void SetFromDouble(Scalar *v, double val, SimpleType t);
 extern void SetCharacter(Scalar *v, char c);
@@ -501,7 +501,7 @@ extern Error ParseToken(const QString *, Scalar *);
 /* Accessors: */
 
 #define ScalarIsError(s) ((s)->type == T_ERROR)
-extern long GetLong(const Scalar *);
+extern int32_t GetLong(const Scalar *);
 extern double GetDouble(const Scalar *);
 extern char GetCharacter(const Scalar *);
 extern bool GetBoolean(const Scalar *);

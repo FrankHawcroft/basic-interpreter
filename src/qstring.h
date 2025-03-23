@@ -83,24 +83,11 @@ with a C99-compliant compiler or MSVC; otherwise 'long' is used. */
 #define QSTRING_LONG_STRINGS 0
 
 #if QSTRING_LONG_STRINGS
-
-#if REASONABLY_C99_COMPLIANT
-
-#include <stdint.h>
 typedef int32_t QsInternalLength;
 #define QS_MAX_LENGTH INT32_MAX
-
 #else
-
-typedef long QsInternalLength;
-#define QS_MAX_LENGTH LONG_MAX
-#endif /* !REASONABLY_C99_COMPLIANT */
-
-#else
-
 typedef short QsInternalLength;
 #define QS_MAX_LENGTH SHRT_MAX
-
 #endif /* !QSTRING_LONG_STRINGS */
 
 /*** Data structure and functions ***/

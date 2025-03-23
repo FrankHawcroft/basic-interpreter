@@ -383,6 +383,41 @@ static void CompleteProfileEntry(
 		RecordExecution(proc->profile, proc->buffer, piece->defStart, PfGetElapsedTimeSince(startTime));
 }
 
+struct FunctionFindParameters
+{
+  const struct Function *sought;
+  QString name;
+};
+
+#if HT_VISIT_INCLUDES_BIN_PARAM
+static bool GetFunctionName(unsigned binIndex, const QString *key, const void *val, void *param)
+#else
+static bool GetFunctionName(const QString *key, const void *val, void *param)
+#endif
+{
+  const BObject *defn = val;
+  struct FunctionFindParameters *ffp = param;
+  if(defn->category == FUNCTION && defn->value.function == ffp->sought) {
+    QsCopy(&ffp->name, key);
+    fprintf(stderr, "Found %.*s\n", (int)QsGetLength(key), QsGetData(key));
+    return FALSE;
+  }
+  return TRUE;
+}
+
+extern void VisitAllDefinitions(short, HtVisitor, void *);
+
+static void SetAdditionalFunctionErrorInfo(const struct Function *f, short argIdx)
+{
+  struct FunctionFindParameters ffp;
+  ffp.sought = f;
+  QsInitNull(&ffp.name);
+  VisitAllDefinitions(SCOPE_BUILTIN, &GetFunctionName, &ffp);
+  if(!QsIsNull(&ffp.name))
+    SetAdditionalErrorMessage("Function: %.*s", QsGetData(&ffp.name), QsGetLength(&ffp.name));
+  QsDispose(&ffp.name);
+}
+
 static Error CreateArguments(struct Process *proc, bool tailCall, const struct Function *f, BObject *arg)
 {
 	Error result = SUCCESS;
@@ -415,7 +450,7 @@ static Error CreateArguments(struct Process *proc, bool tailCall, const struct F
 					InitScalar(&v->value, TypeUsuallyProducedBy(p->type), FALSE);					
 				}
 				else
-					result = NOMEMORY;
+				  result = NOMEMORY;
 			}
 
 			if(result == SUCCESS) {
@@ -431,6 +466,9 @@ static Error CreateArguments(struct Process *proc, bool tailCall, const struct F
 			result = !firstTime || CanDefineVariable(&p->name, proc->callNestLevel)
 				? CreateArgumentVariable(p, &arg[argIdx]) : REDEFINE;
 	}
+
+	if(result != SUCCESS)
+	  SetAdditionalFunctionErrorInfo(f, argIdx - 1);
 	
 	return result;
 }
@@ -493,6 +531,7 @@ static void CallProgramaticallyDefinedFunction(
 			if(conversionError != SUCCESS) {
 				DisposeIfScalar(result);
 				SetObjectToError(result, conversionError);
+				SetAdditionalFunctionErrorInfo(function, -1);
 			}
 			else {
 				fired = GetBoolean(&result->value.scalar);
@@ -503,8 +542,10 @@ static void CallProgramaticallyDefinedFunction(
 
 	/*fprintf(stderr, "Evaled conds\n");*/
 	
-	if(piece == NULL && !IndicatesError(result))
+	if(piece == NULL && !IndicatesError(result)) {
 		SetObjectToError(result, OUTSIDEDOMAIN);
+		SetAdditionalFunctionErrorInfo(function, -1);
+	}
 	
 	if(piece != NULL && !IndicatesError(result)) {
 		/* Evaluate the piece: */
@@ -1177,7 +1218,7 @@ static unsigned CLArgCount(void)
 
 void ArgC_(Scalar *result, const BObject *arg, unsigned count)
 {
-	SetFromLong(result, (long)CLArgCount(), T_INT);
+	SetFromLong(result, (int32_t)CLArgCount(), T_INT);
 }
 
 /* Note that n is 1-based(for parameters!) 0 gets the program name. */
@@ -1206,20 +1247,20 @@ void ArgV_(Scalar *result, const BObject *arg, unsigned count)
 	copied, but merely a pointer to the cached structure. */ 
 void Fre_(Scalar *result, const BObject *arg, unsigned count)
 {
-	long amount;
+	int32_t amount;
 	short infoWanted = arg[0].value.scalar.value.number.s;
 	
 	if(infoWanted == -1) {
 		size_t avail = PfAvailMem();
-		amount = avail > LONG_MAX ? LONG_MAX : (long)avail;
+		amount = avail > INT32_MAX ? INT32_MAX : (int32_t)avail;
 	}
 	else if(infoWanted == -2)
-		amount = StackSpaceNeverUsed();
+		amount = (int32_t)StackSpaceNeverUsed();
 	else if(infoWanted == -3)
-		amount = GetFreeFileBufferSpace(Proc()->buffer);
+		amount = (int32_t)GetFreeFileBufferSpace(Proc()->buffer);
 	else {
 		size_t avail = HeapMemAvail();
-		amount = avail > LONG_MAX ? LONG_MAX : (long)avail;
+		amount = avail > INT32_MAX ? INT32_MAX : (int32_t)avail;
 	}
 
 	SetFromLong(result, amount, T_LONG);
@@ -1270,7 +1311,7 @@ void SAdd_(Scalar *result, const BObject *arg, unsigned count)
 	if(!Opts()->unsafe)
 		SetError(result, ER_UNSAFE);
 	else
-		SetFromLong(result, (long)QsGetData(&arg[0].value.scalar.value.string), T_LONG);
+		SetFromLong(result, (intptr_t)QsGetData(&arg[0].value.scalar.value.string), T_LONG);
 }
 
 void Str_(Scalar *result, const BObject *arg, unsigned count)
@@ -1431,7 +1472,7 @@ void Sqr_(Scalar *result, const BObject *arg, unsigned count)
 
 void Randomize_(BObject *arg, unsigned count)
 {
-	long seed = arg[0].value.scalar.value.number.l;
+	int32_t seed = arg[0].value.scalar.value.number.l;
 	
 	if(seed == 0) {
 		QString line;
@@ -1452,7 +1493,7 @@ void Randomize_(BObject *arg, unsigned count)
 				return;
 			}
 		}
-		while((result = sscanf(QsGetData(&line), "%ld", &seed)) != 1);
+		while((result = sscanf(QsGetData(&line), "%d", &seed)) != 1);
 		
 		QsDispose(&line);
 	}
@@ -1468,7 +1509,7 @@ void Rnd_(Scalar *result, const BObject *arg, unsigned count)
 
 void Random_(Scalar *result, const BObject *arg, unsigned count)
 {
-	long n = arg[0].value.scalar.value.number.l;
+	int32_t n = arg[0].value.scalar.value.number.l;
 	if(n > 0)
 		SetFromLong(result, rand() % n + 1, T_LONG);
 	else
