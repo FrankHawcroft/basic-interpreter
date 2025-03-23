@@ -1,6 +1,7 @@
 #!/bin/sh
 
-[ -f log_sh.txt ] && rm log_sh.txt
+[ -f log_sh_prev.txt ] && rm log_sh_prev.txt
+[ -f log_sh.txt ] && mv log_sh.txt log_sh_prev.txt
 #[ -f all_prof.txt ] && rm all_prof.txt # uncomment to test interpreter's own profiling feature
 
 echo ">>>>>> Platform is MinGW or similar Unix-like shell" > log_sh.txt
@@ -28,11 +29,14 @@ done
 
 #gprof ../src/nb.exe *.out > gprof_profile.txt # uncomment if using gprof
 
-egrep ': FAIL|nb: error|Assertion failed|\[Heap\] error|\[Stack\] error' log_sh.txt > /dev/null
+[ -f log_sh_prev.txt ] && diff -y --suppress-common-lines log_sh_prev.txt log_sh.txt
+egrep ': FAIL|nb: error|Assertion.+failed|\[Heap\] error|\[Stack\] error|core dumped' log_sh.txt > /dev/null
 if [ "$?" -eq "0" ]; then
-	echo "Test batch failed!"
-	exit 1
+    echo "Test batch failed!"
+    exit 1
 else
-	echo "Test batch passed!"
-	exit 0
+    echo "Test batch passed!"
+    [ -f log_sh_last_good.txt ] && rm log_sh_last_good.txt
+    cp log_sh.txt log_sh_last_good.txt
+    exit 0
 fi
