@@ -10,7 +10,7 @@
 
 DEFINT a-z
 
-on error goto WindowsPlatform
+on error goto WindowsOrUnixPlatform
 open "i", 1, "env:Kickstart"
 close 1
 
@@ -21,11 +21,24 @@ TempDir$ = "t:"
 CurDir$ = ""
 goto FinishedPlatformCheck
 
-WindowsPlatform:
+WindowsOrUnixPlatform:
+error on
+on error goto UnixPlatform
+open "i", 1, "c:\windows\win.ini"
+close 1
+
 print "Platform is Windows"
-ParentDir$ = "../"
-TempDir$ = "C:\Windows\Temp\" '' "/tmp/"
+ParentDir$ = "..\"
+TempDir$ = "C:\Windows\Temp\"
 CurDir$ = "."
+goto FinishedPlatformCheck
+
+UnixPlatform:
+print "Platform is Unix-like"
+ParentDir$ = "../"
+TempDir$ = "/var/tmp/"
+CurDir$ = "."
+
 resume FinishedPlatformCheck
 
 FinishedPlatformCheck:

@@ -64,17 +64,26 @@ PriorSpace? = false
 ''
 
 sub DetectPlatform(Platform$)
-	on error goto WindowsPlatform
+	on error goto WindowsOrUnixPlatform
 	open "i", 1, "env:Kickstart"
 	close 1
 
 	Platform = "Amiga"
 	goto FinishedPlatformCheck
 	
-	WindowsPlatform:
+	WindowsOrUnixPlatform:
+	error on
+	on error goto UnixPlatform
+	open "i", 1, "c:\windows\win.ini"
+	close 1
+
 	Platform = "Windows"
+	goto FinishedPlatformCheck
+
+	UnixPlatform:
+	Platform = "Unix"
 	resume FinishedPlatformCheck
-	
+
 	FinishedPlatformCheck:
 	forget error
 endsub
@@ -278,7 +287,7 @@ elseif Format = "VBCC"
 	DefaultActionOptions$ = "-c -o $*.o $*.c -DAMIGA -DVBCC -c99 -lmieee -lamiga -lauto"
 	LinkOptions$ = "-DAMIGA -DVBCC -c99 -lmieee -lamiga -lauto"
 	Clean$ = "delete #?.o"
-elseif Format = "AMIGA-GCC" '' cross-compiling on Windows
+elseif Format = "AMIGA-GCC" '' cross-compiling from Linux, Windows etc.
 	MakeSupportsVariables? = true
 	OFE$ = "o"
 	AFE$ = "s"
@@ -305,8 +314,12 @@ if Platform = "Amiga"
 	CurDir$ = ""
 elseif Platform = "Windows"
 	'ParentDir$ = "../"
-	TD$ = "C:\Windows\Temp\" '' "/tmp/"
+	TD$ = "C:\Windows\Temp\"
 	CurDir$ = "."
+elseif Platform = "Unix"
+	'ParentDir$ = "../"
+	TD$ = "/var/tmp/"
+	CurDir$ = "."	
 else
 	print "Error: unable to determine host platform"
 	system 1
