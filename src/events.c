@@ -500,6 +500,7 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 
 		for(t = &Proc()->trap[FIRST_EVENT_TYPE]; t <= &Proc()->trap[LAST_EVENT_TYPE]; t++)
 			if(t->status == ENABLED && userHandler->priority >= t->priority) {
+				/*fprintf(stderr, "Suspended trap "); QsWrite(&t->name, stderr); fputc('\n', stderr);*/
 				t->status = SUSPENDED;
 				t->suspendedAt = Proc()->callNestLevel;
 			}
@@ -511,7 +512,7 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 		userHandler->nextStatement = Proc()->currentPosition;
 		
 		if(userHandler->subprogramHandler)
-			CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE);
+		  CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE, TRUE);
 		else
 			Proc()->currentPosition = userHandler->handler.simpleLocation.label;
 	}
@@ -884,6 +885,8 @@ void Resume_(const QString *toks, unsigned nToks)
 	struct Trap *activeTrap;
 	short originalNestLevel = Proc()->callNestLevel, trapNestLevel;
 	bool resumeAtNextStatement = QsEqNoCase(labelName, &g_NextKeyword);
+
+	/*fprintf(stderr, "In resume\n");*/
 	
 	/* Check argument syntax: */
 
@@ -900,6 +903,8 @@ void Resume_(const QString *toks, unsigned nToks)
 		CauseError(RESUMEOUTSIDEHANDLER);
 		return;
 	}
+
+	/*fprintf(stderr, "Passed check for active trap\n");*/
 
 	trapNestLevel = activeTrap->suspendedAt;
 	
@@ -945,8 +950,10 @@ void Resume_(const QString *toks, unsigned nToks)
 	
 	/* Slip out of any GOSUBs or block control structures remaining on the stack: */
 
-	if(!resumeAtNextStatement)
-		DiscardCurrentControlFlow();
+	if(!resumeAtNextStatement) {
+		bool wasStatic, wasEvent;
+		DiscardToActivationRecord(&wasStatic, &wasEvent);
+	}
 
 	ReenableEventTraps(Proc(), Proc()->callNestLevel);
 

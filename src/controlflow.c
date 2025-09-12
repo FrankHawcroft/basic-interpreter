@@ -38,6 +38,7 @@
 #define TAKEN_BRANCH 1024
 #define UNTAKEN_BRANCH 2048
 #define BLOCK_PLACEHOLDER 4096
+#define EVENT_HANDLING 8192
 
 enum ControlFlow {
 	NO_CONTROL = 0,
@@ -59,6 +60,7 @@ enum ControlFlow {
 	WHILE_BLOCK = STMT_WHILE | TAKEN_BRANCH,
 	WHILE_UNTAKEN = STMT_WHILE | UNTAKEN_BRANCH,
 	CALL_POSITION = STMT_CALL | TAKEN_BRANCH,
+	EVENT_HANDLER_CALL_POSITION = STMT_CALL | TAKEN_BRANCH | EVENT_HANDLING,
 	NESTED_UNTAKEN_FOR = STMT_FOR | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
 	NESTED_UNTAKEN_IF = STMT_IF | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,			
 	NESTED_UNTAKEN_WHILE = STMT_WHILE | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
@@ -187,7 +189,7 @@ INLINE const struct Statement *SubprogramContext(const struct Process *proc)
 {
 	int offset, limit = ControlFlowStackHeight(proc);
 	for(offset = 0; offset < limit; offset++)
-		if(PeekAt(proc, offset)->kind == CALL_POSITION) return PeekAt(proc, offset)->extension.subprogram;
+	  if(PeekAt(proc, offset)->kind & STMT_CALL) return PeekAt(proc, offset)->extension.subprogram;
 	return NULL;
 }
 
@@ -215,10 +217,15 @@ Error CheckForUnbalancedBlocks(bool inSubprogram)
 {
 	struct Process *proc = Proc();
 	const char *position = NULL;
-	int offset, limit = ControlFlowStackHeight(proc);
+	int offset, limit;
 	Error errorFound = SUCCESS;
 	bool aborted = FALSE;
 
+	/* In a SUB, we expect this happy and quick path - */
+	if(inSubprogram && (CurrentContext(proc) & STMT_CALL))
+	  return SUCCESS;
+	
+	limit = ControlFlowStackHeight(proc);
 	for(offset = 0; offset < limit && !aborted && errorFound == SUCCESS; offset++) {
 		const struct StackNode *sn = Peek(proc, offset);
 		enum ControlFlow kind = sn->kind;
@@ -235,7 +242,7 @@ Error CheckForUnbalancedBlocks(bool inSubprogram)
 			errorFound = REPEATWITHOUTUNTIL;
 		else if((kind & STMT_MASK) == STMT_WHILE)
 			errorFound = WHILEWITHOUTWEND;
-		else if(kind == CALL_POSITION) {
+		else if((kind & CALL_POSITION) == CALL_POSITION) {
 			if(inSubprogram)
 				aborted = TRUE;
 			else
@@ -249,34 +256,37 @@ Error CheckForUnbalancedBlocks(bool inSubprogram)
 	return errorFound;
 }
 
-void PushActivationRecord(const struct Statement *statement)
+void PushActivationRecord(const struct Statement *statement, bool event)
 {
 	struct Process *proc = Proc();
 	struct StackNode returnAddress;
 	
 	assert(IsSubprogram(statement));
 	
-	returnAddress.kind = CALL_POSITION;
+	returnAddress.kind = event ? EVENT_HANDLER_CALL_POSITION : CALL_POSITION;
 	returnAddress.retAddr = proc->currentPosition; /* Start of next stmt. */
 	returnAddress.extension.subprogram = statement;
 	PushContext(proc, &returnAddress);
 }
 
-void DiscardCurrentControlFlow(void)
+/* Clears the stack back to a subprogram call, or bottom of stack if none. */
+void DiscardToActivationRecord(bool *wasStaticContext, bool *wasEventHandler)
 {
 	struct Process *proc = Proc();
 	enum ControlFlow top;
-	while((top = CurrentContext(proc)) != CALL_POSITION && top != NO_CONTROL)
+	
+	while(!((top = CurrentContext(proc)) & STMT_CALL) && top != NO_CONTROL)
 		RemoveTop(proc);
+	*wasStaticContext = InStaticContext(proc);
+	*wasEventHandler = (top & EVENT_HANDLING) != 0;
 }
 
 void ReturnFromSubprogram(void)
 {
 	struct Process *proc = Proc();
-	if(CurrentContext(proc) == CALL_POSITION) {
-		Ret(proc);
-		RemoveTop(proc);
-	}
+	assert((CurrentContext(proc) & CALL_POSITION) == CALL_POSITION);
+	Ret(proc);
+	RemoveTop(proc);
 }
 
 static const char *RetrieveUntakenBranchDestination(struct Process *proc, const char *origin)
@@ -346,7 +356,7 @@ bool InLoopDominatedPath()
 		
 		/* Do not cache converted objects if subprogram calls seem to predominate.
 			Converted objects must be purged on each subprogram exit. */
-		if(Peek(offset)->kind == CALL_POSITION)
+		if((Peek(offset)->kind & CALL_POSITION) == CALL_POSITION)
 			return FALSE;
 		
 		/* Only consider caching converted objects if in a loop. */
@@ -390,7 +400,7 @@ void Return_(BObject *arg, unsigned count)
 	enum ControlFlow kind;
 
 	while((kind = CurrentContext(proc)) != GOSUB_POSITION
-		&& kind != NO_CONTROL && kind != CALL_POSITION)
+	      && kind != NO_CONTROL && (kind & CALL_POSITION) != CALL_POSITION)
 		RemoveTop(proc);
 	
 	if(kind == GOSUB_POSITION) {
@@ -1097,7 +1107,7 @@ static void PrintNodeInfo(int offset)
 		|| nodeKind == NESTED_UNTAKEN_REPEAT || nodeKind == NESTED_UNTAKEN_SELECT;
 	failedTest = nodeKind == FOR_UNTAKEN || nodeKind == IF_UNTAKEN || nodeKind == IF_TAKEN_SKIP_ELSE
 		|| nodeKind == WHILE_UNTAKEN || nodeKind == CASE_TAKEN_SKIP_REST;
-	madeJump = nodeKind == GOSUB_POSITION || nodeKind == CALL_POSITION;
+	madeJump = nodeKind == GOSUB_POSITION || (nodeKind & CALL_POSITION) == CALL_POSITION;
 
 	switch(nodeKind) {
 		case GOSUB_POSITION:
@@ -1140,6 +1150,9 @@ static void PrintNodeInfo(int offset)
 		case CALL_POSITION:
 			description = "SUB CALL";
 			break;
+	case CALL_POSITION | EVENT_HANDLING:
+	  description = "SUB CALL (event handler)";
+	  break;
 		default:
 			description = "? Unknown item";
 			break;
