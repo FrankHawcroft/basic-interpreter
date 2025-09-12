@@ -158,7 +158,9 @@ Error CreateNewProcess(const struct Options *options)
 	
 	p->callNestLevel 
 		= p->functionCallNesting
-		= p->staticSubCallNesting = SCOPE_MAIN;
+		= p->staticSubCallNesting
+	  = p->eventHandlerCallNesting
+	  = SCOPE_MAIN;
 		
 	p->staticFunctionParams = NULL;
 	

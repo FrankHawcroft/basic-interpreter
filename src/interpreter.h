@@ -606,7 +606,7 @@ extern bool StatementIsEmpty(const struct Statement *command);
 
 /*** Subprograms -- subs.c ***/
 
-extern void CallSubprogram(const struct Statement *, const BObject *param, unsigned count, bool firstTime);
+extern void CallSubprogram(const struct Statement *, const BObject *param, unsigned count, bool eventHandler, bool firstTime);
 extern void UnwindForErrorReport(const char **file, int *line, const char **stmt);
 
 /*** Functions -- functions.c ***/
@@ -635,11 +635,11 @@ extern void Improve(struct TokenSequence *);
 
 extern void CreateControlFlowStack(unsigned short height);
 extern void DisposeControlFlowStack(void);
-extern void PushActivationRecord(const struct Statement *);
+extern void PushActivationRecord(const struct Statement *, bool event);
 extern const char *StartOfCurrentSubprogram(void);
 extern bool InStaticContext(const struct Process *proc);
 extern struct HashTable *CurrentStaticContext(const struct Process *);
-extern void DiscardCurrentControlFlow(void);
+extern void DiscardToActivationRecord(bool *wasStatic, bool *wasEvent);
 extern void ReturnFromSubprogram(void);
 extern Error CheckForUnbalancedBlocks(bool inSubprogram);
 extern long StackSpaceNeverUsed(void);

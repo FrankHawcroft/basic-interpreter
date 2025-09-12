@@ -145,7 +145,7 @@ enum Ops {
 
 static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 {
-	unsigned ops = OP_INACTIVE;
+	unsigned ops = OP_INACTIVE | OP_POLL;
 
 	ops |= (EligibleForCaching(ts, callNestLevel) ? OP_CACHE : 0);
 	ops |= (Opts()->optimise && !IsMacro(ts->command) && (ops & OP_CACHE) ? OP_OPTIMISE : 0);
@@ -158,9 +158,6 @@ static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 	if(IsMacro(ts->command)) ops |= OP_MACRO;
 	else if(IsSubprogram(ts->command)) ops |= (OP_EVAL | OP_CONFORM | OP_SUB | OP_CLEAR);
 	else ops |= (OP_EVAL | OP_CONFORM | OP_EXEC | OP_CLEAR);
-	
-	if(ts->command->method.macro != Resume_ && ts->command->method.macro != IfThenElse_)
-		ops |= OP_POLL;
 	
 	return ops;
 }
@@ -202,15 +199,14 @@ static void SetOptimisedOps(struct TokenSequence *ts, short callNestLevel)
 static void ShowTraceInfo(const char *statement)
 {
 	const char *file, *p;
-	int line;
-
+	int line, count;
+	
 	GetLocationInfo(Proc()->buffer, statement, &line, &file);
 	if(file != NULL && *file != NUL && file != Proc()->currentFileName)
 		printf("file> %s\n", Proc()->currentFileName = file);
-	printf("%4d> ", line);
-	for(p = statement; !IsSimpleTerminator(*p) || *p == '\''; p++) /* TODO not right for labels */
-		putchar(*p);
-	putchar('\n');
+	for(p = statement, count = 0; *p != '\n' && *p != NUL; p++, count++)
+		;
+	printf("%4d> %.*s\n", line, count, statement);
 }
 
 static short EffectiveCallNestLevel(const struct Process *proc) { return InStaticContext(proc) ? SCOPE_STATIC : proc->callNestLevel; }
@@ -315,7 +311,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 			}
 			else {
 				assert((ops & OP_SUB) && IsSubprogram(ts->command));
-				CallSubprogram(ts->command, (BObject *)exprStack->base, StkHeight(exprStack), ts->ops == 0);
+				CallSubprogram(ts->command, (BObject *)exprStack->base, StkHeight(exprStack), FALSE, ts->ops == 0);
 			}
 		}
 		else

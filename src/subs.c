@@ -16,7 +16,11 @@
 #include "options.h"
 #include "hashtable.h"
 
-void CallSubprogram(const struct Statement *statement, const BObject *actual, unsigned actualCount, bool firstTime)
+void CallSubprogram(const struct Statement *statement,
+		    const BObject *actual,
+		    unsigned actualCount,
+		    bool eventHandler,
+		    bool firstTime)
 {
 	struct Process *proc = Proc();
 	Error error = SUCCESS;
@@ -27,7 +31,7 @@ void CallSubprogram(const struct Statement *statement, const BObject *actual, un
 
 	++proc->callNestLevel;
 	proc->staticSubCallNesting += statement->staticSub;
-	PushActivationRecord(statement);
+	PushActivationRecord(statement, eventHandler);
 
 	/* Create local variables and copy values or set references from actuals. */
 
@@ -45,10 +49,11 @@ void CallSubprogram(const struct Statement *statement, const BObject *actual, un
 	if(error == SUCCESS)
 		proc->currentPosition = statement->method.sub;
 	else {
+		bool wasStatic, wasEvent;
 		 /* Bail out. */
 		--proc->callNestLevel;
 		proc->staticSubCallNesting -= statement->staticSub;
-		DiscardCurrentControlFlow();
+		DiscardToActivationRecord(&wasStatic, &wasEvent);
 		CauseError(error);
 	}
 }
@@ -302,14 +307,16 @@ void ExitSub_(BObject *arg, unsigned count)
 {
 	struct Process *proc = Proc();
 	if(proc->callNestLevel > SCOPE_MAIN) {
-		bool staticSub = InStaticContext(proc);
+		bool staticSub, eventHandler;
 		
-		DiscardCurrentControlFlow();
+		DiscardToActivationRecord(&staticSub, &eventHandler);
 		if(!staticSub)
 			ClearOutOfContextItems(proc->callNestLevel, proc->callNestLevel);
 		--proc->callNestLevel;
-		ReenableEventTraps(proc, proc->callNestLevel);
+		if(eventHandler)
+			ReenableEventTraps(proc, proc->callNestLevel);
 		proc->staticSubCallNesting -= staticSub;
+		proc->eventHandlerCallNesting -= eventHandler;
 		ReturnFromSubprogram();
 	}
 	else

@@ -64,7 +64,7 @@ struct Process {
 
 	/* Control flow - */
 	struct Stack *controlFlowStack;
-	unsigned currentContext;
+	unsigned currentContext; /* Kind of record on TOS, or NO_CONTROL. */
 	
 	/* Errors - */
 	Error pendingError;
@@ -75,6 +75,7 @@ struct Process {
 	short callNestLevel;
 	short functionCallNesting; /* specifically, call nesting in DEFined functions */
 	short staticSubCallNesting; /* specifically, call nesting in STATIC SUBs */
+	short eventHandlerCallNesting; /* specifically, call nesting in event handling SUBs */
 	
 	/* Stream I/O - */
 	struct Stream *streams;
