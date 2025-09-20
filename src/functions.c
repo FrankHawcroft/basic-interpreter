@@ -385,8 +385,8 @@ static void CompleteProfileEntry(
 
 struct FunctionFindParameters
 {
-  const struct Function *sought;
-  QString name;
+	const struct Function *sought;
+	QString name;
 };
 
 #if HT_VISIT_INCLUDES_BIN_PARAM
@@ -395,27 +395,26 @@ static bool GetFunctionName(unsigned binIndex, const QString *key, const void *v
 static bool GetFunctionName(const QString *key, const void *val, void *param)
 #endif
 {
-  const BObject *defn = val;
-  struct FunctionFindParameters *ffp = param;
-  if(defn->category == FUNCTION && defn->value.function == ffp->sought) {
-    QsCopy(&ffp->name, key);
-    fprintf(stderr, "Found %.*s\n", (int)QsGetLength(key), QsGetData(key));
-    return FALSE;
-  }
-  return TRUE;
+	const BObject *defn = val;
+	struct FunctionFindParameters *ffp = param;
+	if(defn->category == FUNCTION && defn->value.function == ffp->sought) {
+		QsCopy(&ffp->name, key);
+		return FALSE;
+	}
+	return TRUE;
 }
 
 extern void VisitAllDefinitions(short, HtVisitor, void *);
 
 static void SetAdditionalFunctionErrorInfo(const struct Function *f, short argIdx)
 {
-  struct FunctionFindParameters ffp;
-  ffp.sought = f;
-  QsInitNull(&ffp.name);
-  VisitAllDefinitions(SCOPE_BUILTIN, &GetFunctionName, &ffp);
-  if(!QsIsNull(&ffp.name))
-    SetAdditionalErrorMessage("Function: %.*s", QsGetData(&ffp.name), QsGetLength(&ffp.name));
-  QsDispose(&ffp.name);
+	struct FunctionFindParameters ffp;
+	ffp.sought = f;
+	QsInitNull(&ffp.name);
+	VisitAllDefinitions(SCOPE_BUILTIN, &GetFunctionName, &ffp);
+	if(!QsIsNull(&ffp.name))
+		SetAdditionalErrorMessage("Function: %.*s", QsGetData(&ffp.name), QsGetLength(&ffp.name));
+	QsDispose(&ffp.name);
 }
 
 static Error CreateArguments(struct Process *proc, bool tailCall, const struct Function *f, BObject *arg)
@@ -450,7 +449,7 @@ static Error CreateArguments(struct Process *proc, bool tailCall, const struct F
 					InitScalar(&v->value, TypeUsuallyProducedBy(p->type), FALSE);					
 				}
 				else
-				  result = NOMEMORY;
+					result = NOMEMORY;
 			}
 
 			if(result == SUCCESS) {
@@ -468,7 +467,7 @@ static Error CreateArguments(struct Process *proc, bool tailCall, const struct F
 	}
 
 	if(result != SUCCESS)
-	  SetAdditionalFunctionErrorInfo(f, argIdx - 1);
+		SetAdditionalFunctionErrorInfo(f, argIdx - 1);
 	
 	return result;
 }

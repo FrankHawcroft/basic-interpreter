@@ -22,31 +22,36 @@
 #include "hashtable.h"
 #endif
 
-#define STMT_GOSUB 1
-#define STMT_FOR 2
-#define STMT_IF 4
-#define STMT_ELSE 8
-#define STMT_SELECT 16
-#define STMT_CASE 32 
-#define STMT_DEFAULT 64
-#define STMT_REPEAT 128
-#define STMT_WHILE 256
-#define STMT_CALL 512
+#define STMT_GOSUB (1<<0)
+#define STMT_FOR (1<<1)
+#define STMT_IF (1<<2)
+#define STMT_ELSE (1<<3)
+#define STMT_SELECT (1<<4)
+#define STMT_CASE (1<<5)
+#define STMT_DEFAULT (1<<6)
+#define STMT_REPEAT (1<<7)
+#define STMT_WHILE (1<<8)
+#define STMT_CALL (1<<9)
 
-#define STMT_MASK 1023
+#define STMT_MASK ((1<<10)-1)
 
-#define TAKEN_BRANCH 1024
-#define UNTAKEN_BRANCH 2048
-#define BLOCK_PLACEHOLDER 4096
-#define EVENT_HANDLING 8192
+#define TAKEN_BRANCH (1<<10)
+#define UNTAKEN_BRANCH (1<<11)
+#define BLOCK_PLACEHOLDER (1<<12)
+#define EVENT_HANDLING (1<<13)
+
+#define COUNTER_TYPE_INT (1<<14)
+#define COUNTER_TYPE_LONG (1<<15)
+#define COUNTER_TYPE_SINGLE (1<<16)
+#define COUNTER_TYPE_DOUBLE (1<<17)
 
 enum ControlFlow {
 	NO_CONTROL = 0,
 	GOSUB_POSITION = STMT_GOSUB | TAKEN_BRANCH,
-	FOR_INT = STMT_FOR | TAKEN_BRANCH | 8192,
-	FOR_LONG = STMT_FOR | TAKEN_BRANCH | 16384,
-	FOR_SINGLE = STMT_FOR | TAKEN_BRANCH | 32768,
-	FOR_DOUBLE = STMT_FOR | TAKEN_BRANCH | 65536,
+	FOR_INT = STMT_FOR | TAKEN_BRANCH | COUNTER_TYPE_INT,
+	FOR_LONG = STMT_FOR | TAKEN_BRANCH | COUNTER_TYPE_LONG,
+	FOR_SINGLE = STMT_FOR | TAKEN_BRANCH | COUNTER_TYPE_SINGLE,
+	FOR_DOUBLE = STMT_FOR | TAKEN_BRANCH | COUNTER_TYPE_DOUBLE,
 	FOR_UNTAKEN = STMT_FOR | UNTAKEN_BRANCH,
 	IF_BLOCK = STMT_IF | TAKEN_BRANCH, /* or executing an ELSEIF clause */
 	ELSE_BLOCK = STMT_IF | STMT_ELSE | TAKEN_BRANCH,			
@@ -55,14 +60,14 @@ enum ControlFlow {
 	SELECT_ENTERED = STMT_SELECT,
 	CASE_BLOCK = STMT_SELECT | STMT_CASE | TAKEN_BRANCH,			
 	CASE_TAKEN_SKIP_REST = STMT_SELECT | UNTAKEN_BRANCH,
-	DEFAULT_BLOCK = STMT_SELECT | STMT_DEFAULT | TAKEN_BRANCH,			
+	DEFAULT_BLOCK = STMT_SELECT | STMT_DEFAULT | TAKEN_BRANCH,
 	REPEAT_BLOCK = STMT_REPEAT | TAKEN_BRANCH,
 	WHILE_BLOCK = STMT_WHILE | TAKEN_BRANCH,
 	WHILE_UNTAKEN = STMT_WHILE | UNTAKEN_BRANCH,
 	CALL_POSITION = STMT_CALL | TAKEN_BRANCH,
 	EVENT_HANDLER_CALL_POSITION = STMT_CALL | TAKEN_BRANCH | EVENT_HANDLING,
 	NESTED_UNTAKEN_FOR = STMT_FOR | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
-	NESTED_UNTAKEN_IF = STMT_IF | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,			
+	NESTED_UNTAKEN_IF = STMT_IF | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
 	NESTED_UNTAKEN_WHILE = STMT_WHILE | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
 	NESTED_UNTAKEN_REPEAT = STMT_REPEAT | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
 	NESTED_UNTAKEN_SELECT = STMT_SELECT | UNTAKEN_BRANCH | BLOCK_PLACEHOLDER
@@ -189,7 +194,8 @@ INLINE const struct Statement *SubprogramContext(const struct Process *proc)
 {
 	int offset, limit = ControlFlowStackHeight(proc);
 	for(offset = 0; offset < limit; offset++)
-	  if(PeekAt(proc, offset)->kind & STMT_CALL) return PeekAt(proc, offset)->extension.subprogram;
+		if(PeekAt(proc, offset)->kind & STMT_CALL)
+			return PeekAt(proc, offset)->extension.subprogram;
 	return NULL;
 }
 
@@ -223,7 +229,7 @@ Error CheckForUnbalancedBlocks(bool inSubprogram)
 
 	/* In a SUB, we expect this happy and quick path - */
 	if(inSubprogram && (CurrentContext(proc) & STMT_CALL))
-	  return SUCCESS;
+		return SUCCESS;
 	
 	limit = ControlFlowStackHeight(proc);
 	for(offset = 0; offset < limit && !aborted && errorFound == SUCCESS; offset++) {
@@ -284,7 +290,9 @@ void DiscardToActivationRecord(bool *wasStaticContext, bool *wasEventHandler)
 void ReturnFromSubprogram(void)
 {
 	struct Process *proc = Proc();
+
 	assert((CurrentContext(proc) & CALL_POSITION) == CALL_POSITION);
+
 	Ret(proc);
 	RemoveTop(proc);
 }
@@ -298,7 +306,6 @@ static void CacheUntakenBranchDestination(struct Process *proc, const char *orig
 {
 	CreateUntakenBranchCache();
 	if(origin != NULL && destination != NULL && proc->untakenBranchCache != NULL)
-		/* && RetrieveUntakenBranchDestination(origin) != destination */
 		SetInCache(proc->untakenBranchCache, origin, (void *)destination);
 }
 
@@ -400,7 +407,7 @@ void Return_(BObject *arg, unsigned count)
 	enum ControlFlow kind;
 
 	while((kind = CurrentContext(proc)) != GOSUB_POSITION
-	      && kind != NO_CONTROL && (kind & CALL_POSITION) != CALL_POSITION)
+	    && kind != NO_CONTROL && (kind & CALL_POSITION) != CALL_POSITION)
 		RemoveTop(proc);
 	
 	if(kind == GOSUB_POSITION) {
@@ -497,16 +504,16 @@ void System_(BObject *arg, unsigned count)
 }
 
 /* The f.p. version doesn't check for overflow. */
-#define ForLoopIsFinishedFP(newTotal, end, step) (((step) > 0 && (newTotal) > (end)) || ((step) < 0 && (newTotal) < (end)))
+#define ForLoopIsFinishedFP(newTotal, end, step) \
+	(((step) > 0 && (newTotal) > (end)) || ((step) < 0 && (newTotal) < (end)))
+#define ForLoopIsFinishedInt(newTotal, oldTotal, end, step) \
+	  (((step) > 0 && ((newTotal) > (end) || INT32_MAX - (step) < (oldTotal))) \
+	|| ((step) < 0 && ((newTotal) < (end) || INT32_MIN - (step) > (oldTotal))))
 
-#define ForLoopIsFinishedLong(newTotal, oldTotal, end, step) \
-	(((step) > 0 && ((newTotal) > (end) || INT32_MAX - (step) < (oldTotal))) \
-  || ((step) < 0 && ((newTotal) < (end) || INT32_MIN - (step) > (oldTotal))))
-  
-static enum ControlFlow ForLoopState(double start, double end, double step, enum ControlFlow pushIfEntered)
-{
-	return ForLoopIsFinishedFP(start, end, step) ? FOR_UNTAKEN : pushIfEntered;
-}
+#define ForLoopStartStateFP(start, end, step, pushIfEntered) \
+	(ForLoopIsFinishedFP(start, end, step) ? FOR_UNTAKEN : pushIfEntered)
+#define ForLoopStartStateInt(start, end, step, pushIfEntered) \
+	(ForLoopIsFinishedInt(start, start, end, step) ? FOR_UNTAKEN : pushIfEntered)
 
 void For_(BObject *arg, unsigned count)
 {
@@ -528,19 +535,19 @@ void For_(BObject *arg, unsigned count)
 	switch(NonPointer(VarData(&arg[0])->type)) {
 		case T_INT:
 			*(short *)counter = startValue->s;
-			node.kind = ForLoopState(startValue->s, endValue->s, stepSize->s, FOR_INT);
+			node.kind = ForLoopStartStateInt(startValue->s, endValue->s, stepSize->s, FOR_INT);
 			break;
 		case T_LONG:
 			*(int32_t *)counter = startValue->l;
-			node.kind = ForLoopState(startValue->l, endValue->l, stepSize->l, FOR_LONG);
+			node.kind = ForLoopStartStateInt(startValue->l, endValue->l, stepSize->l, FOR_LONG);
 			break;
 		case T_SINGLE:
 			*(float *)counter = startValue->f;
-			node.kind = ForLoopState(startValue->f, endValue->f, stepSize->f, FOR_SINGLE);
+			node.kind = ForLoopStartStateFP(startValue->f, endValue->f, stepSize->f, FOR_SINGLE);
 			break;
 		case T_DOUBLE:
 			*(double *)counter = startValue->d;
-			node.kind = ForLoopState(startValue->d, endValue->d, stepSize->d, FOR_DOUBLE);
+			node.kind = ForLoopStartStateFP(startValue->d, endValue->d, stepSize->d, FOR_DOUBLE);
 			break;
 		default:
 			assert(FALSE);
@@ -556,19 +563,18 @@ void Next_(BObject *arg, unsigned count)
 {
 	struct Process *proc = Proc();
 	struct ForLoopControl *loopControl = PeekForLoopControl(proc);
-	Error error = SUCCESS;
 	bool shouldFinish = FALSE;
 
 	switch(CurrentContext(proc)) {
 		case FOR_INT: {
 			long newTotal = (long)*loopControl->counter.sp + loopControl->stepSize.s;
-			shouldFinish = ForLoopIsFinishedLong(newTotal, *loopControl->counter.sp, loopControl->endValue.s, loopControl->stepSize.s);
+			shouldFinish = ForLoopIsFinishedInt(newTotal, *loopControl->counter.sp, loopControl->endValue.s, loopControl->stepSize.s);
 			*loopControl->counter.sp = (short)newTotal;
 			break;
 		}
 		case FOR_LONG: {
 			long newTotal = *loopControl->counter.lp + loopControl->stepSize.l;
-			shouldFinish = ForLoopIsFinishedLong(newTotal, *loopControl->counter.lp, loopControl->endValue.l, loopControl->stepSize.l);
+			shouldFinish = ForLoopIsFinishedInt(newTotal, *loopControl->counter.lp, loopControl->endValue.l, loopControl->stepSize.l);
 			*loopControl->counter.lp = newTotal;
 			break;
 		}
@@ -584,13 +590,11 @@ void Next_(BObject *arg, unsigned count)
 			shouldFinish = TRUE;
 			break;
 		default:
-			error = NEXTWITHOUTFOR;
-			break;
+			CauseError(NEXTWITHOUTFOR);
+			return; /* bail out */
 	}
 
-	if(error != SUCCESS)
-		CauseError(error);
-	else if(shouldFinish)
+	if(shouldFinish)
 		RemoveTop(proc);
 	else
 		Ret(proc);
@@ -610,7 +614,7 @@ void NextVar_(BObject *arg, unsigned count)
 			error = ER_BAD_NEXT_VARIABLE;
 		else
 			Next_(NULL, 0);
-	
+
 	if(error != SUCCESS)
 		CauseError(error);
 }
@@ -1150,9 +1154,9 @@ static void PrintNodeInfo(int offset)
 		case CALL_POSITION:
 			description = "SUB CALL";
 			break;
-	case CALL_POSITION | EVENT_HANDLING:
-	  description = "SUB CALL (event handler)";
-	  break;
+		case CALL_POSITION | EVENT_HANDLING:
+			description = "SUB CALL (event handler)";
+			break;
 		default:
 			description = "? Unknown item";
 			break;
@@ -1365,7 +1369,7 @@ static bool PrintObjectSignature(unsigned binIndex, const QString *key, const vo
 
 void XDoc_(BObject *arg, unsigned count)
 {
-  VisitAllDefinitions(SCOPE_BUILTIN, &PrintObjectSignature, NULL);
+	VisitAllDefinitions(SCOPE_BUILTIN, &PrintObjectSignature, NULL);
 }
 
 #endif /* DEBUG */
