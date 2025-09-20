@@ -154,7 +154,7 @@ void ResetProgram(void)
 	Proc()->callNestLevel
 		= Proc()->staticSubCallNesting
 		= Proc()->functionCallNesting
-	  = Proc()->eventHandlerCallNesting = SCOPE_MAIN;
+		= Proc()->eventHandlerCallNesting = SCOPE_MAIN;
 	ClearControlFlowStack();
 	ClearOutOfContextItems(SCOPE_GLOBAL, SCOPE_CURRENT);
 	InitEventTraps();

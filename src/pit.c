@@ -103,7 +103,7 @@ bool NoDynamicallyAllocatedMemory(const struct TokenSequence *ts)
 
 bool ShouldCheckEvents(const struct TokenSequence *ts)
 {
-  return !StatementIsEmpty(ts->command);
+	return !StatementIsEmpty(ts->command);
 }
 
 /* Covers CONST as well because it's just Let_ with extra parameter checking in its converter. */

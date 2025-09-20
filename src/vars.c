@@ -157,7 +157,7 @@ struct Variable *MutableVarPtr(BObject *obj)
 
 const struct Variable *VarPtr(const BObject *obj)
 {
-  return MutableVarPtr((BObject *)obj);
+	return MutableVarPtr((BObject *)obj);
 }
 
 Scalar *MutableVarData(BObject *obj)
@@ -616,7 +616,7 @@ void DefStr_(const QString *toks, unsigned nToks) { DefTypeImpl(T_STRING, toks, 
 		if(!Opts()->unsafe) \
 			SetError(result, ER_UNSAFE); \
 		else \
-		  SetFromLong(result, *(type *)(intptr_t)arg[0].value.scalar.value.number.l, typecode); \
+			SetFromLong(result, *(type *)(intptr_t)arg[0].value.scalar.value.number.l, typecode); \
 	}
 
 PeekImpl(Peek_, char, T_INT)
@@ -629,7 +629,7 @@ PeekImpl(PeekL_, int32_t, T_LONG)
 		if(!Opts()->unsafe) \
 			CauseError(ER_UNSAFE); \
 		else \
-		  *((type *)(intptr_t)arg[0].value.scalar.value.number.l) = (type)arg[1].value.scalar.value.number.member; \
+			*((type *)(intptr_t)arg[0].value.scalar.value.number.l) = (type)arg[1].value.scalar.value.number.member; \
 	}
 
 PokeImpl(Poke_, char, s)

@@ -512,7 +512,7 @@ static bool HandleEvent(struct Trap *mooted, struct Trap *userHandler)
 		userHandler->nextStatement = Proc()->currentPosition;
 		
 		if(userHandler->subprogramHandler)
-		  CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE, TRUE);
+			CallSubprogram(userHandler->handler.subprogram, NULL, 0, TRUE, TRUE);
 		else
 			Proc()->currentPosition = userHandler->handler.simpleLocation.label;
 	}
@@ -886,8 +886,6 @@ void Resume_(const QString *toks, unsigned nToks)
 	short originalNestLevel = Proc()->callNestLevel, trapNestLevel;
 	bool resumeAtNextStatement = QsEqNoCase(labelName, &g_NextKeyword);
 
-	/*fprintf(stderr, "In resume\n");*/
-	
 	/* Check argument syntax: */
 
 	if(nToks != 2) {
@@ -903,8 +901,6 @@ void Resume_(const QString *toks, unsigned nToks)
 		CauseError(RESUMEOUTSIDEHANDLER);
 		return;
 	}
-
-	/*fprintf(stderr, "Passed check for active trap\n");*/
 
 	trapNestLevel = activeTrap->suspendedAt;
 	
