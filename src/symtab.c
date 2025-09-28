@@ -227,9 +227,9 @@ void ConvertToObject(const QString *token, BObject *obj, short callNestLevel)
 
 INLINE unsigned NumBins(bool lowMem, short callNestLevel)
 {
-	if(callNestLevel == SCOPE_BUILTIN) return lowMem ? 103 : 809;
+	if(callNestLevel == SCOPE_BUILTIN) return lowMem ? 103 : 1193;
 	else if(callNestLevel == SCOPE_GLOBAL) return lowMem ? 53 : 577; 
-	else if(callNestLevel == SCOPE_MAIN) return lowMem ? 23 : 53;
+	else if(callNestLevel == SCOPE_MAIN) return lowMem ? 23 : 311;
 	else if(!lowMem && callNestLevel <= 5) return 17;
 	else return 7;
 }
