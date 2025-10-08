@@ -1238,7 +1238,13 @@ void PrintStackTrace(int maxDepth, bool raw)
 
 #ifdef DEBUG
 
-extern void DumpCache(const struct Cache *cache);
+static void PrintStatementCacheEntry(const void *ce)
+{
+  if(WithinFileBuffer(Proc()->buffer, (const char *)ce))
+	  fprintf(stderr, "....%hX\n", PointerDisplayValue(ce));
+	else
+	  PrintTokSeq((const struct TokenSequence *)ce);
+}
 
 void XFree_(BObject *arg, unsigned count)
 {	
@@ -1249,15 +1255,16 @@ void XFree_(BObject *arg, unsigned count)
 	PrintFileBufferInfo(Proc()->buffer);
 	fprintf(stderr, "-- Symbol table --\n");
 	PrintSymTabStatus();
-	/*PrintSymTab();*/
+	PrintSymTab();
 	fprintf(stderr, "-- QString --\n");
 	QsPrintMemInfo();
 	fprintf(stderr, "-- Statement cache --\n");
+	fprintf(stderr, "%lu quick, %lu instrumented\n", Proc()->quick, Proc()->instrumented);
 	PrintCacheInfo(Proc()->statementCache);
-	/*DumpCache(Proc()->statementCache);*/
+	DumpCacheCustom(Proc()->statementCache, &PrintStatementCacheEntry);
 	fprintf(stderr, "-- Single-line IF cache --\n");
 	PrintCacheInfo(Proc()->ifThenElseCache);
-	/*DumpCache(Proc()->statementCache);*/
+	/*DumpCache(Proc()->ifThenElseCache);*/
 	fprintf(stderr, "-- Untaken branch cache --\n");
 	PrintCacheInfo(Proc()->untakenBranchCache);
 	/*DumpCache(Proc()->untakenBranchCache);*/
@@ -1273,7 +1280,7 @@ void XCache_(BObject *arg, unsigned count)
 {
 	fprintf(stderr, "-- Statement cache --\n");
 	PrintCacheInfo(Proc()->statementCache);
-	DumpCache(Proc()->statementCache);
+	/*DumpCacheCustom(Proc()->statementCache, (void (*)(const void *))&PrintTokSeq);*/
 	fprintf(stderr, "-- Single-line IF cache --\n");
 	PrintCacheInfo(Proc()->ifThenElseCache);
 	DumpCache(Proc()->ifThenElseCache);

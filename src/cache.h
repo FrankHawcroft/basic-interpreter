@@ -20,5 +20,6 @@ extern void *RetrieveFromCache(struct Cache *, const void *key);
 DIAGNOSTIC_FN_DECL(void RunCacheTests(void));
 DIAGNOSTIC_FN_DECL(void PrintCacheInfo(const struct Cache *));
 DIAGNOSTIC_FN_DECL(void DumpCache(const struct Cache *));
+DIAGNOSTIC_FN_DECL(void DumpCacheCustom(const struct Cache *, void (*display)(const void *)));
 
 #endif /* BAS_CACHE_H_INCLUDED */

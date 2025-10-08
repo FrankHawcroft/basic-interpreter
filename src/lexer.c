@@ -811,6 +811,8 @@ void PrintTokSeq(const struct TokenSequence *tokSeq)
 {
 	int ctr;
 
+	if(tokSeq->ops != 0)
+	  fprintf(stderr, "%.4hX ", tokSeq->ops);
 	if(!QsIsNull(&tokSeq->lineNumber))		/* Line number (optional) */
 		QsWrite(&tokSeq->lineNumber, stderr);
 	else
@@ -825,14 +827,22 @@ void PrintTokSeq(const struct TokenSequence *tokSeq)
 		QsWrite(&tokSeq->statementName, stderr);
 	else
 		fprintf(stderr, "[]");
-
+	
 	for(ctr = 0; ctr < tokSeq->length; ctr++) {
-		const QString *curTok = &tokSeq->rest[ctr];
+	  const QString *curTok;
 		
 		fputc(' ', stderr);
-	
+
+		/* Display object info if already converted to binary: */
+		
+		if(tokSeq->preconverted != NULL) {
+		  DumpObject(&tokSeq->preconverted[ctr]);
+		  continue;
+		}
+		
 		/* Display the token nicely: */
 
+		curTok = &tokSeq->rest[ctr];
 		if(QsGetLength(curTok) > 0) {
 			char tokFirst = QsGetFirst(curTok);
 

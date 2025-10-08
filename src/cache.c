@@ -75,7 +75,7 @@ struct Cache *CreateCache(unsigned capacity, unsigned tableSize, void (*disposeV
 	/* As a gesture at getting a reasonable modulus for hashes, ensure that at least there'll
 	be an odd number of bins. */
 	if(tableSize == 0)
-		tableSize = 5 * capacity;
+		tableSize = 7 * capacity;
 	tableSize = tableSize + (tableSize % 2 == 0);
 	
 #if USE_SIMPLE_ARRAY
@@ -338,6 +338,27 @@ void PrintCacheInfo(const struct Cache *c)
 	}
 	else
 		fprintf(stderr, "Cache not created.\n");
+}
+
+void DumpCacheCustom(const struct Cache *cache, void (*display)(const void *))
+{
+	if(cache != NULL) {
+		fprintf(stderr, "-- Dumping cache ....%hX\n", PointerDisplayValue(cache));
+#if USE_SIMPLE_ARRAY
+		{
+			unsigned n;
+			for(n = 0; n != cache->tableSize; n++)
+				if(cache->table[n].key != NULL) {
+					fprintf(stderr, "%4u: ....%hX => ", n, 
+						PointerDisplayValue(cache->table[n].key));
+					(*display)(cache->table[n].value);
+				}
+		}
+		fprintf(stderr, "-- End of cache dump\n");
+#else
+		HtDump(cache->table);
+#endif
+	}
 }
 
 void DumpCache(const struct Cache *cache)
