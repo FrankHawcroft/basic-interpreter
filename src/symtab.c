@@ -227,8 +227,8 @@ void ConvertToObject(const QString *token, BObject *obj, short callNestLevel)
 
 INLINE unsigned NumBins(bool lowMem, short callNestLevel)
 {
-	if(callNestLevel == SCOPE_BUILTIN) return lowMem ? 103 : 1193;
-	else if(callNestLevel == SCOPE_GLOBAL) return lowMem ? 53 : 577; 
+	if(callNestLevel == SCOPE_BUILTIN) return lowMem ? 103 : 829;
+	else if(callNestLevel == SCOPE_GLOBAL) return lowMem ? 23 : 311; 
 	else if(callNestLevel == SCOPE_MAIN) return lowMem ? 23 : 311;
 	else if(!lowMem && callNestLevel <= 5) return 17;
 	else return 7;
@@ -366,7 +366,7 @@ void PrintSymTabStatus(void)
 	}
 	
 	fprintf(stderr, "Max call nesting %hd.\n", proc->maxNestLevel);
-	fprintf(stderr, "Hash table totals: %lu definitions added; %lu full (multi-table) lookups; %lu searches in total.\n",
+	fprintf(stderr, "Hash table totals: %lu definitions created; %lu full (multi-table) lookups; %lu searches in total.\n",
 		proc->definitions, proc->lookUps, proc->hashTableSearches);
 }
 
