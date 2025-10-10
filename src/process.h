@@ -117,6 +117,7 @@ struct Process {
 	/* Various statistics - */
 	short maxNestLevel;
 	unsigned long definitions, hashTableSearches, lookUps;
+	unsigned long instrumented, quick;
 #endif
 };
 

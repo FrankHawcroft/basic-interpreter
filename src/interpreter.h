@@ -627,8 +627,7 @@ extern bool EligibleForCaching(const struct TokenSequence *, short callNestLevel
 extern bool NoDynamicallyAllocatedMemory(const struct TokenSequence *);
 extern bool ShouldCheckEvents(const struct TokenSequence *ts);
 extern void StorePreconvertedObjects(struct TokenSequence *, short callNestLevelWhenExecuted);
-extern const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel);
-extern void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted);
+extern void ImproveIfAssignmentStatement(struct TokenSequence *ts, const struct Stack *exprStack, short callNestLevelWhenExecuted);
 extern void Improve(struct TokenSequence *);
 
 /*** Control flow stack -- controlflow.c ***/
@@ -757,7 +756,9 @@ extern const char KW_INPUT[];
 extern const char KW_INSTR[];
 extern const char KW_LEN[];
 extern const char KW_LETQ_LOCAL[]; /* Internal only - faster interning. */
+extern const char KW_LETQ_LOCAL_IND[]; /* Internal only - faster interning. */
 extern const char KW_LETQ_PREDEF[]; /* Internal only - faster interning. */
+extern const char KW_LETQ_PREDEF_IND[]; /* Internal only - faster interning. */
 extern const char KW_LET[];
 extern const char KW_LINE[];
 extern const char KW_MID[];

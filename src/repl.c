@@ -52,7 +52,7 @@ Error Prepare(struct TokenSequence *tokSeq)
 
 	/* Now attempt to resolve the statement. MakeSavoury has attempted to retrieve it after dealing with
 		sugar like two-word forms (END IF --> ENDIF etc.) and synonyms, but if it's a forward-declared
-		subprogram, it won't have been found. GetStatement will forward-declared all subprograms if
+		subprogram, it won't have been found. GetStatement will forward-declare all subprograms if
 		necessary. */
 
 	if(tokSeq->command == NULL && (error = GetStatement(&tokSeq->statementName, &tokSeq->command)) != SUCCESS)
@@ -143,6 +143,11 @@ enum Ops {
 	OP_OPTIMISE = 0x8000
 };
 
+static bool IsInstrumented(unsigned ops)
+{
+	return (ops & (OP_TRACE | OP_VERBOSE | OP_PROFILE | OP_CACHE | OP_OPTIMISE)) != 0;
+}
+
 static unsigned GetOps(const struct TokenSequence *ts, short callNestLevel)
 {
 	unsigned ops = OP_INACTIVE | OP_POLL;
@@ -214,13 +219,16 @@ static short EffectiveCallNestLevel(const struct Process *proc) { return InStati
 void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 {
 	unsigned ops;
-	const BObject *vdef = NULL;
 	PfHighResolutionTimeStamp startTime;
 	short initialCallNestLevel = SCOPE_NONEXISTENT;
 	
 	assert(ts != NULL);
 	assert(exprStack != NULL);
 	
+#ifdef DEBUG
+	++proc->instrumented;
+#endif
+
 	ops = ts->ops;
 	if(ops == 0) {
 		initialCallNestLevel = EffectiveCallNestLevel(proc);
@@ -241,7 +249,10 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 #endif
 	}
 	
-	/* Determine if the statement should actually be executed. */
+	/* Determine if the statement should actually be executed.
+	   Could be in currently 'dead' code - a non-taken branch, if this
+	hasn't been cached in the untaken branch cache so we can skip over.
+	Also need to keep track of block statement nesting in 'dead' code. */
 
 	if((ops & OP_INACTIVE) && (*ts->command->inactive)(proc, FALSE))
 		ops = (ops & OP_POLL) | (ops & OP_CACHE);
@@ -296,12 +307,8 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 				due to the SCOPE_STATIC convention - it isn't possible to 'see' the calling subprogram's scope, once
 				in a called sub. */
 				
-			if(ops & OP_CACHE) {
+			if(ops & OP_CACHE)
 				StorePreconvertedObjects(ts, initialCallNestLevel);
-				if(ts->preconverted == NULL)
-					/* May be an assignment (LET) statement, for which variable lookup can be made quicker. */
-					vdef = AssignmentTarget(ts, initialCallNestLevel);
-			}
 
 			/* Call the statement or subprogram. */
 
@@ -317,6 +324,9 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 		else
 			CauseError(error);
 
+		if(ops & OP_CACHE)
+		  ImproveIfAssignmentStatement(ts, exprStack, initialCallNestLevel);
+		
 		/* Delete parameters. */
 
 		if(ops & OP_CLEAR)
@@ -340,7 +350,6 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	statements like CLEAR, TRON or TROFF, or the FRE function,  statement will clear the statement cache, invalidating ts if it was retrieved from the cache. */
 	
 	if(ops & OP_CACHE) {
-		ImproveIfAssignmentStatement(ts, vdef, initialCallNestLevel);
 		/* Recalculate ops so as not to capture particular state we don't want (i.e. skipping). 
 			Also, ensure recaching doesn't happen - as noted above, this is important for more than just
 			performance. */
@@ -361,6 +370,67 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	/* Move to the next statement. */
 
 	proc->currentStatementStart = proc->currentPosition;
+}
+
+/* An optimised form of Do() that deals with cached 'ordinary' statements. */
+static void DoQuickly(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
+{
+  Error error = SUCCESS;
+
+#ifdef DEBUG
+  ++proc->quick;
+#endif
+  
+  /* Check for running through dead code - */
+  if(/*(ts->ops & OP_INACTIVE) && */ (*ts->command->inactive)(proc, FALSE)) {
+    /*if(ts->ops & OP_POLL)
+      CheckForEvents(proc);*/ /* necessary? */
+    /* Just move to the next statement - */
+    proc->currentStatementStart = proc->currentPosition;
+    return;
+  }
+
+  /* Evaluate parameters - */
+  if(ts->ops & OP_EVALQ)
+    EvalPreconverted(ts->preconverted, exprStack, ts->length - 1);
+  else if(ts->ops & OP_EVAL)
+    Eval(ts->rest, ts->command->convert, 0, exprStack);
+
+  /* Do kind and type checking and conversion, and insert defaults - */
+  if(ts->ops & OP_CONFORMQ)
+    error = ConformQuickly(ts->command->formal, (BObject *)exprStack->base, ts->command->formalCount);
+  else if(ts->ops & OP_CONFORM)
+    error = Conform(ts->command->formal, ts->command->formalCount,
+		    (BObject *)exprStack->base,
+		    (unsigned)StkHeight(exprStack));
+
+  /* Execute the command, call, or macro - */
+  if(error == SUCCESS) {
+    if(ts->ops & OP_EXEC)
+      (*ts->command->method.builtIn)((BObject *)exprStack->base, StkHeight(exprStack));				
+    else if(ts->ops & OP_SUB)
+      CallSubprogram(ts->command, (BObject *)exprStack->base, StkHeight(exprStack), FALSE, FALSE);
+    else if(ts->ops & OP_MACRO)
+      (*ts->command->method.macro)(ts->rest, ts->length);
+  }
+  else /* raise type checking etc. error */
+    CauseError(error);
+
+  /* Delete parameters - */
+  if(ts->ops & OP_CLEARQ)
+    StkClearQuick(exprStack);
+  else if(ts->ops & OP_CLEAR)
+    ClearExprStk(exprStack);
+
+  /* Check for events - */
+  /*if(ts->ops & OP_POLL)*/
+  /* currently, checked for all but empty statements - these are short-circuited
+     above by the inactive handler, so OP_POLL can be assumed always to be true
+     here */
+  CheckForEvents(proc);
+
+  /* Move to the next statement - */
+  proc->currentStatementStart = proc->currentPosition;
 }
 
 static void Immediate(void)
@@ -468,7 +538,10 @@ int Loop(void)
 
 			if(cached != NULL) {
 				proc->currentPosition = cached->next;
-				Do(proc, cached, &exprStack);
+				if(!IsInstrumented(cached->ops))
+					DoQuickly(proc, cached, &exprStack);
+				else
+					Do(proc, cached, &exprStack);
 			}
 			else {
 				const char *scanPosition = proc->currentStatementStart;

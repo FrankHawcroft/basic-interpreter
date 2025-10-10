@@ -45,8 +45,11 @@ const char KW_INPUT[] = "INPUT";
 const char KW_INSTR[] = "INSTR";
 const char KW_LEN[] = "LEN";
 const char KW_LET[] = "LET";
-const char KW_LETQ_LOCAL[] = "LETQL~"; /* For cached statements - faster interning. */
-const char KW_LETQ_PREDEF[] = "LETQP~"; /* For cached statements - faster interning. */
+/* Quicker versions of LET used when statements are cached - */
+const char KW_LETQ_LOCAL[] = "LETQL~";
+const char KW_LETQ_LOCAL_IND[] = "LETQLI~";
+const char KW_LETQ_PREDEF[] = "LETQP~";
+const char KW_LETQ_PREDEF_IND[] = "LETQPI~";
 const char KW_LINE[] = "LINE";
 const char KW_MID[] = "MID";
 const char KW_NAME[] = "NAME";

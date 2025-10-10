@@ -211,7 +211,7 @@ static struct Parameter m_ArgsForSound[5] = {
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE},
 	{LITERAL, TR_NUM_TO_INT, NULL, NO_NAME, 1, FALSE}};
 
-static struct Parameter m_ArgsForSwap[2] = {
+static struct Parameter m_ArgsForSwapAndIndirectLet[2] = {
 	{SCALAR_VAR, TR_ANY, NULL, NO_NAME, 1, FALSE},
 	{SCALAR_VAR, TR_SAME, NULL, NO_NAME, 1, FALSE}};
 
@@ -330,7 +330,9 @@ static const struct BuiltInStatement m_StmtDefinitions[] = {
 	{KW_INPUT, Input_, DefaultConvert, DefaultInactive, m_ArgsForInput, 2},
 	{"KILL", Kill_, DefaultConvert, DefaultInactive, m_ArgForKill, 1},
 	{KW_LETQ_LOCAL, Let_, LocalScalarAssignConvert, DefaultInactive, m_ArgsForConstAndLet, 2}, /* Quicker for local scalars. */
-	{KW_LETQ_PREDEF, Let_, DefaultConvert, DefaultInactive, m_ArgsForConstAndLet, 2}, /* Quicker for predefined vars. */
+	{KW_LETQ_LOCAL_IND, LetIndirect_, LocalScalarAssignConvert, DefaultInactive, m_ArgsForSwapAndIndirectLet, 2}, /* Quicker for local scalar var copy. */
+	{KW_LETQ_PREDEF, Let_, DefaultConvert, DefaultInactive, m_ArgsForConstAndLet, 2}, /* Quicker for already-existing vars. */
+	{KW_LETQ_PREDEF_IND, LetIndirect_, DefaultConvert, DefaultInactive, m_ArgsForSwapAndIndirectLet, 2}, /* Quick for copying existing vars. */
 	{KW_LINE, Line_, DefaultConvert, DefaultInactive, m_ArgForLine, 1},
 	{"LINEINPUT", LineInput_, DefaultConvert, DefaultInactive, m_ArgsForLineInput, 2},
 	{"LOAD", Load_, DefaultConvert, DefaultInactive, m_ArgForLoad, 1},
@@ -377,7 +379,7 @@ static const struct BuiltInStatement m_StmtDefinitions[] = {
 	{KW_STOP, Stop_, DefaultConvert, DefaultInactive, NULL, 0},
 	{"SUB", Sub_, EmptyConvert, DefaultInactive, NULL, TOKENISED_ARGUMENTS},
 	{KW_SUSPEND, Suspend_, EmptyConvert, DefaultInactive, NULL, TOKENISED_ARGUMENTS},
-	{"SWAP", Swap_, DefaultConvert, DefaultInactive, m_ArgsForSwap, 2},
+	{"SWAP", Swap_, DefaultConvert, DefaultInactive, m_ArgsForSwapAndIndirectLet, 2},
 	{"SYSTEM", System_, DefaultConvert, DefaultInactive, m_ArgForSystem, 1},
 	{"TROFF", TrOff_, DefaultConvert, DefaultInactive, NULL, 0},
 	{"TRON", TrOn_, DefaultConvert, DefaultInactive, NULL, 0},

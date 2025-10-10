@@ -351,6 +351,11 @@ void Let_(BObject *arg, unsigned count)
 	CopyDereferencingBoth(MutableVarData(&arg[0]), &arg[1].value.scalar);
 }
 
+void LetIndirect_(BObject *arg, unsigned count)
+{
+	CopyDereferencingBoth(MutableVarData(&arg[0]), VarData(&arg[1]));
+}
+
 void Swap_(BObject *arg, unsigned count)
 {
 	Scalar t, *x = MutableVarData(&arg[0]), *y = MutableVarData(&arg[1]);

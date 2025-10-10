@@ -112,35 +112,34 @@ static bool IsAssignmentStatement(const struct Statement *command)
 	return !IsSubprogram(command) && !IsMacro(command) && command->method.builtIn == Let_;
 }
 
-const BObject *AssignmentTarget(const struct TokenSequence *ts, short callNestLevel)
+/* Assignments where the rhs value doesn't have to be loaded, like
+   x = y
+   x = a(i, j)
+etc. Can just copy through the existing references and avoid creating and
+pushing a temporary object. */
+void ImproveIfAssignmentStatement(struct TokenSequence *ts, const struct Stack *exprStack, short callNestLevelWhenExecuted)
 {
-	const BObject *vdef = NULL;
-	if(IsAssignmentStatement(ts->command)) {
-		const QString *v = &ts->rest[QsGetFirst(&ts->rest[0]) == '(' ? 1 : 0];
-		vdef = LookUp(v, callNestLevel);
-	}
-	return vdef != NULL && IsVariable(vdef) ? vdef : NULL;
-}
+  if(IsAssignmentStatement(ts->command)) {
+    const BObject *lhs = PeekExprStk(exprStack, 1);
+    const BObject *rhs = PeekExprStk(exprStack, 0);
+    bool matchingVariableTypes = IsVariable(lhs) && IsVariable(rhs) && GetSimpleType(lhs) == GetSimpleType(rhs);
+    QString letFlavour;
 
-void ImproveIfAssignmentStatement(struct TokenSequence *ts, const BObject *vdef, short callNestLevelWhenExecuted)
-{
-	if(vdef == NULL)
-		return;
-		
-	if((callNestLevelWhenExecuted == SCOPE_MAIN || callNestLevelWhenExecuted == SCOPE_STATIC)
-	|| (vdef->category & (VARIABLE_IS_SHARED | VARIABLE_IS_ARRAY | VARIABLE_IS_REF))) {
-		/* Either variable sticks around, or, if in a dynamic sub, assume it'll always be created
-			by DIM or SHARED or as a reference parameter, before being assigned to. */
-		QString letqPredef;
-		QsInitStaticNTS(&letqPredef, KW_LETQ_PREDEF);
-		RequireSuccess(GetStatement(&letqPredef, &ts->command));
-	}
-	else {
-		/* Local scalar - not quite as quick, but can avoid full lookup, and type checks. */
-		QString letqLocal;
-		QsInitStaticNTS(&letqLocal, KW_LETQ_LOCAL);
-		RequireSuccess(GetStatement(&letqLocal, &ts->command));
-	}
+     if((callNestLevelWhenExecuted == SCOPE_MAIN || callNestLevelWhenExecuted == SCOPE_STATIC)
+	|| (lhs->category & (VARIABLE_IS_SHARED | VARIABLE_IS_ARRAY | VARIABLE_IS_REF)))
+       /* Either variable sticks around, or, if in a dynamic sub, assume it'll
+	  always be created by DIM or SHARED or as a reference parameter,
+	  before being assigned to. */
+       QsInitStaticNTS(&letFlavour,
+	 matchingVariableTypes ? KW_LETQ_PREDEF_IND : KW_LETQ_PREDEF);
+     else
+       /* Local scalar - not quite as quick, but can avoid full lookup, and
+	  type checks. */
+       QsInitStaticNTS(&letFlavour,
+	 matchingVariableTypes ? KW_LETQ_LOCAL_IND : KW_LETQ_LOCAL);
+     
+     RequireSuccess(GetStatement(&letFlavour, &ts->command));
+  }
 }
 
 static bool SuitableForInlining(const Scalar *s)

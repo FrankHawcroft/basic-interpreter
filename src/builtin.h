@@ -66,6 +66,7 @@ extern void IfThenLet_(BObject *, unsigned);
 extern void Input_(BObject *, unsigned);
 extern void Kill_(BObject *, unsigned);
 extern void Let_(BObject *, unsigned);
+extern void LetIndirect_(BObject *, unsigned);
 extern void Line_(BObject *, unsigned); /* TODO box options */
 extern void LineTo_(BObject *, unsigned); /* TODO should be LINE STEP? */
 extern void LineInput_(BObject *, unsigned);

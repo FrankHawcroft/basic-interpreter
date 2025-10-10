@@ -149,6 +149,7 @@ Error CreateNewProcess(const struct Options *options)
 		
 	p->maxNestLevel = SCOPE_MAIN;
 	p->definitions = p->hashTableSearches = p->lookUps = 0;
+	p->instrumented = p->quick = 0;
 #endif
 
 	p->statementCache = NULL;
