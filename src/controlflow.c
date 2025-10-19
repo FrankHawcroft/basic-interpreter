@@ -47,6 +47,7 @@
 
 enum ControlFlow {
 	NO_CONTROL = 0,
+	SYNTAX_CHECK = UNTAKEN_BRANCH | BLOCK_PLACEHOLDER,
 	GOSUB_POSITION = STMT_GOSUB | TAKEN_BRANCH,
 	FOR_INT = STMT_FOR | TAKEN_BRANCH | COUNTER_TYPE_INT,
 	FOR_LONG = STMT_FOR | TAKEN_BRANCH | COUNTER_TYPE_LONG,
@@ -1425,25 +1426,21 @@ void ConditionalJumpConvert(unsigned index, const QString *token, BObject *resul
 in the non-taken branch(es) of an IF...THEN...ELSE statement. They keep track of
 nested control structures. */
 
-/* SkippingWhenExecuting returns TRUE if in a non-taken branch of a control flow
-statement. This is a generic test based on the control flow stack state - 
-for specific statements, more complicated tests are provided below. */
-INLINE bool SkippingWhenExecuting(const struct Process *proc)
+/* TRUE if in a non-taken branch of a control flow statement. This is a generic
+check based on the control flow stack state - for specific statements, more 
+complicated tests are provided below. */
+INLINE bool Skipping(const struct Process *proc)
 {
 	enum ControlFlow nodeKind = CurrentContext(proc);
-	return (nodeKind & UNTAKEN_BRANCH) || nodeKind == SELECT_ENTERED;
-}
-
-INLINE bool Skipping(const struct Process *proc, bool syntaxCheck)
-{
-	return SkippingWhenExecuting(proc) || syntaxCheck;
+	return (nodeKind & UNTAKEN_BRANCH) != 0 || nodeKind == SELECT_ENTERED;
 }
 
 static bool PushPlacekeeper(struct Process *proc, enum ControlFlow kind)
 {
 	struct StackNode placeKeeper;
 	placeKeeper.kind = kind;
-	placeKeeper.retAddr = proc->currentStatementStart; /* For error reporting and untaken branch caching. */
+	placeKeeper.retAddr = proc->currentStatementStart;
+	  /* retAddr used for error reporting and untaken branch caching. */
 	PushContext(proc, &placeKeeper);
 	return TRUE;
 }
@@ -1481,53 +1478,50 @@ static bool HandleComplexInactiveBehaviour(
 		return kind != tryThisBranch && kind != errorCase;
 }
 
-bool DefaultInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck); }
+bool DefaultInactive(struct Process *p) { return Skipping(p); }
 
-bool EmptyInactive(struct Process *p, bool syntaxCheck)
-	{ return TRUE; }
+bool EmptyInactive(struct Process *p) { return TRUE; }
 
-bool DataInactive(struct Process *p, bool syntaxCheck)
-	{ return FALSE; }
+bool DataInactive(struct Process *p) { return FALSE; }
 
-bool IfInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_IF); }
+bool IfInactive(struct Process *p)
+	{ return Skipping(p) && PushPlacekeeper(p, NESTED_UNTAKEN_IF); }
 
-bool ForInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_FOR); }
+bool ForInactive(struct Process *p)
+	{ return Skipping(p) && PushPlacekeeper(p, NESTED_UNTAKEN_FOR); }
 
-bool WhileInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_WHILE); }
+bool WhileInactive(struct Process *p)
+	{ return Skipping(p) && PushPlacekeeper(p, NESTED_UNTAKEN_WHILE); }
 
-bool RepeatInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_REPEAT); }
+bool RepeatInactive(struct Process *p)
+	{ return Skipping(p) && PushPlacekeeper(p, NESTED_UNTAKEN_REPEAT); }
 
-bool SelectInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PushPlacekeeper(p, NESTED_UNTAKEN_SELECT); }
+bool SelectInactive(struct Process *p)
+	{ return Skipping(p) && PushPlacekeeper(p, NESTED_UNTAKEN_SELECT); }
 
-bool EndIfInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_IF); }
+bool EndIfInactive(struct Process *p)
+	{ return Skipping(p) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_IF); }
 
-bool WEndInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_WHILE); }
+bool WEndInactive(struct Process *p)
+	{ return Skipping(p) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_WHILE); }
 
-bool NextInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_FOR); }
+bool NextInactive(struct Process *p)
+	{ return Skipping(p) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_FOR); }
 
-bool UntilInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_REPEAT); }
+bool UntilInactive(struct Process *p)
+	{ return Skipping(p) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_REPEAT); }
 
-bool EndSelectInactive(struct Process *p, bool syntaxCheck)
-	{ return Skipping(p, syntaxCheck) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_SELECT); }
+bool EndSelectInactive(struct Process *p)
+	{ return Skipping(p) && PopMatchingPlacekeeper(p, NESTED_UNTAKEN_SELECT); }
 
-bool ElseInactive(struct Process *p, bool syntaxCheck)
+bool ElseInactive(struct Process *p)
 {
 	enum ControlFlow nodeKind = CurrentContext(p);
 	return nodeKind == NESTED_UNTAKEN_IF
 		|| HandleComplexInactiveBehaviour(p, IF_UNTAKEN, ELSE_BLOCK, IF_BLOCK, IF_TAKEN_SKIP_ELSE);
 }
 
-bool CaseInactive(struct Process *p, bool syntaxCheck)
+bool CaseInactive(struct Process *p)
 {
 	enum ControlFlow nodeKind = CurrentContext(p);
 	return nodeKind == NESTED_UNTAKEN_SELECT
@@ -1535,10 +1529,24 @@ bool CaseInactive(struct Process *p, bool syntaxCheck)
 }
 
 /* Since subs don't nest, always execute END SUB - */
-bool EndSubInactive(struct Process *p, bool syntaxCheck)
-	{ return FALSE; }
+bool EndSubInactive(struct Process *p) { return FALSE; }
 
 /* Used for statements which are restricted to use within a subprogram: EXIT SUB, LOCAL, etc.
 If not in a subprogram, the statement's ordinary method will then be called, and cause an error. */
-bool SubprogramOnlyInactive(struct Process *p, bool syntaxCheck)
-	{ return p->callNestLevel > SCOPE_MAIN && Skipping(p, syntaxCheck); }
+bool SubprogramOnlyInactive(struct Process *p)
+	{ return p->callNestLevel > SCOPE_MAIN && Skipping(p); }
+
+/* Helpers for the pre-execution syntax checking pass. */
+void BeginSyntaxCheck()
+{
+  struct StackNode placeKeeper;
+  placeKeeper.kind = SYNTAX_CHECK;
+  placeKeeper.retAddr = NULL;
+  PushContext(Proc(), &placeKeeper);
+}
+
+void EndSyntaxCheck()
+{
+  if(ControlFlowStackHeight(Proc()) > 1)
+    RemoveTop(Proc());
+}

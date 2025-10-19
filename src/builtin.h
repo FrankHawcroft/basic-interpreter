@@ -227,22 +227,22 @@ extern void LocalScalarAssignConvert(unsigned, const QString *, BObject *);
 
 /*** Control-flow stack management for non-taken branches ***/
 
-extern bool DefaultInactive(struct Process *, bool);
-extern bool EmptyInactive(struct Process *, bool);
-extern bool DataInactive(struct Process *, bool);
-extern bool IfInactive(struct Process *, bool);
-extern bool ForInactive(struct Process *, bool);
-extern bool WhileInactive(struct Process *, bool);
-extern bool RepeatInactive(struct Process *, bool);
-extern bool SelectInactive(struct Process *, bool);
-extern bool EndIfInactive(struct Process *, bool);
-extern bool WEndInactive(struct Process *, bool);
-extern bool NextInactive(struct Process *, bool);
-extern bool UntilInactive(struct Process *, bool);
-extern bool EndSelectInactive(struct Process *, bool);
-extern bool ElseInactive(struct Process *, bool);
-extern bool CaseInactive(struct Process *, bool);
-extern bool EndSubInactive(struct Process *, bool);
-extern bool SubprogramOnlyInactive(struct Process *, bool);
+extern bool DefaultInactive(struct Process *);
+extern bool EmptyInactive(struct Process *);
+extern bool DataInactive(struct Process *);
+extern bool IfInactive(struct Process *);
+extern bool ForInactive(struct Process *);
+extern bool WhileInactive(struct Process *);
+extern bool RepeatInactive(struct Process *);
+extern bool SelectInactive(struct Process *);
+extern bool EndIfInactive(struct Process *);
+extern bool WEndInactive(struct Process *);
+extern bool NextInactive(struct Process *);
+extern bool UntilInactive(struct Process *);
+extern bool EndSelectInactive(struct Process *);
+extern bool ElseInactive(struct Process *);
+extern bool CaseInactive(struct Process *);
+extern bool EndSubInactive(struct Process *);
+extern bool SubprogramOnlyInactive(struct Process *);
 
 #endif /* BAS_BUILTIN_H_INCLUDED */

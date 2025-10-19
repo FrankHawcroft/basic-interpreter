@@ -28,7 +28,7 @@ void PrintVerboseTracingPrefix(char pass)
 {
 	fprintf(stderr, "%5hu %c %c ",
 		(unsigned short)(Proc()->currentStatementStart - FileBufferBase(Proc()->buffer)),
-		DefaultInactive(Proc(), FALSE) ? '-' : '+',
+		DefaultInactive(Proc()) ? '-' : '+',
 		pass);
 }
 #endif
@@ -254,7 +254,7 @@ void Do(struct Process *proc, struct TokenSequence *ts, struct Stack *exprStack)
 	hasn't been cached in the untaken branch cache so we can skip over.
 	Also need to keep track of block statement nesting in 'dead' code. */
 
-	if((ops & OP_INACTIVE) && (*ts->command->inactive)(proc, FALSE))
+	if((ops & OP_INACTIVE) && (*ts->command->inactive)(proc))
 		ops = (ops & OP_POLL) | (ops & OP_CACHE);
 
 	if(ops & OP_CACHE)
@@ -382,7 +382,7 @@ static void DoQuickly(struct Process *proc, struct TokenSequence *ts, struct Sta
 #endif
   
   /* Check for running through dead code - */
-  if(/*(ts->ops & OP_INACTIVE) && */ (*ts->command->inactive)(proc, FALSE)) {
+  if(/*(ts->ops & OP_INACTIVE) && */ (*ts->command->inactive)(proc)) {
     /*if(ts->ops & OP_POLL)
       CheckForEvents(proc);*/ /* necessary? */
     /* Just move to the next statement - */

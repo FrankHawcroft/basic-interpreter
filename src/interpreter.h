@@ -292,7 +292,7 @@ struct Statement {
 		void (*macro)(const QString *token, unsigned nToken);
 	} method; /* The start of the subprogram's body, or the implementation of the command. */
 	Interner convert; /* Token --> BObject conversion. */
-	bool (*inactive)(struct Process *, bool);
+	bool (*inactive)(struct Process *);
 		/* Control flow management for block statements, called when in non-taken branch. */
 	struct Parameter *formal;
 	short formalCount;

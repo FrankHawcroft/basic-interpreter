@@ -173,6 +173,8 @@ reports only up to a limited maximum number of errors to stderr. */
 
 #define MAX_REPORTED_SYNTAX_ERRORS 20
 
+extern void BeginSyntaxCheck(void);
+extern void EndSyntaxCheck(void);
 extern bool CanAssumeCommonSyntax(const struct Statement *cmd);
 
 bool ProgramSyntaxCheckPassed(void)
@@ -190,6 +192,8 @@ bool ProgramSyntaxCheckPassed(void)
 		return TRUE;
 
 	CreateTokenSequence(&tokens, Opts()->lowMemory ? 6 : 40);
+
+	BeginSyntaxCheck();
 	
 	while(WithinFileBuffer(proc->buffer, position) && errorCount < MAX_REPORTED_SYNTAX_ERRORS) {
 		error = Tokenise(&position, &tokens, TRUE);
@@ -218,7 +222,7 @@ bool ProgramSyntaxCheckPassed(void)
 		/* Track nested block control statements. */
 		proc->currentStatementStart = tokens.start; /* So that tag is set in CF stack record. */
 		if(tokens.command != NULL)
-			(*tokens.command->inactive)(proc, TRUE);
+			(*tokens.command->inactive)(proc);
 		
 		ClearTokenSequence(&tokens);
 	}
@@ -235,6 +239,8 @@ bool ProgramSyntaxCheckPassed(void)
 		GetLocationInfo(proc->buffer, proc->currentStatementStart, &line, &file);
 		ReportError(error, file, line, proc->currentStatementStart, proc->additionalErrorInfo);
 	}
+
+	EndSyntaxCheck();
 	
 	/* Reset current position for start of execution. */
 	proc->currentStatementStart = proc->currentPosition = FileBufferBase(proc->buffer);
