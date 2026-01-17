@@ -20,38 +20,38 @@ dim pix$(resx, resy)
 
 FOR a = 0 TO 15
 	ac$ = CHR(a*17) 
-    cmap$(a) = ac$ + CHR(a * 10.2) + CHR(a * 5.1)
-    cmap$(a + 16) = ac$ + ac$ + ac$
+	cmap$(a) = ac$ + CHR(a * 10.2) + CHR(a * 5.1)
+	cmap$(a + 16) = ac$ + ac$ + ac$
 NEXT
 cmap$(16) = CHR(0) + CHR(64) + CHR(128)
 maxLv = 0
 MakeMount: 
 FOR iter = 6 TO 1 STEP -1
-    sk = 2 ^ iter
-    hL = sk/2
-    PRINT "Doing Iteration" ; iter
-    Dotops: 
-    PRINT "Tops & Bottoms " ;
-    FOR y = 0 TO 64 STEP sk
-    	FOR x = hL TO 64 STEP sk
+	sk = 2 ^ iter
+	hL = sk/2
+	PRINT "Doing Iteration" ; iter
+	Dotops: 
+	PRINT "Tops & Bottoms " ;
+	FOR y = 0 TO 64 STEP sk
+		FOR x = hL TO 64 STEP sk
 			ran = (RND-.5) * max * sk
 			oLd = (Lv(x-hL, y) + Lv(x + hL, y)) / 2
 			Lv(x, y) = oLd + ran
 		NEXT x
-    NEXT y
-    Dobottoms: 
-    PRINT "Sides " ;
-    FOR x = 0 TO 64 STEP sk
-    	FOR y = hL TO 64 STEP sk
+	NEXT y
+	Dobottoms: 
+	PRINT "Sides " ;
+	FOR x = 0 TO 64 STEP sk
+		FOR y = hL TO 64 STEP sk
 			ran = (RND - .5) * max * sk
 			oLd = (Lv(x, y - hL) + Lv(x, y + hL)) / 2
 			Lv(x, y) = oLd + ran
 		NEXT y
-    NEXT x
-    Docentres: 
-    PRINT "Centers "
-    FOR x = hL TO 64 STEP sk
-    	FOR y = hL TO 64 STEP sk
+	NEXT x
+	Docentres: 
+	PRINT "Centers "
+	FOR x = hL TO 64 STEP sk
+		FOR y = hL TO 64 STEP sk
 			ran = (RND - .5) * max * sk
 			oLd1 = (Lv(x + hL, y - hL) + Lv(x-hL, y + hL)) / 2
 			oLd2 = (Lv(x - hL, y - hL) + Lv(x+hL, y + hL)) / 2
@@ -59,7 +59,7 @@ FOR iter = 6 TO 1 STEP -1
 			Lv(x, y) = oLd + ran
 			IF Lv(x, y) > maxLv THEN maxLv = Lv(x, y)
 		NEXT y
-    NEXT x
+	NEXT x
 NEXT iter
 
 def incr(xa, xb) where xa <= xb as 1
@@ -94,17 +94,17 @@ ym = 2
 xshift = .5
 yp = 70
 FOR x = 0 TO 64
-    IF Lv(x, 0) < 0 THEN Lv(x, 0) = 0
+	IF Lv(x, 0) < 0 THEN Lv(x, 0) = 0
 NEXT
 FOR y = 0 TO 63
-    IF Lv(0, y) < 0 THEN Lv(0, y) = 0
-    FOR x = 0 TO 63
-    	IF Lv (x, y) < 0 THEN Lv(x, y) = 0
+	IF Lv(0, y) < 0 THEN Lv(0, y) = 0
+	FOR x = 0 TO 63
+		IF Lv (x, y) < 0 THEN Lv(x, y) = 0
 		LvS = Lv(x, y) + Lv(x, y) + Lv(x, y)
 		LvS = (LvS + Lv(x, y))/4
 		a = x : b = y
 		rx1 = xm * a + xshift * b
-		ry1 = ym * b + yp -Lv(a, b)
+		ry1 = ym * b + yp - Lv(a, b)
 		GOSUB getshade
 		shade1 = shade
 		a = x
@@ -114,12 +114,12 @@ FOR y = 0 TO 63
 		shade2 = shade
 		a = x : b = y
 		rx3 = xm * a + xshift * b
-		ry3 = ym * b + yp -Lv(a, b)
+		ry3 = ym * b + yp - Lv(a, b)
 		GOSUB getshade 
 		shade3 = shade
 		a = x
 		rx4 = xm * a + xshift * b
-		ry4 = ym * b + yp -Lv(a, b)
+		ry4 = ym * b + yp - Lv(a, b)
 		GOSUB getshade
 		shade4 = shade
 		a = x + .5 : b = y + .5
@@ -127,7 +127,7 @@ FOR y = 0 TO 63
 		ry = ym * b + yp
 		a = x : b = y
 		ry = ry - LvS
-		
+				
 		plot rx, ry, rx1, ry1, rx2, ry2, shade1
 		plot rx, ry, rx2, ry2, rx4, ry4, shade2
 		plot rx, ry, rx1, ry1, rx3, ry3, shade3
@@ -141,7 +141,6 @@ for y = 0 to resy
 	next
 	print
 next
-
 END
 
 getshade: 
@@ -153,18 +152,18 @@ getshade:
 	xrun2 = xc - c
 	yrun1 = yc - b
 	yrun2 = yc - d
-	rise1 = LvS - Lv (a, b)
-	rise2 = LvS - Lv (c, d)
+	rise1 = LvS - Lv(a, b)
+	rise2 = LvS - Lv(c, d)
 	yrise = ABS(rise1 *xrun2 - rise2 *xrun1)
 	yrun = ABS(yrun1 * xrun2 - xrun1 *yrun2)
 	IF yrun = yrise THEN : yrun = 1 : yrise = 1 : ENDIF '' changed to block IF
-	xrise = ABS (rise1 * yrun2 - rise2 * yrun1)
-	xrun = ABS (xrun1 * yrun2 - yrun1 * xrun2)
+	xrise = ABS(rise1 * yrun2 - rise2 * yrun1)
+	xrun = ABS(xrun1 * yrun2 - yrun1 * xrun2)
 	IF xrun = xrise THEN : xrun = 1 : xrise = 1 : ENDIF
 	xrise = xrise / 2
 	yrise = yrise / 2
-	xshade = 1 -ABS (xrise / (xrun + xrise))
-	yshade = 1 -ABS (yrise / (yrun + yrise))
+	xshade = 1 - ABS(xrise / (xrun + xrise))
+	yshade = 1 - ABS(yrise / (yrun + yrise))
 	shade = 14 * xshade *yshade + 1
 	IF LvS > snowLine THEN shade = shade + 16
 	IF LvS <= 0 THEN shade = 16
